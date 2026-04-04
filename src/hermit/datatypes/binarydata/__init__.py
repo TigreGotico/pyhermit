@@ -1,7 +1,13 @@
 """xsd:base64Binary and xsd:hexBinary datatype handlers."""
 import base64
 from typing import Any
-from hermit.datatypes.registry import DatatypeHandler, DatatypeRegistry, MalformedLiteralException, ValueSpaceSubset
+
+from hermit.datatypes.registry import (
+    DatatypeHandler,
+    DatatypeRegistry,
+    MalformedLiteralException,
+    ValueSpaceSubset,
+)
 
 
 class BinaryDataValueSpaceSubset(ValueSpaceSubset):
@@ -37,12 +43,12 @@ class BinaryDataDatatypeHandler(DatatypeHandler):
             try:
                 return base64.b64decode(lexical_form)
             except Exception:
-                raise MalformedLiteralException(f"Invalid base64Binary: {lexical_form!r}")
+                raise MalformedLiteralException(f"Invalid base64Binary: {lexical_form!r}") from None
         elif datatype_iri.endswith("hexBinary"):
             try:
                 return bytes.fromhex(lexical_form)
             except ValueError:
-                raise MalformedLiteralException(f"Invalid hexBinary: {lexical_form!r}")
+                raise MalformedLiteralException(f"Invalid hexBinary: {lexical_form!r}") from None
         return lexical_form
 
     def create_value_space_subset(self, datatype_iri, facet_uris, facet_values):

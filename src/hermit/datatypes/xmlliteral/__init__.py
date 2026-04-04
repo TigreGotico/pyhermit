@@ -1,5 +1,6 @@
 """xml:literal datatype handler."""
 from typing import Any
+
 from hermit.datatypes.registry import DatatypeHandler, DatatypeRegistry, ValueSpaceSubset
 
 

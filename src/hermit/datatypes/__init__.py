@@ -21,15 +21,17 @@ __all__ = [
 
 def _register_all() -> None:
     """Import all handler sub-packages so they self-register."""
-    from hermit.datatypes import owlreal
-    from hermit.datatypes import doublenum
-    from hermit.datatypes import floatnum
-    from hermit.datatypes import datetime as datetime_dt
-    from hermit.datatypes import bool as bool_dt
-    from hermit.datatypes import anyuri
-    from hermit.datatypes import xmlliteral
-    from hermit.datatypes import rdfplainliteral
-    from hermit.datatypes import binarydata
+    from hermit.datatypes import (  # noqa: F401 (side-effect: handlers register on import)
+        anyuri,
+        binarydata,
+        bool as bool_dt,
+        datetime as datetime_dt,
+        doublenum,
+        floatnum,
+        owlreal,
+        rdfplainliteral,
+        xmlliteral,
+    )
 
 
 # Auto-register on first access

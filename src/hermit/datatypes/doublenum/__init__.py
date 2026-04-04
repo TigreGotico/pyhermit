@@ -1,10 +1,21 @@
 """xsd:double datatype handler."""
 from typing import Any
-from hermit.datatypes.registry import DatatypeHandler, DatatypeRegistry, MalformedLiteralException, ValueSpaceSubset
+
+from hermit.datatypes.registry import (
+    DatatypeHandler,
+    DatatypeRegistry,
+    MalformedLiteralException,
+    ValueSpaceSubset,
+)
 
 
 class DoubleValueSpaceSubset(ValueSpaceSubset):
-    def __init__(self, values: frozenset[float] | None = None, empty: bool = False, entire: bool = False):
+    def __init__(
+        self,
+        values: frozenset[float] | None = None,
+        empty: bool = False,
+        entire: bool = False,
+    ):
         self._empty = empty or (values is not None and len(values) == 0)
         self._entire = entire and not self._empty
         self._values = values if values is not None else frozenset()
@@ -44,9 +55,11 @@ class DoubleDatatypeHandler(DatatypeHandler):
         try:
             return float(lexical_form)
         except ValueError:
-            raise MalformedLiteralException(f"Invalid double: {lexical_form!r}")
+            raise MalformedLiteralException(f"Invalid double: {lexical_form!r}") from None
 
-    def create_value_space_subset(self, datatype_iri: str, facet_uris: tuple, facet_values: tuple) -> ValueSpaceSubset:
+    def create_value_space_subset(
+        self, datatype_iri: str, facet_uris: tuple, facet_values: tuple
+    ) -> ValueSpaceSubset:
         return DoubleValueSpaceSubset(entire=True)
 
     def entire_space(self, datatype_iri: str) -> ValueSpaceSubset:

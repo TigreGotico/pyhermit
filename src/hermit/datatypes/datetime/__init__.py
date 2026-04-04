@@ -1,7 +1,13 @@
 """xsd:dateTime datatype handler."""
 from datetime import datetime
 from typing import Any
-from hermit.datatypes.registry import DatatypeHandler, DatatypeRegistry, MalformedLiteralException, ValueSpaceSubset
+
+from hermit.datatypes.registry import (
+    DatatypeHandler,
+    DatatypeRegistry,
+    MalformedLiteralException,
+    ValueSpaceSubset,
+)
 
 
 class DateTimeValueSpaceSubset(ValueSpaceSubset):
@@ -47,7 +53,7 @@ class DateTimeDatatypeHandler(DatatypeHandler):
             # ISO 8601 format
             return datetime.fromisoformat(lexical_form.replace("Z", "+00:00"))
         except (ValueError, TypeError):
-            raise MalformedLiteralException(f"Invalid dateTime: {lexical_form!r}")
+            raise MalformedLiteralException(f"Invalid dateTime: {lexical_form!r}") from None
 
     def create_value_space_subset(self, datatype_iri, facet_uris, facet_values):
         return DateTimeValueSpaceSubset(entire=True)

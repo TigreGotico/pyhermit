@@ -99,7 +99,8 @@ __all__ = [
 import re
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from typing import TypeVar, Protocol
+from typing import Any, ClassVar, Protocol, TypeVar
+from collections.abc import Collection, Mapping
 
 _T = TypeVar("_T")
 
@@ -376,11 +377,11 @@ class Individual(Term):
         return False
 
     @classmethod
-    def create(cls, uri: str) -> "Individual":
+    def create(cls, uri: str) -> Individual:
         return _interner.intern(cls(uri))
 
     @classmethod
-    def create_anonymous(cls, id: str) -> "Individual":
+    def create_anonymous(cls, id: str) -> Individual:
         return cls.create(cls._anonymous_uri(id))
 
     @staticmethod
@@ -415,7 +416,7 @@ class Variable(Term):
         return False
 
     @classmethod
-    def create(cls, name: str) -> "Variable":
+    def create(cls, name: str) -> Variable:
         return _interner.intern(cls(name))
 
 
@@ -463,9 +464,10 @@ class Constant(Term):
         return False
 
     @classmethod
-    def create(cls, lexical_form: str, datatype_iri: str) -> "Constant":
+    def create(cls, lexical_form: str, datatype_iri: str) -> Constant:
         # Deferred import to avoid circular dependency
-        from hermit.datatypes.registry import DatatypeRegistry, MalformedLiteralException
+        from hermit.datatypes.registry import DatatypeRegistry
+
         try:
             data_value = DatatypeRegistry.parse_literal(lexical_form, datatype_iri)
         except Exception:
@@ -474,7 +476,7 @@ class Constant(Term):
         return _interner.intern(cls(lexical_form, datatype_iri, data_value))
 
     @classmethod
-    def create_anonymous(cls, id: str) -> "Individual":
+    def create_anonymous(cls, id: str) -> Individual:
         return cls.create(id, "internal:anonymous-constants")
 
 
@@ -556,7 +558,7 @@ class AtomicConcept(LiteralConcept):
         return False
 
     @classmethod
-    def create(cls, uri: str) -> "AtomicConcept":
+    def create(cls, uri: str) -> AtomicConcept:
         return _interner.intern(cls(uri))
 
     @classmethod
@@ -614,7 +616,7 @@ class AtomicNegationConcept(LiteralConcept):
         return False
 
     @classmethod
-    def create(cls, negated: AtomicConcept) -> "AtomicNegationConcept":
+    def create(cls, negated: AtomicConcept) -> AtomicNegationConcept:
         return _interner.intern(cls(negated))
 
 
@@ -680,7 +682,7 @@ class AtomicRole(Role):
         return False
 
     @classmethod
-    def create(cls, iri: str) -> "AtomicRole":
+    def create(cls, iri: str) -> AtomicRole:
         return _interner.intern(cls(iri))
 
     @classmethod
@@ -740,7 +742,7 @@ class InverseRole(Role):
         return False
 
     @classmethod
-    def create(cls, inverse_of: AtomicRole) -> "InverseRole":
+    def create(cls, inverse_of: AtomicRole) -> InverseRole:
         return _interner.intern(cls(inverse_of))
 
 
@@ -889,7 +891,7 @@ class Atom:
         return False
 
     @classmethod
-    def create(cls, predicate: DLPredicate, *arguments: Term) -> "Atom":
+    def create(cls, predicate: DLPredicate, *arguments: Term) -> Atom:
         return _interner.intern(cls(predicate, arguments))
 
 
@@ -1050,7 +1052,7 @@ class DLClause:
         return False
 
     @classmethod
-    def create(cls, head_atoms: tuple[Atom, ...], body_atoms: tuple[Atom, ...]) -> "DLClause":
+    def create(cls, head_atoms: tuple[Atom, ...], body_atoms: tuple[Atom, ...]) -> DLClause:
         return _interner.intern(cls(head_atoms, body_atoms))
 
 
@@ -1109,7 +1111,7 @@ class AtomicDataRange(DataRange):
         return False
 
     @classmethod
-    def create(cls, datatype_iri: str) -> "AtomicDataRange":
+    def create(cls, datatype_iri: str) -> AtomicDataRange:
         return _interner.intern(cls(datatype_iri))
 
 
@@ -1146,7 +1148,7 @@ class AtomicNegationDataRange(DataRange):
         return False
 
     @classmethod
-    def create(cls, negated: AtomicDataRange) -> "AtomicNegationDataRange":
+    def create(cls, negated: AtomicDataRange) -> AtomicNegationDataRange:
         return _interner.intern(cls(negated))
 
 
@@ -1214,7 +1216,7 @@ class AtLeastConcept(AtLeast):
         return False
 
     @classmethod
-    def create(cls, number: int, on_role: Role, to_concept: LiteralConcept) -> "AtLeastConcept":
+    def create(cls, number: int, on_role: Role, to_concept: LiteralConcept) -> AtLeastConcept:
         return _interner.intern(cls(number, on_role, to_concept))
 
 
@@ -1243,7 +1245,7 @@ class AtLeastDataRange(AtLeast):
         return False
 
     @classmethod
-    def create(cls, number: int, on_role: Role, to_data_range: DataRange) -> "AtLeastDataRange":
+    def create(cls, number: int, on_role: Role, to_data_range: DataRange) -> AtLeastDataRange:
         return _interner.intern(cls(number, on_role, to_data_range))
 
 
@@ -1253,12 +1255,12 @@ class ExistsDescriptionGraph(ExistentialConcept):
     """Existential concept from a description graph."""
     __slots__ = ("_description_graph", "_vertex")
 
-    def __init__(self, description_graph: "DescriptionGraph", vertex: int) -> None:
+    def __init__(self, description_graph: DescriptionGraph, vertex: int) -> None:
         self._description_graph = description_graph
         self._vertex = vertex
 
     @property
-    def description_graph(self) -> "DescriptionGraph":
+    def description_graph(self) -> DescriptionGraph:
         return self._description_graph
 
     @property
@@ -1287,7 +1289,7 @@ class ExistsDescriptionGraph(ExistentialConcept):
         return False
 
     @classmethod
-    def create(cls, description_graph: "DescriptionGraph", vertex: int) -> "ExistsDescriptionGraph":
+    def create(cls, description_graph: DescriptionGraph, vertex: int) -> ExistsDescriptionGraph:
         return _interner.intern(cls(description_graph, vertex))
 
 
@@ -1331,7 +1333,7 @@ class AnnotatedEquality:
         return False
 
     @classmethod
-    def create(cls, cardinality: int, on_role: Role, to_concept: LiteralConcept) -> "AnnotatedEquality":
+    def create(cls, cardinality: int, on_role: Role, to_concept: LiteralConcept) -> AnnotatedEquality:
         return _interner.intern(cls(cardinality, on_role, to_concept))
 
 
@@ -1340,7 +1342,7 @@ class AnnotatedEquality:
 class NodeIDLessEqualThan:
     """Built-in predicate for node ordering in at-most translation."""
     __slots__ = ()
-    INSTANCE: ClassVar["NodeIDLessEqualThan | None"] = None
+    INSTANCE: ClassVar[NodeIDLessEqualThan | None] = None
 
     def arity(self) -> int:
         return 2
@@ -1355,7 +1357,7 @@ class NodeIDLessEqualThan:
         return isinstance(other, NodeIDLessEqualThan)
 
     @classmethod
-    def create(cls) -> "NodeIDLessEqualThan":
+    def create(cls) -> NodeIDLessEqualThan:
         if cls.INSTANCE is None:
             cls.INSTANCE = cls()
         return cls.INSTANCE
@@ -1385,7 +1387,7 @@ class NodeIDsAscendingOrEqual:
         return isinstance(other, NodeIDsAscendingOrEqual) and self._arity == other._arity
 
     @classmethod
-    def create(cls, arity: int) -> "NodeIDsAscendingOrEqual":
+    def create(cls, arity: int) -> NodeIDsAscendingOrEqual:
         return _interner.intern(cls(arity))
 
 
@@ -1396,7 +1398,7 @@ class DatatypeRestriction(AtomicDataRange):
     __slots__ = ("_datatype_iri", "_facet_uris", "_facet_values")
 
     def __init__(self, datatype_iri: str, facet_uris: tuple[str, ...],
-                 facet_values: tuple["Constant", ...]) -> None:
+                 facet_values: tuple[Constant, ...]) -> None:
         # Note: we don't call super().__init__ because AtomicDataRange also
         # stores _datatype_iri.  We keep our own copy for facet access.
         self._datatype_iri = datatype_iri
@@ -1413,7 +1415,7 @@ class DatatypeRestriction(AtomicDataRange):
     def facet_uri(self, index: int) -> str:
         return self._facet_uris[index]
 
-    def facet_value(self, index: int) -> "Constant":
+    def facet_value(self, index: int) -> Constant:
         return self._facet_values[index]
 
     def is_always_true(self) -> bool:
@@ -1426,14 +1428,14 @@ class DatatypeRestriction(AtomicDataRange):
         result = Prefixes.STANDARD.abbreviate_iri(self._datatype_iri)
         if self._facet_uris:
             parts = []
-            for furi, fval in zip(self._facet_uris, self._facet_values):
+            for furi, fval in zip(self._facet_uris, self._facet_values, strict=False):
                 parts.append(f"{Prefixes.STANDARD.abbreviate_iri(furi)}={fval}")
             result += "[" + ",".join(parts) + "]"
         return result
 
     def __hash__(self) -> int:
         h = hash(self._datatype_iri)
-        for furi, fval in zip(self._facet_uris, self._facet_values):
+        for furi, fval in zip(self._facet_uris, self._facet_values, strict=False):
             h += hash(furi) + hash(fval)
         return h
 
@@ -1443,22 +1445,22 @@ class DatatypeRestriction(AtomicDataRange):
                 return False
             if len(self._facet_uris) != len(other._facet_uris):
                 return False
-            for furi, fval in zip(self._facet_uris, self._facet_values):
+            for furi, fval in zip(self._facet_uris, self._facet_values, strict=False):
                 if not self._facet_in(other, furi, fval):
                     return False
             return True
         return False
 
     @staticmethod
-    def _facet_in(restriction: "DatatypeRestriction", uri: str, val: "Constant") -> bool:
-        for u, v in zip(restriction._facet_uris, restriction._facet_values):
+    def _facet_in(restriction: DatatypeRestriction, uri: str, val: Constant) -> bool:
+        for u, v in zip(restriction._facet_uris, restriction._facet_values, strict=False):
             if u == uri and v == val:
                 return True
         return False
 
     @classmethod
     def create(cls, datatype_iri: str, facet_uris: tuple[str, ...],
-               facet_values: tuple["Constant", ...]) -> "DatatypeRestriction":
+               facet_values: tuple[Constant, ...]) -> DatatypeRestriction:
         return _interner.intern(cls(datatype_iri, facet_uris, facet_values))
 
 
@@ -1468,7 +1470,7 @@ class InternalDatatype(AtomicDataRange):
     """Internal datatype for DL clauses (ignored by datatype manager)."""
     __slots__ = ("_iri",)
     RDFS_LITERAL_IRI = "http://www.w3.org/2000/01/rdf-schema#Literal"
-    RDFS_LITERAL: ClassVar["InternalDatatype | None"] = None
+    RDFS_LITERAL: ClassVar[InternalDatatype | None] = None
 
     def __init__(self, iri: str) -> None:
         self._iri = iri
@@ -1499,7 +1501,7 @@ class InternalDatatype(AtomicDataRange):
         return isinstance(other, InternalDatatype) and self._iri == other._iri
 
     @classmethod
-    def create(cls, uri: str) -> "InternalDatatype":
+    def create(cls, uri: str) -> InternalDatatype:
         return _interner.intern(cls(uri))
 
 InternalDatatype.RDFS_LITERAL = InternalDatatype.create(InternalDatatype.RDFS_LITERAL_IRI)

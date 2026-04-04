@@ -1,6 +1,12 @@
 """xsd:float datatype handler."""
 from typing import Any
-from hermit.datatypes.registry import DatatypeHandler, DatatypeRegistry, MalformedLiteralException, ValueSpaceSubset
+
+from hermit.datatypes.registry import (
+    DatatypeHandler,
+    DatatypeRegistry,
+    MalformedLiteralException,
+    ValueSpaceSubset,
+)
 
 
 class FloatValueSpaceSubset(ValueSpaceSubset):
@@ -43,7 +49,7 @@ class FloatDatatypeHandler(DatatypeHandler):
         try:
             return float(lexical_form)
         except ValueError:
-            raise MalformedLiteralException(f"Invalid float: {lexical_form!r}")
+            raise MalformedLiteralException(f"Invalid float: {lexical_form!r}") from None
 
     def create_value_space_subset(self, datatype_iri, facet_uris, facet_values):
         return FloatValueSpaceSubset(entire=True)

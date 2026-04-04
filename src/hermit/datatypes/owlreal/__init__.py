@@ -7,7 +7,7 @@ space using Python's ``decimal.Decimal`` for arbitrary precision.
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from fractions import Fraction
 from typing import Any
 
@@ -17,7 +17,6 @@ from hermit.datatypes.registry import (
     MalformedLiteralException,
     ValueSpaceSubset,
 )
-
 
 # ---------------------------------------------------------------------------
 # BigRational — port of HermiT's BigRational for owl:real
@@ -40,7 +39,7 @@ class BigRational:
             try:
                 self._value = Fraction(value)
             except (ValueError, ZeroDivisionError):
-                raise MalformedLiteralException(f"Cannot parse as rational: {value}")
+                raise MalformedLiteralException(f"Cannot parse as rational: {value}") from None
 
     @property
     def fraction(self) -> Fraction:
@@ -54,27 +53,27 @@ class BigRational:
             return self._value == other._value
         return False
 
-    def __lt__(self, other: "BigRational") -> bool:
+    def __lt__(self, other: BigRational) -> bool:
         return self._value < other._value
 
-    def __le__(self, other: "BigRational") -> bool:
+    def __le__(self, other: BigRational) -> bool:
         return self._value <= other._value
 
-    def __gt__(self, other: "BigRational") -> bool:
+    def __gt__(self, other: BigRational) -> bool:
         return self._value > other._value
 
-    def __ge__(self, other: "BigRational") -> bool:
+    def __ge__(self, other: BigRational) -> bool:
         return self._value >= other._value
 
     def __repr__(self) -> str:
         return f"BigRational({self._value})"
 
     @classmethod
-    def from_decimal(cls, d: Decimal) -> "BigRational":
+    def from_decimal(cls, d: Decimal) -> BigRational:
         return cls(Fraction(d))
 
     @classmethod
-    def infinity(cls, positive: bool = True) -> "BigRationalInfinity":
+    def infinity(cls, positive: bool = True) -> BigRationalInfinity:
         return BigRationalInfinity(positive)
 
 
@@ -253,9 +252,7 @@ class OWLRealDatatypeHandler(DatatypeHandler):
         try:
             return BigRational(lexical_form)
         except (ValueError, MalformedLiteralException):
-            raise MalformedLiteralException(
-                f"Invalid {datatype_iri} literal: {lexical_form!r}"
-            )
+            raise MalformedLiteralException(f"Invalid {datatype_iri} literal: {lexical_form!r}") from None
 
     def create_value_space_subset(
         self,
@@ -269,28 +266,28 @@ class OWLRealDatatypeHandler(DatatypeHandler):
         lo_inc = True
         hi_inc = True
 
-        XSD_NS = "http://www.w3.org/2001/XMLSchema#"
-        for uri, val in zip(facet_uris, facet_values):
-            if uri == XSD_NS + "minInclusive":
-                br = val if isinstance(val, BigRational) else BigRational(val.data_value if hasattr(val, 'data_value') else val)
+        xsd_ns = "http://www.w3.org/2001/XMLSchema#"
+
+        def _to_rational(v: Any) -> BigRational:
+            if isinstance(v, BigRational):
+                return v
+            raw = v.data_value if hasattr(v, "data_value") else v
+            return BigRational(raw)
+
+        for uri, val in zip(facet_uris, facet_values, strict=True):
+            br = _to_rational(val)
+            if uri == xsd_ns + "minInclusive":
                 if br < lo or (br == lo and not lo_inc):
-                    lo = br
-                    lo_inc = True
-            elif uri == XSD_NS + "maxInclusive":
-                br = val if isinstance(val, BigRational) else BigRational(val.data_value if hasattr(val, 'data_value') else val)
+                    lo, lo_inc = br, True
+            elif uri == xsd_ns + "maxInclusive":
                 if br > hi or (br == hi and not hi_inc):
-                    hi = br
-                    hi_inc = True
-            elif uri == XSD_NS + "minExclusive":
-                br = val if isinstance(val, BigRational) else BigRational(val.data_value if hasattr(val, 'data_value') else val)
+                    hi, hi_inc = br, True
+            elif uri == xsd_ns + "minExclusive":
                 if br > lo or (br == lo and lo_inc):
-                    lo = br
-                    lo_inc = False
-            elif uri == XSD_NS + "maxExclusive":
-                br = val if isinstance(val, BigRational) else BigRational(val.data_value if hasattr(val, 'data_value') else val)
+                    lo, lo_inc = br, False
+            elif uri == xsd_ns + "maxExclusive":
                 if br < hi or (br == hi and hi_inc):
-                    hi = br
-                    hi_inc = False
+                    hi, hi_inc = br, False
 
         if lo > hi or (lo == hi and not (lo_inc and hi_inc)):
             return OWLRealValueSpaceSubset(empty=True)

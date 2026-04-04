@@ -1,6 +1,12 @@
 """xsd:boolean datatype handler."""
 from typing import Any
-from hermit.datatypes.registry import DatatypeHandler, DatatypeRegistry, MalformedLiteralException, ValueSpaceSubset
+
+from hermit.datatypes.registry import (
+    DatatypeHandler,
+    DatatypeRegistry,
+    MalformedLiteralException,
+    ValueSpaceSubset,
+)
 
 
 class BooleanValueSpaceSubset(ValueSpaceSubset):
