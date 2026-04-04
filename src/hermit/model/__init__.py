@@ -99,7 +99,7 @@ __all__ = [
 import re
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from typing import Any, ClassVar, Protocol, TypeVar
+from typing import Any, ClassVar, Protocol, TypeVar, cast
 from collections.abc import Collection, Mapping
 
 _T = TypeVar("_T")
@@ -120,18 +120,18 @@ class Interner:
     __slots__ = ("_cache",)
 
     def __init__(self) -> None:
-        self._cache: dict[tuple[type, ...], dict[int, Any]] = {}
+        self._cache: dict[type[Any], dict[int, Any]] = {}
 
-    def intern(self, obj: Any) -> Any:
-        key = type(obj)
+    def intern(self, obj: _T) -> _T:
+        key: type[Any] = type(obj)
         bucket = self._cache.get(key)
         if bucket is None:
             bucket = {}
             self._cache[key] = bucket
         h = hash(obj)
-        existing = bucket.get(h)
+        existing: Any = bucket.get(h)
         if existing is not None and existing == obj:
-            return existing
+            return cast(_T, existing)
         bucket[h] = obj
         return obj
 
@@ -175,7 +175,7 @@ class Prefixes:
         "swrlb:": "http://www.w3.org/2003/11/swrlb#",
     }
 
-    STANDARD: ClassVar[Prefixes | None] = None
+    STANDARD: ClassVar[Prefixes]
 
     def __init__(self) -> None:
         self._prefix_iris_by_name: dict[str, str] = OrderedDict()
@@ -476,7 +476,7 @@ class Constant(Term):
         return _interner.intern(cls(lexical_form, datatype_iri, data_value))
 
     @classmethod
-    def create_anonymous(cls, id: str) -> Individual:
+    def create_anonymous(cls, id: str) -> Constant:
         return cls.create(id, "internal:anonymous-constants")
 
 
@@ -519,6 +519,10 @@ class AtomicConcept(LiteralConcept):
     THING_IRI = "http://www.w3.org/2002/07/owl#Thing"
     NOTHING_IRI = "http://www.w3.org/2002/07/owl#Nothing"
     INTERNAL_NAMED_IRI = "internal:nam#Named"
+
+    THING: ClassVar[AtomicConcept]
+    NOTHING: ClassVar[AtomicConcept]
+    INTERNAL_NAMED: ClassVar[AtomicConcept]
 
     def __init__(self, iri: str) -> None:
         self._iri = iri
@@ -563,13 +567,9 @@ class AtomicConcept(LiteralConcept):
 
     @classmethod
     def _predefined(cls) -> tuple[AtomicConcept, AtomicConcept, AtomicConcept]:
-        thing = cls(cls.THING_IRI)
-        nothing = cls(cls.NOTHING_IRI)
-        internal_named = cls(cls.INTERNAL_NAMED_IRI)
-        # Register them so they are interned
-        thing = _interner.intern(thing)
-        nothing = _interner.intern(nothing)
-        internal_named = _interner.intern(internal_named)
+        thing: AtomicConcept = _interner.intern(cls(cls.THING_IRI))
+        nothing: AtomicConcept = _interner.intern(cls(cls.NOTHING_IRI))
+        internal_named: AtomicConcept = _interner.intern(cls(cls.INTERNAL_NAMED_IRI))
         return thing, nothing, internal_named
 
 
@@ -649,6 +649,11 @@ class AtomicRole(Role):
     TOP_DATA_ROLE_IRI = "http://www.w3.org/2002/07/owl#topDataProperty"
     BOTTOM_DATA_ROLE_IRI = "http://www.w3.org/2002/07/owl#bottomDataProperty"
 
+    TOP_OBJECT_ROLE: ClassVar[AtomicRole]
+    BOTTOM_OBJECT_ROLE: ClassVar[AtomicRole]
+    TOP_DATA_ROLE: ClassVar[AtomicRole]
+    BOTTOM_DATA_ROLE: ClassVar[AtomicRole]
+
     def __init__(self, iri: str) -> None:
         self._iri = iri
 
@@ -689,16 +694,11 @@ class AtomicRole(Role):
     def _predefined(
         cls,
     ) -> tuple[AtomicRole, AtomicRole, AtomicRole, AtomicRole]:
-        top_obj = cls(cls.TOP_OBJECT_ROLE_IRI)
-        bot_obj = cls(cls.BOTTOM_OBJECT_ROLE_IRI)
-        top_data = cls(cls.TOP_DATA_ROLE_IRI)
-        bot_data = cls(cls.BOTTOM_DATA_ROLE_IRI)
-        return (
-            _interner.intern(top_obj),
-            _interner.intern(bot_obj),
-            _interner.intern(top_data),
-            _interner.intern(bot_data),
-        )
+        top_obj: AtomicRole = _interner.intern(cls(cls.TOP_OBJECT_ROLE_IRI))
+        bot_obj: AtomicRole = _interner.intern(cls(cls.BOTTOM_OBJECT_ROLE_IRI))
+        top_data: AtomicRole = _interner.intern(cls(cls.TOP_DATA_ROLE_IRI))
+        bot_data: AtomicRole = _interner.intern(cls(cls.BOTTOM_DATA_ROLE_IRI))
+        return top_obj, bot_obj, top_data, bot_data
 
 
 (
@@ -1110,9 +1110,9 @@ class AtomicDataRange(DataRange):
             return self._datatype_iri == other._datatype_iri
         return False
 
-    @classmethod
-    def create(cls, datatype_iri: str) -> AtomicDataRange:
-        return _interner.intern(cls(datatype_iri))
+    @staticmethod
+    def create(datatype_iri: str) -> AtomicDataRange:
+        return _interner.intern(AtomicDataRange(datatype_iri))
 
 
 class AtomicNegationDataRange(DataRange):
@@ -1126,6 +1126,10 @@ class AtomicNegationDataRange(DataRange):
     @property
     def negated(self) -> AtomicDataRange:
         return self._negated
+
+    @staticmethod
+    def create(negated: AtomicDataRange) -> AtomicNegationDataRange:
+        return _interner.intern(AtomicNegationDataRange(negated))
 
     def is_always_true(self) -> bool:
         return False
@@ -1146,10 +1150,6 @@ class AtomicNegationDataRange(DataRange):
         if isinstance(other, AtomicNegationDataRange):
             return self._negated == other._negated
         return False
-
-    @classmethod
-    def create(cls, negated: AtomicDataRange) -> AtomicNegationDataRange:
-        return _interner.intern(cls(negated))
 
 
 # ===========================================================================
@@ -1459,8 +1459,10 @@ class DatatypeRestriction(AtomicDataRange):
         return False
 
     @classmethod
-    def create(cls, datatype_iri: str, facet_uris: tuple[str, ...],
-               facet_values: tuple[Constant, ...]) -> DatatypeRestriction:
+    def create(  # type: ignore[override]
+        cls, datatype_iri: str, facet_uris: tuple[str, ...],
+        facet_values: tuple[Constant, ...],
+    ) -> DatatypeRestriction:
         return _interner.intern(cls(datatype_iri, facet_uris, facet_values))
 
 
@@ -1636,7 +1638,7 @@ class DLOntology:
         self._has_at_most = False
         self._has_nominals = False
         self._all_desc_graphs = self._collect_graphs(dl_clauses)
-        self._data_prop_assertions: dict = {}
+        self._data_prop_assertions: dict[AtomicRole, dict[Individual, set[Constant]]] = {}
 
     @property
     def ontology_iri(self) -> str | None:
