@@ -497,6 +497,21 @@ class Concept(ABC):
     @abstractmethod
     def is_always_false(self) -> bool: ...
 
+    def accept(self, visitor: Any) -> None:
+        """Dispatch to the appropriate visitor method on *visitor*."""
+        if isinstance(self, AtomicConcept):
+            visitor.visit_atomic_concept(self)
+        elif isinstance(self, AtomicNegationConcept):
+            visitor.visit_atomic_negation_concept(self)
+        elif isinstance(self, AtLeastConcept):
+            visitor.visit_at_least_concept(self)
+        elif isinstance(self, AtLeastDataRange):
+            visitor.visit_at_least_data_range(self)
+        elif isinstance(self, ExistsDescriptionGraph):
+            visitor.visit_exists_description_graph(self)
+        else:
+            visitor.visit_other_concept(self)
+
     def __str__(self) -> str:
         return str(self)
 
@@ -1092,6 +1107,41 @@ class DLClause:
     def create(cls, head_atoms: tuple[Atom, ...], body_atoms: tuple[Atom, ...]) -> DLClause:
         return _interner.intern(cls(head_atoms, body_atoms))
 
+    def get_safe_version(self, safe_making_predicate: DLPredicate) -> DLClause:
+        """
+        Return a "safe" version of this clause where all "unsafe" variables
+        (those appearing only in the head, not in the body) are constrained
+        by adding a body atom with the given safe-making predicate.
+
+        This replaces tautological concepts (Thing -> always true, Nothing
+        -> always false) by ensuring every head-only variable appears in a
+        body atom like Thing(X), making the clause safe for evaluation.
+        """
+        variables: set[Variable] = set()
+        # Collect all variables that occur in the head
+        for atom in self._head_atoms:
+            for i in range(atom.arity()):
+                arg = atom.argument(i)
+                if isinstance(arg, Variable):
+                    variables.add(arg)
+        # Remove those that also appear in the body
+        for atom in self._body_atoms:
+            for i in range(atom.arity()):
+                arg = atom.argument(i)
+                if isinstance(arg, Variable):
+                    variables.discard(arg)
+        # If clause is empty, add X as unsafe
+        if not self._head_atoms and not self._body_atoms:
+            variables.add(Variable.create("X"))
+        # If no unsafe variables, return self
+        if not variables:
+            return self
+        # Add body atoms for each unsafe variable
+        new_body_atoms: list[Atom] = list(self._body_atoms)
+        for variable in variables:
+            new_body_atoms.append(Atom.create(safe_making_predicate, variable))
+        return DLClause.create(self._head_atoms, tuple(new_body_atoms))
+
 
 # ---------------------------------------------------------------------------
 # DataRange hierarchy
@@ -1110,6 +1160,17 @@ class DataRange(ABC):
 
     def arity(self) -> int:
         return 1
+
+    def accept(self, visitor: Any) -> None:
+        """Dispatch to the appropriate visitor method on *visitor*."""
+        if isinstance(self, DatatypeRestriction):
+            visitor.visit_datatype_restriction(self)
+        elif isinstance(self, InternalDatatype):
+            visitor.visit_internal_datatype(self)
+        elif isinstance(self, ConstantEnumeration):
+            visitor.visit_constant_enumeration(self)
+        else:
+            visitor.visit_other_data_range(self)
 
     def __str__(self) -> str:
         return str(self)
@@ -1483,6 +1544,9 @@ class NodeIDsAscendingOrEqual:
 class DatatypeRestriction(AtomicDataRange):
     """Data range with datatype URI and facet restrictions."""
     __slots__ = ("_datatype_iri", "_facet_uris", "_facet_values")
+
+    NO_FACET_URIS: ClassVar[tuple[str, ...]] = ()
+    NO_FACET_VALUES: ClassVar[tuple[Constant, ...]] = ()
 
     def __init__(self, datatype_iri: str, facet_uris: tuple[str, ...],
                  facet_values: tuple[Constant, ...]) -> None:
