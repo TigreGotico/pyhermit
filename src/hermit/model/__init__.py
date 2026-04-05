@@ -71,6 +71,7 @@ __all__ = [
     "Role",
     "AtomicRole",
     "InverseRole",
+    "NegatedAtomicRole",
     # Atoms & clauses
     "Atom",
     "DLClause",
@@ -84,6 +85,7 @@ __all__ = [
     "DataRange",
     "AtomicDataRange",
     "AtomicNegationDataRange",
+    "ConstantEnumeration",
     "DatatypeRestriction",
     "InternalDatatype",
     # Description graphs
@@ -747,6 +749,41 @@ class InverseRole(Role):
 
 
 # ---------------------------------------------------------------------------
+# NegatedAtomicRole
+# ---------------------------------------------------------------------------
+
+class NegatedAtomicRole:
+    """Represents a negated atomic role (not(R))."""
+
+    __slots__ = ("_negated_atomic_role",)
+
+    def __init__(self, negated_atomic_role: AtomicRole) -> None:
+        self._negated_atomic_role = negated_atomic_role
+
+    @property
+    def negated_atomic_role(self) -> AtomicRole:
+        return self._negated_atomic_role
+
+    def __str__(self) -> str:
+        return f"not({self._negated_atomic_role})"
+
+    def __repr__(self) -> str:
+        return f"NegatedAtomicRole({self._negated_atomic_role!r})"
+
+    def __hash__(self) -> int:
+        return -hash(self._negated_atomic_role)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, NegatedAtomicRole):
+            return self._negated_atomic_role == other._negated_atomic_role
+        return False
+
+    @classmethod
+    def create(cls, negated_atomic_role: AtomicRole) -> NegatedAtomicRole:
+        return _interner.intern(cls(negated_atomic_role))
+
+
+# ---------------------------------------------------------------------------
 # Equality / Inequality sentinels
 # ---------------------------------------------------------------------------
 
@@ -1150,6 +1187,56 @@ class AtomicNegationDataRange(DataRange):
         if isinstance(other, AtomicNegationDataRange):
             return self._negated == other._negated
         return False
+
+
+class ConstantEnumeration(AtomicDataRange):
+    """A data range consisting of a given set of constants."""
+
+    __slots__ = ("_constants",)
+
+    def __init__(self, constants: tuple[Constant, ...]) -> None:
+        super().__init__("")  # placeholder -- arity handled by constants
+        self._constants = constants
+
+    @property
+    def constants(self) -> tuple[Constant, ...]:
+        return self._constants
+
+    def get_number_of_constants(self) -> int:
+        return len(self._constants)
+
+    def get_constant(self, index: int) -> Constant:
+        return self._constants[index]
+
+    def get_negation(self) -> AtomicNegationDataRange:
+        return AtomicNegationDataRange.create(self)
+
+    def is_always_true(self) -> bool:
+        return False
+
+    def is_always_false(self) -> bool:
+        return len(self._constants) == 0
+
+    def __str__(self) -> str:
+        parts = " ".join(str(c) for c in self._constants)
+        return f"{{ {parts} }}"
+
+    def __repr__(self) -> str:
+        return f"ConstantEnumeration({self._constants!r})"
+
+    def __hash__(self) -> int:
+        return hash(self._constants)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ConstantEnumeration):
+            return self._constants == other._constants
+        return False
+
+    @classmethod
+    def create(cls, constants: list[Constant] | tuple[Constant, ...]) -> ConstantEnumeration:
+        if isinstance(constants, list):
+            constants = tuple(constants)
+        return _interner.intern(cls(constants))
 
 
 # ===========================================================================

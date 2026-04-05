@@ -68,6 +68,7 @@ line-length = 120
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B"]
 ignore = [
+    "N802",   # Function names: keep Java camelCase (getTimeOut, etc.)
     "N818",   # Exception naming: keep Java names (MalformedLiteralException)
     "I001",   # Import sorting: side-effect imports in _register_all()
 ]
