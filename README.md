@@ -83,6 +83,92 @@ HermiT uses a tableau-based decision procedure for OWL 2 DL:
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for a detailed explanation.
 
+## EYE vs HermiT — Complementing Each Other
+
+The Python ecosystem now has two fundamentally different reasoners: **pyhermit** (this project) and **[EYE](https://github.com/eyereasoner/eye)** (the Euler-Yap Engine by Jos De Roo). They are not competitors — they are complementary pieces that together cover the full landscape of Semantic Web reasoning.
+
+### At a Glance
+
+| Aspect | EYE (Euler-Yap Engine) | pyhermit (HermiT Python) |
+|---|---|---|
+| **Logic** | Notation3 (N3) — First-Order Logic with higher-order rules | OWL 2 DL — Description Logic (SROIQ) |
+| **Semantics** | Open-world *and* closed-world (via `log:collectAllRules`); N3 paths | OWL 2 Direct Semantics (open-world, strict DL) |
+| **Algorithm** | Backward-chaining rule engine with proof generation | Tableau-based decision procedure with hyperresolution |
+| **Decidability** | Undecidable in general (Turing-complete rule engine) | Decidable — guaranteed termination for OWL 2 DL |
+| **Expressivity** | Arbitrary N3 rules, including `log:implies`, `@forAll`, `log:semantics` | OWL 2 DL (SROIQ) + DL-safe SWRL + Datalog queries |
+| **Input format** | N3 / Turtle / Notation3 rules | OWL 2 (RDF/XML, Functional-Style Syntax, OWL API) |
+| **Output** | Derived N3 triples + proofs in N3 proof format | Subsumption hierarchies, class instances, entailment checks |
+| **Strength** | Rule-based inference, cross-ontology mappings, defeasible reasoning, linked data integration | Ontology classification, consistency checking, instance retrieval with cardinality restrictions |
+| **Weakness** | No guaranteed termination on arbitrary N3; no native support for cardinality restrictions, nominals, or complex datatype reasoning | Cannot process arbitrary N3 rules; no support for higher-order quantification or meta-reasoning |
+| **Origin** | Jos De Roo, originally at Agfa; community-driven since 2005 | Boris Motik, Birte Glimm, Giorgos Stoilos, Ian Horrocks — Oxford University |
+
+### How They Complement Each Other
+
+#### 1. N3 Rules + DL Ontologies — a Complete Pipeline
+
+EYE excels at transforming and integrating heterogeneous Linked Data using N3 rules. pyhermit excels at classifying and querying a well-structured OWL ontology. A natural pipeline:
+
+```
+Raw Linked Data ──[EYE: N3 rules]──▶ Normalized OWL Ontology ──[pyhermit]──▶ Classification, Realization, Queries
+```
+
+EYE handles the messy world of data integration: mapping between vocabularies, inferring new triples from heterogeneous sources, applying defeasible rules with exceptions. The result is a clean, consistent OWL ontology that pyhermit can classify and query with full DL expressivity.
+
+#### 2. Open-World Rules + Decidable Classification
+
+EYE can derive new facts from N3 rules in an open-world setting, but it cannot guarantee termination on arbitrary rule sets. pyhermit guarantees termination and completeness for OWL 2 DL, but it cannot process arbitrary first-order rules. Together:
+
+- **Use EYE** for: cross-ontology alignment, schema mapping, defeasible reasoning, proof generation, linked data integration
+- **Use pyhermit** for: ontology consistency checking, class hierarchy computation, cardinality restriction reasoning, datatype reasoning with full facet support, SWRL-safe rules
+
+#### 3. Different Rule Paradigms
+
+| Scenario | Better tool |
+|---|---|
+| "If X is a parent of Y and Y is a parent of Z, then X is a grandparent of Z" | **EYE** — simple forward-chaining N3 rule |
+| "A Person has at most 2 parents" | **pyhermit** — cardinality restriction (`max 2 hasParent`) |
+| "Map schema A to schema B, except when exception C applies" | **EYE** — N3 with negation-as-failure |
+| "Is this ontology consistent? Classify all classes." | **pyhermit** — tableau with blocking guarantees |
+| "Find all individuals that satisfy a complex class expression" | **pyhermit** — DL-safe query + datatype reasoning |
+| "Prove why this conclusion follows from these rules" | **EYE** — built-in proof generation in N3 proof format |
+
+#### 4. Shared Philosophy, Different Foundations
+
+Both projects share a commitment to:
+- **Pure Python** (no JVM, no external binary dependencies)
+- **Open source** (LGPL 3.0 for HermiT; MIT for EYE JS components)
+- **W3C standards** — EYE implements W3C Notation3; pyhermit implements W3C OWL 2 DL
+- **FOSS ethos** — both are gifts to the community, built by researchers and practitioners
+
+Where they differ is in the logical foundations:
+- **EYE** follows the Tim Berners-Lee tradition of N3 as a universal rule language — if you can express it in N3, EYE can try to prove it.
+- **pyhermit** follows the description logic tradition of OWL 2 — every reasoning task is guaranteed to terminate with a complete and correct answer, at the cost of expressivity.
+
+### Using Both Together
+
+A practical pattern for a Python application:
+
+```python
+# Step 1: EYE integrates heterogeneous data
+from eyereasoner import n3reasoner
+euler_output = n3reasoner(data_rules="integrate.n3", sources=["db.ttl", "api.json.n3"])
+
+# Step 2: Parse EYE's output as an OWL ontology
+from hermit.model import DLOntology
+ontology = load_from_rdf(euler_output)
+
+# Step 3: pyhermit classifies and queries
+from hermit import Reasoner
+reasoner = Reasoner(ontology)
+reasoner.precompute_inferences()
+print(f"Consistent: {reasoner.is_consistent()}")
+for cls in reasoner.get_sub_classes("Pizza"):
+    print(f"  Subclass: {cls}")
+reasoner.dispose()
+```
+
+This combination gives you the best of both worlds: EYE's flexible rule-based integration and HermiT's decidable, complete DL classification.
+
 ## Project Status
 
 This is an active port of HermiT 1.3.8. The Java original was developed by Boris Motik, Birte Glimm, Giorgos Stoilos, and Ian Horrocks at the University of Oxford.
