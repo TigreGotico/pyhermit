@@ -56,6 +56,8 @@ class InstanceManager:
         try:
             self.m_reasoner = reasoner
             self.m_tableau_monitor = self.m_reasoner.get_tableau().get_tableau_monitor()
+            self.m_classes_initialised = False
+            self.m_current_concept_hierarchy: Hierarchy[AtomicConcept] | None = None
             dlo = self.m_reasoner.get_dl_ontology()
             self.m_individuals = list(dlo.get_all_individuals())
             self.m_complex_roles: set[AtomicRole] = set()
@@ -343,7 +345,7 @@ class InstanceManager:
     def set_to_classified_concept_hierarchy(
         self, atomic_concept_hierarchy: Hierarchy[AtomicConcept]
     ) -> None:
-        if atomic_concept_hierarchy is not self.m_current_concept_hierarchy:
+        if getattr(self, 'm_current_concept_hierarchy', None) is not atomic_concept_hierarchy:
             self.m_current_concept_hierarchy = atomic_concept_hierarchy
             if self.m_classes_initialised and self.m_individuals:
                 for node in self.m_current_concept_hierarchy.get_all_nodes_set():

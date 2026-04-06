@@ -125,7 +125,7 @@ class DependencySetFactory:
             self._add_to_unused_list(dependency_set)
 
     def add_branching_point(
-        self, dependency_set: DependencySet, branching_point: int
+        self, dependency_set: DependencySet | None, branching_point: int
     ) -> PermanentDependencySet:
         """Return a permanent set equivalent to *dependency_set* plus *branching_point*."""
         permanent = self.get_permanent(dependency_set)
@@ -200,14 +200,17 @@ class DependencySetFactory:
         return result
 
     def get_permanent(
-        self, dependency_set: DependencySet
+        self, dependency_set: DependencySet | None
     ) -> PermanentDependencySet:
         """Return a :class:`PermanentDependencySet` equivalent to *dependency_set*.
 
         If the argument is already permanent it is returned as-is.
+        If ``None``, returns the empty set.
         Otherwise the factory flattens any :class:`UnionDependencySet` and
         interns the result.
         """
+        if dependency_set is None:
+            return self.empty_set
         if isinstance(dependency_set, PermanentDependencySet):
             return dependency_set
 
@@ -220,8 +223,8 @@ class DependencySetFactory:
 
         while self._unprocessed_sets:
             union_ds = self._unprocessed_sets.pop()
-            for idx in range(union_ds._number_of_constituents):
-                constituent = union_ds._dependency_sets[idx]
+            for idx in range(union_ds.m_number_of_constituents):
+                constituent = union_ds.m_dependency_sets[idx]
                 if isinstance(constituent, UnionDependencySet):
                     self._unprocessed_sets.append(constituent)
                 else:

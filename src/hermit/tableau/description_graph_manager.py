@@ -9,12 +9,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from hermit.tableau.union_dependency_set import UnionDependencySet
+
 if TYPE_CHECKING:
     from hermit.model import DescriptionGraph, ExistsDescriptionGraph
     from hermit.tableau.extension_manager import ExtensionTable, Retrieval
     from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau
-    from hermit.tableau.union_dependency_set import UnionDependencySet
 
 
 class DescriptionGraphManager:

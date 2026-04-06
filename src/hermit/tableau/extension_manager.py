@@ -200,9 +200,29 @@ class ExtensionTable(ABC):
     @abstractmethod
     def propagate_delta_new(self) -> bool: ...
 
-    @abstractmethod
     def create_retrieval(
-        self, bound_mask: list[bool], view: str
+        self,
+        bound_mask_or_positions: list[bool] | list[int],
+        view_or_bindings: str | list[Any] = "TOTAL",
+        tuple_buffer: list[Any] | None = None,
+        owns_buffers: bool = False,
+        view: str = "TOTAL",
+    ) -> Retrieval:
+        """Create a retrieval. Supports both Java-overloaded signatures.
+
+        1. ``create_retrieval(bound_mask: list[bool], view: str)``
+        2. ``create_retrieval(binding_positions, bindings_buffer, tuple_buffer, owns_buffers, view)``
+        """
+        ...
+
+    @abstractmethod
+    def create_retrieval_full(
+        self,
+        binding_positions: list[int],
+        bindings_buffer: list[Any],
+        tuple_buffer: list[Any],
+        owns_buffers: bool,
+        view: str,
     ) -> Retrieval: ...
 
 
@@ -297,6 +317,78 @@ class _SimpleRetrieval(Retrieval):
 
     def is_core(self) -> bool:
         idx = self._current_index - self._extension_table.m_tuple_arity
+        return self._extension_table.m_core_manager.is_core(idx)
+
+
+class _FullRetrieval(Retrieval):
+    """Retrieval using explicit binding positions and external buffers.
+
+    Mirrors the Java ``ExtensionTable.createRetrieval(int[], Object[], Object[], boolean, View)``.
+    ``binding_positions[i] == -1`` means slot i is unbound (free variable);
+    otherwise it is the index in ``bindings_buffer`` containing the bound value.
+    """
+
+    def __init__(
+        self,
+        extension_table: ExtensionTable,
+        binding_positions: list[int],
+        bindings_buffer: list[Any],
+        tuple_buffer: list[Any],
+        owns_buffers: bool,
+        view: str,
+    ) -> None:
+        self._extension_table = extension_table
+        self._binding_positions = binding_positions
+        self._bindings_buffer = bindings_buffer
+        self._tuple_buffer = tuple_buffer
+        self._owns_buffers = owns_buffers
+        self._view = view
+        self._current_index = -1
+        self._arity = extension_table.m_tuple_arity
+
+    def clear(self) -> None:
+        self._current_index = -1
+
+    def open(self) -> None:
+        self._current_index = 0
+
+    def next(self) -> None:
+        table = self._extension_table.m_tuple_table
+        arity = self._arity
+        positions = self._binding_positions
+        bindings = self._bindings_buffer
+        while self._current_index < table.size:
+            match = True
+            for i in range(arity + 1):  # +1 for dependency set slot
+                pos = positions[i]
+                if pos >= 0:
+                    expected = bindings[pos]
+                    actual = table.get_tuple_object(self._current_index, i)
+                    if actual is not expected:
+                        match = False
+                        break
+            if match:
+                table.retrieve_tuple(self._tuple_buffer, self._current_index)
+                self._current_index += arity + 1
+                return
+            self._current_index += arity + 1
+        self._current_index = table.size
+
+    def after_last(self) -> bool:
+        return self._current_index >= self._extension_table.m_tuple_table.size
+
+    def get_tuple_buffer(self) -> list[Any]:
+        return self._tuple_buffer
+
+    def get_bindings_buffer(self) -> list[Any]:
+        return self._bindings_buffer
+
+    def get_dependency_set(self) -> DependencySet | None:
+        idx = self._current_index - (self._arity + 1)
+        return self._extension_table.m_dependency_set_manager.get_dependency_set(idx)
+
+    def is_core(self) -> bool:
+        idx = self._current_index - (self._arity + 1)
         return self._extension_table.m_core_manager.is_core(idx)
 
 
@@ -397,8 +489,43 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
     def propagate_delta_new(self) -> bool:
         return False
 
-    def create_retrieval(self, bound_mask: list[bool], view: str) -> Retrieval:
-        return _SimpleRetrieval(self, bound_mask, view)
+    def create_retrieval(
+        self,
+        bound_mask_or_positions: list[bool] | list[int],
+        view_or_bindings: str | list[Any] = "TOTAL",
+        tuple_buffer: list[Any] | None = None,
+        owns_buffers: bool = False,
+        view: str = "TOTAL",
+    ) -> Retrieval:
+        """Create a retrieval. Supports both Java-overloaded signatures:
+        
+        1. ``create_retrieval(bound_mask: list[bool], view: str)``
+        2. ``create_retrieval(binding_positions, bindings_buffer, tuple_buffer, owns_buffers, view)``
+        """
+        # Detect signature by checking first element type
+        if bound_mask_or_positions and isinstance(bound_mask_or_positions[0], bool):
+            # Simple retrieval: (bound_mask, view)
+            return _SimpleRetrieval(self, bound_mask_or_positions, view_or_bindings if isinstance(view_or_bindings, str) else view)
+        else:
+            # Full retrieval: (binding_positions, bindings_buffer, tuple_buffer, owns_buffers, view)
+            bindings = view_or_bindings if isinstance(view_or_bindings, list) else []
+            return _FullRetrieval(
+                self, bound_mask_or_positions, bindings,
+                tuple_buffer or [None] * len(bound_mask_or_positions),
+                owns_buffers, view
+            )
+
+    def create_retrieval_full(
+        self,
+        binding_positions: list[int],
+        bindings_buffer: list[Any],
+        tuple_buffer: list[Any],
+        owns_buffers: bool,
+        view: str,
+    ) -> Retrieval:
+        return _FullRetrieval(
+            self, binding_positions, bindings_buffer, tuple_buffer, owns_buffers, view
+        )
 
 
 class ExtensionTableWithFullIndex(ExtensionTableWithTupleIndexes):
@@ -529,9 +656,17 @@ class ExtensionManager:
         """Return the binary (concept-assertion) extension table."""
         return self.m_binary_extension_table
 
+    def get_binary_extension_table(self) -> ExtensionTable:
+        """Java-compatible alias for :attr:`binary_extension_table`."""
+        return self.m_binary_extension_table
+
     @property
     def ternary_extension_table(self) -> ExtensionTable:
         """Return the ternary (role-assertion) extension table."""
+        return self.m_ternary_extension_table
+
+    def get_ternary_extension_table(self) -> ExtensionTable:
+        """Java-compatible alias for :attr:`ternary_extension_table`."""
         return self.m_ternary_extension_table
 
     def get_extension_table(self, arity: int) -> ExtensionTable:

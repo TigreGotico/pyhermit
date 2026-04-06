@@ -551,6 +551,10 @@ class AtomicConcept(LiteralConcept):
     def arity(self) -> int:
         return 1
 
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
+
     def get_negation(self) -> LiteralConcept:
         if self is self.THING:
             return self.NOTHING
@@ -577,6 +581,10 @@ class AtomicConcept(LiteralConcept):
         if isinstance(other, AtomicConcept):
             return self._iri == other._iri
         return False
+
+    def equals(self, other: object) -> bool:
+        """Java-compatible equality check."""
+        return self.__eq__(other)
 
     @classmethod
     def create(cls, uri: str) -> AtomicConcept:
@@ -608,6 +616,10 @@ class AtomicNegationConcept(LiteralConcept):
 
     def arity(self) -> int:
         return 1
+
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
 
     def get_negation(self) -> LiteralConcept:
         return self._negated
@@ -681,6 +693,10 @@ class AtomicRole(Role):
     def arity(self) -> int:
         return 2
 
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
+
     def get_inverse(self) -> Role:
         if self in (self.TOP_OBJECT_ROLE, self.BOTTOM_OBJECT_ROLE):
             return self
@@ -702,6 +718,10 @@ class AtomicRole(Role):
         if isinstance(other, AtomicRole):
             return self._iri == other._iri
         return False
+
+    def equals(self, other: object) -> bool:
+        """Java-compatible equality check."""
+        return self.__eq__(other)
 
     @classmethod
     def create(cls, iri: str) -> AtomicRole:
@@ -740,6 +760,13 @@ class InverseRole(Role):
 
     def get_inverse(self) -> Role:
         return self._inverse_of
+
+    def arity(self) -> int:
+        return 2
+
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
 
     def get_role_assertion(self, term0: Term, term1: Term) -> Atom:
         return Atom.create(self._inverse_of, term1, term0)
@@ -815,6 +842,10 @@ class Equality:
     def arity(self) -> int:
         return 2
 
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
+
     def __str__(self) -> str:
         return "=="
 
@@ -843,6 +874,10 @@ class Inequality:
 
     def arity(self) -> int:
         return 2
+
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
 
     def __str__(self) -> str:
         return "!="
@@ -892,14 +927,26 @@ class Atom:
     def arity(self) -> int:
         return len(self._arguments)
 
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
+
     def argument(self, index: int) -> Term:
         return self._arguments[index]
+
+    def get_argument(self, index: int) -> Term:
+        """Java-compatible alias for :meth:`argument`."""
+        return self.argument(index)
 
     def argument_variable(self, index: int) -> Variable | None:
         arg = self._arguments[index]
         if isinstance(arg, Variable):
             return arg
         return None
+
+    def get_argument_variable(self, index: int) -> Variable | None:
+        """Java-compatible alias for :meth:`argument_variable`."""
+        return self.argument_variable(index)
 
     def get_variables(self, variables: set[Variable]) -> None:
         for arg in self._arguments:
@@ -916,6 +963,14 @@ class Atom:
 
     def replace_predicate(self, new_predicate: DLPredicate) -> Atom:
         return Atom.create(new_predicate, *self._arguments)
+
+    def get_dl_predicate(self) -> DLPredicate:
+        """Java-compatible alias for :attr:`predicate`."""
+        return self._predicate
+
+    def equals(self, other: object) -> bool:
+        """Java-compatible equality check."""
+        return self.__eq__(other)
 
     def __str__(self) -> str:
         pred = self._predicate
@@ -986,14 +1041,34 @@ class DLClause:
     def head_length(self) -> int:
         return len(self._head_atoms)
 
+    def get_head_length(self) -> int:
+        """Java-compatible alias for :meth:`head_length`."""
+        return self.head_length()
+
     def head_atom(self, index: int) -> Atom:
         return self._head_atoms[index]
 
     def body_length(self) -> int:
         return len(self._body_atoms)
 
+    def get_body_length(self) -> int:
+        """Java-compatible alias for :meth:`body_length`."""
+        return self.body_length()
+
     def body_atom(self, index: int) -> Atom:
         return self._body_atoms[index]
+
+    def get_body_atom(self, index: int) -> Atom:
+        """Java-compatible alias for :meth:`body_atom`."""
+        return self.body_atom(index)
+
+    def get_body_atoms(self) -> tuple[Atom, ...]:
+        """Java-compatible alias for :attr:`body_atoms`."""
+        return self._body_atoms
+
+    def get_head_atoms(self) -> tuple[Atom, ...]:
+        """Java-compatible alias for :attr:`head_atoms`."""
+        return self._head_atoms
 
     # -- clause classification methods (ported from Java) -------------------
 
@@ -1078,6 +1153,85 @@ class DLClause:
                     and arg1 == head.argument(1)
                 )
         return False
+
+    def is_atomic_role_inverse_inclusion(self) -> bool:
+        """Check if this is R(X,Y) -> S(Y,X) (inverse role inclusion)."""
+        if self.body_length() == 1 and self.head_length() == 1:
+            body = self._body_atoms[0]
+            head = self._head_atoms[0]
+            if (
+                body.arity() == 2
+                and head.arity() == 2
+                and isinstance(body.predicate, AtomicRole)
+                and isinstance(head.predicate, AtomicRole)
+            ):
+                arg0 = body.argument(0)
+                arg1 = body.argument(1)
+                return (
+                    isinstance(arg0, Variable)
+                    and isinstance(arg1, Variable)
+                    and arg0 != arg1
+                    and arg0 == head.argument(1)
+                    and arg1 == head.argument(0)
+                )
+        return False
+
+    def is_functionality_axiom(self) -> bool:
+        """Check if this is a functionality axiom (at-most-1 restriction)."""
+        # R(X,Y1) ∧ R(X,Y2) → Y1 == Y2
+        if self.head_length() == 1 and self.body_length() == 2:
+            head = self._head_atoms[0]
+            if head.predicate is Equality.INSTANCE:
+                body0 = self._body_atoms[0]
+                body1 = self._body_atoms[1]
+                if (
+                    isinstance(body0.predicate, AtomicRole)
+                    and isinstance(body1.predicate, AtomicRole)
+                    and body0.predicate == body1.predicate
+                ):
+                    # Same first argument, different second arguments
+                    if (body0.argument(0) == body1.argument(0)
+                            and body0.argument(1) != body1.argument(1)
+                            and head.argument(0) == body0.argument(1)
+                            and head.argument(1) == body1.argument(1)):
+                        return True
+        return False
+
+    def is_inverse_functionality_axiom(self) -> bool:
+        """Check if this is an inverse functionality axiom."""
+        # R(Y1,X) ∧ R(Y2,X) → Y1 == Y2
+        if self.head_length() == 1 and self.body_length() == 2:
+            head = self._head_atoms[0]
+            if head.predicate is Equality.INSTANCE:
+                body0 = self._body_atoms[0]
+                body1 = self._body_atoms[1]
+                if (
+                    isinstance(body0.predicate, AtomicRole)
+                    and isinstance(body1.predicate, AtomicRole)
+                    and body0.predicate == body1.predicate
+                ):
+                    if (body0.argument(1) == body1.argument(1)
+                            and body0.argument(0) != body1.argument(0)
+                            and head.argument(0) == body0.argument(0)
+                            and head.argument(1) == body1.argument(0)):
+                        return True
+        return False
+
+    def get_head_atom(self, index: int) -> Atom:
+        """Java-compatible alias for :meth:`head_atom`."""
+        return self.head_atom(index)
+
+    def get_changed_dl_clause(
+        self,
+        new_head_atoms: list[Atom] | None,
+        new_body_atoms: list[Atom],
+    ) -> DLClause:
+        """Create a new DL clause with the given body atoms (and optionally new head atoms).
+
+        Java-compatible method for creating reordered/cloned clauses.
+        """
+        head = tuple(new_head_atoms) if new_head_atoms is not None else self._head_atoms
+        return DLClause.create(head, tuple(new_body_atoms))
 
     def __str__(self) -> str:
         head = " v ".join(str(a) for a in self._head_atoms) if self._head_atoms else "⊥"
@@ -1332,6 +1486,10 @@ class AtLeast(ExistentialConcept):
     def arity(self) -> int:
         return 1
 
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
+
     def is_always_true(self) -> bool:
         return False
 
@@ -1418,6 +1576,10 @@ class ExistsDescriptionGraph(ExistentialConcept):
     def arity(self) -> int:
         return 1
 
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
+
     def is_always_true(self) -> bool:
         return False
 
@@ -1467,6 +1629,10 @@ class AnnotatedEquality:
     def arity(self) -> int:
         return 3
 
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
+
     def __str__(self) -> str:
         return f"==@atMost({self._cardinality} {self._on_role} {self._to_concept})"
 
@@ -1495,6 +1661,10 @@ class NodeIDLessEqualThan:
     def arity(self) -> int:
         return 2
 
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
+
     def __str__(self) -> str:
         return "<="
 
@@ -1503,6 +1673,10 @@ class NodeIDLessEqualThan:
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, NodeIDLessEqualThan)
+
+    def equals(self, other: object) -> bool:
+        """Java-compatible equality check."""
+        return self.__eq__(other)
 
     @classmethod
     def create(cls) -> NodeIDLessEqualThan:
@@ -1525,6 +1699,10 @@ class NodeIDsAscendingOrEqual:
     def arity(self) -> int:
         return self._arity
 
+    def get_arity(self) -> int:
+        """Java-compatible alias for :meth:`arity`."""
+        return self.arity()
+
     def __str__(self) -> str:
         return "NodeIDsAscendingOrEqual"
 
@@ -1533,6 +1711,10 @@ class NodeIDsAscendingOrEqual:
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, NodeIDsAscendingOrEqual) and self._arity == other._arity
+
+    def equals(self, other: object) -> bool:
+        """Java-compatible equality check."""
+        return self.__eq__(other)
 
     @classmethod
     def create(cls, arity: int) -> NodeIDsAscendingOrEqual:
@@ -1640,6 +1822,10 @@ class InternalDatatype(AtomicDataRange):
 
     def is_always_false(self) -> bool:
         return False
+
+    def get_negation(self) -> AtomicNegationDataRange:
+        """Return the negation of this datatype."""
+        return AtomicNegationDataRange.create(self)
 
     def is_internal_datatype(self) -> bool:
         return True
@@ -1815,6 +2001,18 @@ class DLOntology:
     def all_individuals(self) -> frozenset[Individual]:
         return self._all_individuals
 
+    def get_all_individuals(self) -> frozenset[Individual]:
+        """Return all individuals (Java-compatible alias)."""
+        return self._all_individuals
+
+    def get_all_complex_object_roles(self) -> frozenset[Role]:
+        """Return all complex object property roles (empty in current implementation)."""
+        return frozenset()
+
+    def get_all_atomic_object_roles(self) -> frozenset[AtomicRole]:
+        """Return all atomic object property roles."""
+        return self._all_obj_roles
+
     @property
     def all_description_graphs(self) -> frozenset[DescriptionGraph]:
         return self._all_desc_graphs
@@ -1923,6 +2121,34 @@ class DLOntology:
                 dg = atom.predicate.description_graph
                 graphs[dg.name] = dg
         return frozenset(graphs.values())
+
+    def get_all_description_graphs(self) -> frozenset[DescriptionGraph]:
+        """Return all description graphs referenced in this ontology's clauses."""
+        return self._all_desc_graphs
+
+    def get_dl_clauses(self) -> frozenset[DLClause]:
+        """Return the DL clauses."""
+        return self._dl_clauses
+
+    def get_positive_facts(self) -> frozenset[Atom]:
+        """Return the positive facts."""
+        return self._positive_facts
+
+    def get_negative_facts(self) -> frozenset[Atom]:
+        """Return the negative facts."""
+        return self._negative_facts
+
+    def contains_object_role(self, role: AtomicRole) -> bool:
+        """Check whether the ontology contains the given object role."""
+        return role in self._all_obj_roles
+
+    def has_unknown_datatype_restrictions(self) -> bool:
+        """Check whether the ontology has unknown datatype restrictions."""
+        return False
+
+    def get_all_unknown_datatype_restrictions(self) -> frozenset:
+        """Return all unknown datatype restrictions (empty set by default)."""
+        return frozenset()
 
     def __repr__(self) -> str:
         return (f"DLOntology({self._ontology_iri!r}, "

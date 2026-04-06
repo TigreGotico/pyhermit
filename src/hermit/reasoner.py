@@ -465,16 +465,11 @@ class Reasoner:
             return True
         if not self._dl_ontology.contains_individual(individual):
             return concept is AtomicConcept.THING
-        if direct:
-            self.classify_classes()
-            self._initialise_class_instance_manager()
-            if self._instance_manager is None:
-                return False
-            return bool(self._instance_manager.has_type(individual, concept, True))
+        self.classify_classes()
         self._initialise_class_instance_manager()
         if self._instance_manager is None:
             return False
-        return bool(self._instance_manager.has_type(individual, concept, False))
+        return bool(self._instance_manager.has_type(individual, concept, direct))
 
     def has_role_relationship(
         self, subject: Individual, role: AtomicRole, obj: Individual

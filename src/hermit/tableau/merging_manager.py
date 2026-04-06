@@ -127,8 +127,8 @@ class MergingManager:
             if can_merge_0_into_1 and can_merge_1_into_0:
                 # Pick the one with fewer positive concepts to merge into
                 if (
-                    node0._number_of_positive_atomic_concepts
-                    > node1._number_of_positive_atomic_concepts
+                    node0.m_number_of_positive_atomic_concepts
+                    > node1.m_number_of_positive_atomic_concepts
                 ):
                     merge_from = node1
                     merge_into = node0
@@ -152,8 +152,8 @@ class MergingManager:
         while node is not None:
             if (
                 node.is_active()
-                and node._parent is not None
-                and (not node._parent.is_active() or node._parent is merge_from)
+                and node.m_parent is not None
+                and (not node.m_parent.is_active() or node.m_parent is merge_from)
             ):
                 if self.m_tableau_monitor is not None:
                     self.m_tableau_monitor.node_pruned(node)

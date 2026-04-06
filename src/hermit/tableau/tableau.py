@@ -193,6 +193,14 @@ class Tableau:
         """Return the tableau monitor."""
         return self.m_tableau_monitor
 
+    def get_tableau_monitor(self):
+        """Return the tableau monitor (Java-compatible alias)."""
+        return self.m_tableau_monitor
+
+    def get_extension_manager(self) -> Any:
+        """Return the extension manager (Java-compatible alias)."""
+        return self.m_extension_manager
+
     @property
     def existential_expansion_strategy(self) -> Any:
         """Return the existential expansion strategy."""
@@ -519,19 +527,25 @@ class Tableau:
                 self.m_current_branching_point,
             )
             if per_test_positive_facts_dummy_dependency:
-                for atom in per_test_positive_facts_dummy_dependency:
-                    self._load_positive_fact(terms_to_nodes, atom, dependency_set)
+                from hermit.model import Atom as _Atom, AtomicConcept as _AC
+
+                for individual, dep_set in per_test_positive_facts_dummy_dependency.items():
+                    top_atom = _Atom.create(_AC.THING, individual)
+                    self._load_positive_fact(terms_to_nodes, top_atom, dep_set)
             if per_test_negative_facts_dummy_dependency:
-                for atom in per_test_negative_facts_dummy_dependency:
-                    self._load_negative_fact(terms_to_nodes, atom, dependency_set)
+                from hermit.model import Atom as _Atom, AtomicConcept as _AC
+
+                for individual, dep_set in per_test_negative_facts_dummy_dependency.items():
+                    top_atom = _Atom.create(_AC.THING, individual)
+                    self._load_negative_fact(terms_to_nodes, top_atom, dep_set)
 
         # Map individuals to nodes
         if nodes_for_individuals is not None:
-            from hermit.model import AtomicConcept
+            from hermit.model import Atom as _Atom, AtomicConcept as _AC
 
             for individual, _existing_node in nodes_for_individuals.items():
                 if terms_to_nodes.get(individual) is None:
-                    top_assertion = Atom.create(AtomicConcept.THING, individual)
+                    top_assertion = _Atom.create(_AC.THING, individual)
                     self._load_positive_fact(
                         terms_to_nodes,
                         top_assertion,
@@ -688,10 +702,10 @@ class Tableau:
                 if term.is_anonymous():
                     node = self._create_new_ni_node(dependency_set)
                 else:
-                    node = self._create_new_named_node(dependency_set)
+                    node = self.create_new_named_node(dependency_set)
             else:
                 constant = term
-                node = self._create_new_root_constant_node(dependency_set)
+                node = self.create_new_root_constant_node(dependency_set)
                 if not constant.is_anonymous():
                     self.m_extension_manager.add_assertion_unary(
                         ConstantEnumeration.create([constant]),
@@ -1051,10 +1065,10 @@ class Tableau:
             self.m_allocated_nodes += 1
         else:
             node = self.m_first_free_node
-            self.m_first_free_node = node._next_tableau_node
+            self.m_first_free_node = node.m_next_tableau_node
 
-        assert node._node_id == -1
-        assert node._node_state is None
+        assert node.m_node_id == -1
+        assert node.m_node_state is None
         node.initialize(
             self.m_number_of_nodes_in_tableau + 1, parent, node_type, tree_depth
         )
@@ -1062,11 +1076,11 @@ class Tableau:
 
         self.m_existential_expansion_strategy.node_initialized(node)
 
-        node._previous_tableau_node = self.m_last_tableau_node
+        node.m_previous_tableau_node = self.m_last_tableau_node
         if self.m_last_tableau_node is None:
             self.m_first_tableau_node = node
         else:
-            self.m_last_tableau_node._next_tableau_node = node
+            self.m_last_tableau_node.m_next_tableau_node = node
         self.m_last_tableau_node = node
 
         self.m_existential_expansion_strategy.node_status_changed(node)
@@ -1107,18 +1121,18 @@ class Tableau:
 
         Concept and role assertions should have already been copied.
         """
-        assert node._node_state == NodeState.ACTIVE
-        assert node._merged_into is None
-        assert node._merged_into_dependency_set is None
-        assert node._previous_merged_or_pruned_node is None
+        assert node.m_node_state == NodeState.ACTIVE
+        assert node.m_merged_into is None
+        assert node.m_merged_into_dependency_set is None
+        assert node.m_previous_merged_or_pruned_node is None
 
-        node._merged_into = merge_into
-        node._merged_into_dependency_set = (
+        node.m_merged_into = merge_into
+        node.m_merged_into_dependency_set = (
             self.m_dependency_set_factory.get_permanent(dependency_set)
         )
-        self.m_dependency_set_factory.add_usage(node._merged_into_dependency_set)
-        node._node_state = NodeState.MERGED
-        node._previous_merged_or_pruned_node = self.m_last_merged_or_pruned_node
+        self.m_dependency_set_factory.add_usage(node.m_merged_into_dependency_set)
+        node.m_node_state = NodeState.MERGED
+        node.m_previous_merged_or_pruned_node = self.m_last_merged_or_pruned_node
         self.m_last_merged_or_pruned_node = node
         self.m_number_of_merged_or_pruned_nodes += 1
         self.m_existential_expansion_strategy.node_status_changed(node)
@@ -1126,13 +1140,13 @@ class Tableau:
 
     def prune_node(self, node: Node) -> None:
         """Mark *node* as pruned."""
-        assert node._node_state == NodeState.ACTIVE
-        assert node._merged_into is None
-        assert node._merged_into_dependency_set is None
-        assert node._previous_merged_or_pruned_node is None
+        assert node.m_node_state == NodeState.ACTIVE
+        assert node.m_merged_into is None
+        assert node.m_merged_into_dependency_set is None
+        assert node.m_previous_merged_or_pruned_node is None
 
-        node._node_state = NodeState.PRUNED
-        node._previous_merged_or_pruned_node = self.m_last_merged_or_pruned_node
+        node.m_node_state = NodeState.PRUNED
+        node.m_previous_merged_or_pruned_node = self.m_last_merged_or_pruned_node
         self.m_last_merged_or_pruned_node = node
         self.m_number_of_merged_or_pruned_nodes += 1
         self.m_existential_expansion_strategy.node_status_changed(node)
@@ -1143,17 +1157,17 @@ class Tableau:
         assert node is not None
 
         saved_merged_info: Node | None = None
-        if node._node_state == NodeState.MERGED:
+        if node.m_node_state == NodeState.MERGED:
             self.m_dependency_set_factory.remove_usage(
-                node._merged_into_dependency_set
+                node.m_merged_into_dependency_set
             )
-            saved_merged_info = node._merged_into
-            node._merged_into = None
-            node._merged_into_dependency_set = None
+            saved_merged_info = node.m_merged_into
+            node.m_merged_into = None
+            node.m_merged_into_dependency_set = None
 
-        node._node_state = NodeState.ACTIVE
-        self.m_last_merged_or_pruned_node = node._previous_merged_or_pruned_node
-        node._previous_merged_or_pruned_node = None
+        node.m_node_state = NodeState.ACTIVE
+        self.m_last_merged_or_pruned_node = node.m_previous_merged_or_pruned_node
+        node.m_previous_merged_or_pruned_node = None
         self.m_number_of_merged_or_pruned_nodes -= 1
         self.m_existential_expansion_strategy.node_status_changed(node)
         if saved_merged_info is not None:
@@ -1163,20 +1177,20 @@ class Tableau:
         """Destroy and recycle the last tableau node."""
         node = self.m_last_tableau_node
         assert node is not None
-        assert node._node_state == NodeState.ACTIVE
-        assert node._merged_into is None
-        assert node._merged_into_dependency_set is None
-        assert node._previous_merged_or_pruned_node is None
+        assert node.m_node_state == NodeState.ACTIVE
+        assert node.m_merged_into is None
+        assert node.m_merged_into_dependency_set is None
+        assert node.m_previous_merged_or_pruned_node is None
 
         self.m_existential_expansion_strategy.node_destroyed(node)
-        if node._previous_tableau_node is None:
+        if node.m_previous_tableau_node is None:
             self.m_first_tableau_node = None
         else:
-            node._previous_tableau_node._next_tableau_node = None
-        self.m_last_tableau_node = node._previous_tableau_node
+            node.m_previous_tableau_node.m_next_tableau_node = None
+        self.m_last_tableau_node = node.m_previous_tableau_node
 
         node.destroy()
-        node._next_tableau_node = self.m_first_free_node
+        node.m_next_tableau_node = self.m_first_free_node
         self.m_first_free_node = node
         self.m_number_of_nodes_in_tableau -= 1
 
@@ -1195,6 +1209,10 @@ class Tableau:
     @property
     def first_tableau_node(self) -> Node | None:
         """Return the first node in the tableau linked list."""
+        return self.m_first_tableau_node
+
+    def get_first_tableau_node(self) -> Node | None:
+        """Return the first node (Java-compatible alias for first_tableau_node)."""
         return self.m_first_tableau_node
 
     @property
@@ -1230,7 +1248,7 @@ class Tableau:
         while node is not None:
             if node.node_id == node_id:
                 return node
-            node = node._next_tableau_node
+            node = node.m_next_tableau_node
         return None
 
     def get_existential_concepts_buffer(self) -> list[Any]:
@@ -1257,19 +1275,19 @@ class Tableau:
         node = self.m_first_tableau_node
         count = 0
         while node is not None:
-            if node._previous_tableau_node is None:
+            if node.m_previous_tableau_node is None:
                 if self.m_first_tableau_node is not node:
                     raise RuntimeError("First tableau node is pointing wrongly.")
             else:
-                if node._previous_tableau_node._next_tableau_node is not node:
+                if node.m_previous_tableau_node.m_next_tableau_node is not node:
                     raise RuntimeError("Previous tableau node is pointing wrongly.")
-            if node._next_tableau_node is None:
+            if node.m_next_tableau_node is None:
                 if self.m_last_tableau_node is not node:
                     raise RuntimeError("Last tableau node is pointing wrongly.")
             else:
-                if node._next_tableau_node._previous_tableau_node is not node:
+                if node.m_next_tableau_node.m_previous_tableau_node is not node:
                     raise RuntimeError("Next tableau node is pointing wrongly.")
             count += 1
-            node = node._next_tableau_node
+            node = node.m_next_tableau_node
         if count != self.m_number_of_nodes_in_tableau:
             raise RuntimeError("Invalid number of nodes in the tableau.")

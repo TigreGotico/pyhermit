@@ -8,10 +8,12 @@ from hermit.datatypes.registry import (
     UnsupportedFacetException,
     ValueSpaceSubset,
 )
+from hermit.model import InternalDatatype
 
 __all__ = [
     "DatatypeHandler",
     "DatatypeRegistry",
+    "InternalDatatype",
     "MalformedLiteralException",
     "UnsupportedDatatypeException",
     "UnsupportedFacetException",
