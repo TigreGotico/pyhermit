@@ -271,6 +271,8 @@ class _SimpleRetrieval(Retrieval):
         self._tuple_buffer: list[Any] = [None] * buf_size
         self._bindings_buffer: list[Any | None] = [None] * len(bound_mask)
         self._current_index = -1
+        self._start_index = 0
+        self._end_index = 0
         self._arity = len(bound_mask)
 
     def clear(self) -> None:
@@ -280,13 +282,31 @@ class _SimpleRetrieval(Retrieval):
         self._bindings_buffer = [None] * self._arity
 
     def open(self) -> None:
-        self._current_index = 0
+        # Set start/end indices based on view (mirrors Java ExtensionTable.UnindexedRetrieval.open())
+        table = self._extension_table.m_tuple_table
+        arity = self._extension_table.m_tuple_arity
+        # Convert tuple indices to element indices (each tuple occupies arity+1 slots)
+        slot_size = arity + 1
+        if self._view == "EXTENSION_THIS":
+            self._start_index = 0
+            self._end_index = self._extension_table._after_extension_this_tuple_index * slot_size
+        elif self._view == "EXTENSION_OLD":
+            self._start_index = 0
+            self._end_index = self._extension_table._after_extension_old_tuple_index * slot_size
+        elif self._view == "DELTA_OLD":
+            self._start_index = self._extension_table._after_extension_old_tuple_index * slot_size
+            self._end_index = self._extension_table._after_extension_this_tuple_index * slot_size
+        else:  # TOTAL
+            self._start_index = 0
+            self._end_index = self._extension_table._after_delta_new_tuple_index * slot_size
+
+        self._current_index = self._start_index
 
     def next(self) -> None:
         table = self._extension_table.m_tuple_table
         arity = self._extension_table.m_tuple_arity
         mask = self._bound_mask
-        while self._current_index < table.size:
+        while self._current_index < self._end_index and self._current_index < table.size:
             match = True
             for i in range(arity):
                 if mask[i]:
@@ -303,10 +323,10 @@ class _SimpleRetrieval(Retrieval):
                     pass
                 return
             self._current_index += arity
-        self._current_index = table.size  # past end
+        self._current_index = self._end_index  # past end
 
     def after_last(self) -> bool:
-        return self._current_index >= self._extension_table.m_tuple_table.size
+        return self._current_index >= self._end_index
 
     def get_tuple_buffer(self) -> list[Any]:
         return self._tuple_buffer
@@ -421,13 +441,15 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         self._after_delta_new_tuple_index = 0
 
     def branching_point_pushed(self) -> None:
-        self._after_extension_this_tuple_index = self.m_tuple_table.size
-        self._after_delta_new_tuple_index = self.m_tuple_table.size
+        slot_size = self.m_tuple_arity + 1
+        self._after_extension_this_tuple_index = self.m_tuple_table.size // slot_size
+        self._after_delta_new_tuple_index = self.m_tuple_table.size // slot_size
 
     def backtrack(self) -> None:
-        self.m_tuple_table.truncate(self._after_extension_old_tuple_index)
-        self._after_extension_this_tuple_index = self.m_tuple_table.size
-        self._after_delta_new_tuple_index = self.m_tuple_table.size
+        self.m_tuple_table.truncate(self._after_extension_old_tuple_index * (self.m_tuple_arity + 1))
+        slot_size = self.m_tuple_arity + 1
+        self._after_extension_this_tuple_index = self.m_tuple_table.size // slot_size
+        self._after_delta_new_tuple_index = self.m_tuple_table.size // slot_size
 
     def add_tuple(
         self,
@@ -533,7 +555,40 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         return False
 
     def propagate_delta_new(self) -> bool:
-        return False
+        """Propagate delta-new tuples to extension-this, and extension-this to extension-old.
+
+        Mirrors the Java ExtensionTable.propagateDeltaNew():
+            boolean deltaNewNotEmpty = (m_afterExtensionThisTupleIndex != m_afterDeltaNewTupleIndex);
+            m_afterExtensionOldTupleIndex = m_afterExtensionThisTupleIndex;
+            m_afterExtensionThisTupleIndex = m_afterDeltaNewTupleIndex;
+            m_afterDeltaNewTupleIndex = m_tupleTable.getFirstFreeTupleIndex();
+            return deltaNewNotEmpty;
+
+        Note: The Python TupleTable uses element indices (flat array), not tuple indices.
+        Each tuple occupies (arity + 1) element slots (the extra slot is for the dependency set).
+        We convert element count to tuple count by dividing by (arity + 1).
+
+        Additional fix: after clear() when both indices are 0 but tuples exist (loaded
+        before any propagation), treat all existing tuples as delta_new.
+        """
+        slot_size = self.m_tuple_arity + 1
+        first_free_tuple_index = self.m_tuple_table.size // slot_size
+
+        # If both indices are 0 but there are tuples, treat all as delta_new
+        if (
+            self._after_extension_this_tuple_index == 0
+            and self._after_delta_new_tuple_index == 0
+            and first_free_tuple_index > 0
+        ):
+            self._after_delta_new_tuple_index = first_free_tuple_index
+
+        delta_new_not_empty = (
+            self._after_extension_this_tuple_index != self._after_delta_new_tuple_index
+        )
+        self._after_extension_old_tuple_index = self._after_extension_this_tuple_index
+        self._after_extension_this_tuple_index = self._after_delta_new_tuple_index
+        self._after_delta_new_tuple_index = first_free_tuple_index
+        return delta_new_not_empty
 
     def create_retrieval(
         self,
@@ -1073,6 +1128,49 @@ class ExtensionManager:
             return self.add_assertion_binary(
                 role.get_inverse_of(), node_to, node_from, dependency_set, is_core
             )
+
+    def add_assertion(
+        self,
+        dl_predicate: DLPredicate,
+        *args: Any,
+    ) -> bool:
+        """Add an assertion, dispatching by arity.
+
+        Supports the following call signatures (mirroring Java overloading):
+        - ``(dl_predicate, node, dependency_set, is_core)`` — unary
+        - ``(dl_predicate, node0, node1, dependency_set, is_core)`` — binary
+        - ``(dl_predicate, node0, node1, node2, dependency_set, is_core)`` — ternary
+        """
+        n = len(args)
+        if n == 3:
+            # Unary: (node, dependency_set, is_core)
+            node, ds, core = args
+            return self.add_assertion_unary(dl_predicate, node, ds, core)
+        elif n == 4:
+            # Binary: (node0, node1, dependency_set, is_core)
+            node0, node1, ds, core = args
+            return self.add_assertion_binary(dl_predicate, node0, node1, ds, core)
+        elif n == 5:
+            # Ternary: (node0, node1, node2, dependency_set, is_core)
+            node0, node1, node2, ds, core = args
+            return self.add_assertion_ternary(dl_predicate, node0, node1, node2, ds, core)
+        else:
+            raise ValueError(
+                f"add_assertion requires 3-5 additional arguments, got {n}"
+            )
+
+    def add_assertion_binary(
+        self,
+        dl_predicate: DLPredicate,
+        node0: Node,
+        node1: Node,
+        dependency_set: DependencySet,
+        is_core: bool,
+    ) -> bool:
+        """Add a binary assertion (DLPredicate on two nodes)."""
+        return self.add_role_assertion(
+            dl_predicate, node0, node1, dependency_set, is_core
+        )
 
     def add_assertion_unary(
         self,

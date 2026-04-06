@@ -14,20 +14,22 @@
 - [x] **Entailment checker** — batch entailment checking
 - [x] **CLI** — 7 subcommands (classify, realize, consistent, entails, query, stats, dump-clauses)
 - [x] **Structural data structures** (3 files) — NormalizedAxioms, OWLAxiomsExpressivity, OWLClausification (843 lines)
-- [x] **Tests** — 419 tests passing (350 unit + 69 integration/tableau)
+- [x] **Tests** — 415/425 tests passing
 - [x] **CI** — GitHub Actions (ruff, mypy, pytest on Python 3.10–3.13)
 - [x] **Docs** — README with EYE comparison, brainstorm.md, sprint.md, spec.md, audit.md, status.md
 
-## In Progress 🔄
+## Known Issues 🐛
 
-- [ ] **Integration test fixes** — 6 tests failing:
-  - `TestPropertySubsumption::test_property_hierarchy` — KeyError in Hierarchy.transform
-  - `TestABoxReasoning::test_fido_not_cat` — incorrect type inference
-  - `TestBottomDetection::*` — A reported satisfiable when A ⊑ B and A ⊑ ¬B
-  - `TestBranchingPoint::test_branching_point_creation` — tableau API mismatch
+### Critical (affecting correctness)
+1. **apply_dl_clauses binary/ternary tuple confusion** — The hyperresolution manager's apply_dl_clauses treats all delta_old tuples as ternary (role assertions with 2 nodes), but binary tuples (concept assertions with 1 node) have a different structure. This prevents the DL clause fire-and-derive mechanism from working correctly.
+
+### Minor
+2. **10 failing tests** — 8 integration tests (due to #1), 2 tableau unit tests (branching point, hyperresolution)
+3. **F821 ruff ignore** — TYPE_CHECKING imports for Node/Tableau need systematic cleanup across blocking/existentials/tableau modules
 
 ## Pending ⏳
 
+- [ ] **Fix apply_dl_clauses** — Separate binary and ternary tuple processing paths
 - [ ] **ExpressionManager** — NNF + simplification (~560 Java lines)
 - [ ] **OWLNormalization** — OWL axioms → normalized disjunctions (~1,400 Java lines, requires OWL API parser)
 - [ ] **BuiltInPropertyManager** — top/bottom property axiomatization (~270 Java lines)
@@ -39,15 +41,14 @@
 
 | Metric | Value |
 |---|---|
-| Total commits | 8 |
+| Total commits | 12 |
 | Python source files | 88 |
 | Test files | 7 |
-| Total source lines | 27,963 |
-| Total test lines | 4,467 |
-| **Total lines** | **32,430** |
-| Tests | **419 passing, 6 failing** |
+| Total source lines | ~28,000 |
+| Total test lines | ~4,500 |
+| **Total lines** | **~32,500** |
+| Tests | **415 passing, 10 failing** |
 | Ruff errors | **0** |
-| Mypy strict (model) | **0** |
 
 ## Dependency Chain
 
@@ -65,7 +66,7 @@ OWLNormalization → BuiltInPropertyManager → ObjectPropertyInclusionManager (
 
 ## Next Priorities
 
-1. **Fix 6 failing integration tests** — semantic bugs in tableau reasoning
+1. **Fix apply_dl_clauses** — The critical blocker for all tableau reasoning
 2. **ExpressionManager** — NNF + simplification (needed for OWLNormalization)
 3. **OWLNormalization** — the largest remaining piece (~1,400 lines)
 4. **OWL ontology parser** — RDF/XML or FSS reader

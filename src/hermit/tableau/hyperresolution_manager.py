@@ -401,9 +401,16 @@ class HyperresolutionManager:
                     self.m_tuple_consumers_by_delta_predicate.get(delta_old_predicate)
                 )
                 apply_unoptimized = True
+                # The Java original checks: deltaOldTupleBuffer[0] instanceof AtomicRole
+                # Only ternary tuples (role assertions) have node1 and node2 as Nodes.
+                # Binary tuples (concept assertions) have only 2 elements: predicate + node.
+                # Index 2 in a binary tuple is the dependency set, not a Node.
+                from hermit.model import AtomicRole
+                is_role_assertion = isinstance(delta_old_predicate, AtomicRole)
                 if (
                     unoptimized_compiled_dl_clause_info is not None
                     and delta_old_tuple_buffer[1] is not None
+                    and is_role_assertion
                 ):
                     node1 = delta_old_tuple_buffer[1]
                     node2: Node = delta_old_tuple_buffer[2]  # type: ignore[assignment]
