@@ -71,4 +71,6 @@ ignore = [
     "N802",   # Function names: keep Java camelCase (getTimeOut, etc.)
     "N818",   # Exception naming: keep Java names (MalformedLiteralException)
     "I001",   # Import sorting: side-effect imports in _register_all()
+    "N814",   # CamelCase imported as constant (AtomicConcept as _AC)
+    "B027",   # Empty method in abstract base class (create_retrieval default impl)
 ]

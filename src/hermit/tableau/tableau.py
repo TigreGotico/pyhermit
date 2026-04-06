@@ -522,7 +522,7 @@ class Tableau:
             self.m_branching_points[0] = BranchingPoint(self)
             self.m_current_branching_point += 1
             self.m_nonbacktrackable_branching_point = self.m_current_branching_point
-            dependency_set = self.m_dependency_set_factory.add_branching_point(
+            self.m_dependency_set_factory.add_branching_point(
                 self.m_dependency_set_factory.empty_set,
                 self.m_current_branching_point,
             )

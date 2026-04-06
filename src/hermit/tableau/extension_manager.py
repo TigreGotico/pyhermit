@@ -498,14 +498,15 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         view: str = "TOTAL",
     ) -> Retrieval:
         """Create a retrieval. Supports both Java-overloaded signatures:
-        
+
         1. ``create_retrieval(bound_mask: list[bool], view: str)``
         2. ``create_retrieval(binding_positions, bindings_buffer, tuple_buffer, owns_buffers, view)``
         """
         # Detect signature by checking first element type
         if bound_mask_or_positions and isinstance(bound_mask_or_positions[0], bool):
             # Simple retrieval: (bound_mask, view)
-            return _SimpleRetrieval(self, bound_mask_or_positions, view_or_bindings if isinstance(view_or_bindings, str) else view)
+            v = view_or_bindings if isinstance(view_or_bindings, str) else view
+            return _SimpleRetrieval(self, bound_mask_or_positions, v)
         else:
             # Full retrieval: (binding_positions, bindings_buffer, tuple_buffer, owns_buffers, view)
             bindings = view_or_bindings if isinstance(view_or_bindings, list) else []

@@ -368,10 +368,6 @@ class Node:
         """Return the count of positive atomic concepts asserted to this node."""
         return self.m_number_of_positive_atomic_concepts
 
-    def is_active(self) -> bool:
-        """Return ``True`` if the node is active."""
-        return self.m_node_state == NodeState.ACTIVE
-
     def is_merged(self) -> bool:
         """Return ``True`` if the node has been merged into another."""
         return self.m_node_state == NodeState.MERGED
