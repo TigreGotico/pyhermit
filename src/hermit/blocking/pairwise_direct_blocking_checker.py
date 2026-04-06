@@ -12,7 +12,6 @@ PairWiseDirectBlockingChecker
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 
 from hermit.model import AtomicConcept, AtomicRole, DataRange
 from hermit.blocking.set_factory import Entry, SetFactory

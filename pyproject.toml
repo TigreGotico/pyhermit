@@ -73,4 +73,5 @@ ignore = [
     "I001",   # Import sorting: side-effect imports in _register_all()
     "N814",   # CamelCase imported as constant (AtomicConcept as _AC)
     "B027",   # Empty method in abstract base class (create_retrieval default impl)
+    "F821",   # Temporarily: TYPE_CHECKING imports for Node/Tableau need cleanup
 ]
