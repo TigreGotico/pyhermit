@@ -354,7 +354,7 @@ class Reasoner:
         fresh = Individual.create_anonymous("fresh-individual")
         assertion = Atom.create(concept, fresh)
         return self._get_tableau_with_facts({assertion}).is_satisfiable(
-            True, False, None, None, None, None, None,
+            True, True, None, None, None, None, None,
             ReasoningTaskDescription.is_concept_satisfiable(concept),
         )
 

@@ -161,49 +161,43 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
     def assertion_added_concept(
         self, concept: Concept, node: Node, is_core: bool
     ) -> None:
-        self.m_blocking_strategy.assertion_added_concept(concept, node, is_core)
+        self.m_blocking_strategy.assertion_added(concept, node, is_core)
 
     def assertion_core_set_concept(self, concept: Concept, node: Node) -> None:
-        self.m_blocking_strategy.assertion_core_set_concept(concept, node)
+        self.m_blocking_strategy.assertion_core_set(concept, node)
 
     def assertion_removed_concept(
         self, concept: Concept, node: Node, is_core: bool
     ) -> None:
-        self.m_blocking_strategy.assertion_removed_concept(concept, node, is_core)
+        self.m_blocking_strategy.assertion_removed(concept, node, is_core)
 
     def assertion_added_data_range(
         self, data_range: DataRange, node: Node, is_core: bool
     ) -> None:
-        self.m_blocking_strategy.assertion_added_data_range(data_range, node, is_core)
+        self.m_blocking_strategy.assertion_added(data_range, node, is_core)
 
     def assertion_core_set_data_range(self, data_range: DataRange, node: Node) -> None:
-        self.m_blocking_strategy.assertion_core_set_data_range(data_range, node)
+        self.m_blocking_strategy.assertion_core_set(data_range, node)
 
     def assertion_removed_data_range(
         self, data_range: DataRange, node: Node, is_core: bool
     ) -> None:
-        self.m_blocking_strategy.assertion_removed_data_range(data_range, node, is_core)
+        self.m_blocking_strategy.assertion_removed(data_range, node, is_core)
 
     def assertion_added_atomic_role(
         self, atomic_role: AtomicRole, node_from: Node, node_to: Node, is_core: bool
     ) -> None:
-        self.m_blocking_strategy.assertion_added_atomic_role(
-            atomic_role, node_from, node_to, is_core
-        )
+        self.m_blocking_strategy.assertion_added(atomic_role, node_from, node_to, is_core)
 
     def assertion_core_set_atomic_role(
         self, atomic_role: AtomicRole, node_from: Node, node_to: Node
     ) -> None:
-        self.m_blocking_strategy.assertion_core_set_atomic_role(
-            atomic_role, node_from, node_to
-        )
+        self.m_blocking_strategy.assertion_core_set(atomic_role, node_from, node_to)
 
     def assertion_removed_atomic_role(
         self, atomic_role: AtomicRole, node_from: Node, node_to: Node, is_core: bool
     ) -> None:
-        self.m_blocking_strategy.assertion_removed_atomic_role(
-            atomic_role, node_from, node_to, is_core
-        )
+        self.m_blocking_strategy.assertion_removed(atomic_role, node_from, node_to, is_core)
 
     def nodes_merged(self, merge_from: Node, merge_into: Node) -> None:
         self.m_blocking_strategy.nodes_merged(merge_from, merge_into)

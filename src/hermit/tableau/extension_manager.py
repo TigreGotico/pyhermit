@@ -266,14 +266,17 @@ class _SimpleRetrieval(Retrieval):
         self._extension_table = extension_table
         self._bound_mask = bound_mask
         self._view = view
-        self._tuple_buffer: list[Any] = [None] * len(bound_mask)
+        # Buffer needs to hold arity+1 elements (includes dependency set slot)
+        buf_size = extension_table.m_tuple_arity + 1
+        self._tuple_buffer: list[Any] = [None] * buf_size
         self._bindings_buffer: list[Any | None] = [None] * len(bound_mask)
         self._current_index = -1
         self._arity = len(bound_mask)
 
     def clear(self) -> None:
         self._current_index = -1
-        self._tuple_buffer = [None] * self._arity
+        buf_size = self._extension_table.m_tuple_arity + 1
+        self._tuple_buffer = [None] * buf_size
         self._bindings_buffer = [None] * self._arity
 
     def open(self) -> None:
@@ -442,6 +445,49 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         self.m_dependency_set_manager.store_dependency_set(tuple_index, dependency_set)
         if is_core:
             self.m_core_manager.mark_core(tuple_index, True)
+
+        # Post-add processing (mirrors Java ExtensionTable.postAdd)
+        dl_predicate = tuple_data[0]
+        from hermit.model import (
+            AtomicConcept,
+            AtomicNegationConcept,
+            AtomicRole,
+            DataRange,
+            DescriptionGraph,
+            ExistentialConcept,
+            NegatedAtomicRole,
+        )
+        if isinstance(dl_predicate, AtomicConcept):
+            node = tuple_data[1]
+            node.m_number_of_positive_atomic_concepts += 1
+            if self.m_tableau is not None:
+                strat = self.m_tableau.m_existential_expansion_strategy
+                strat.assertion_added_concept(dl_predicate, node, is_core)
+        elif isinstance(dl_predicate, ExistentialConcept):
+            node = tuple_data[1]
+            node.add_unprocessed_existential(dl_predicate)
+            if self.m_tableau is not None:
+                strat = self.m_tableau.m_existential_expansion_strategy
+                strat.assertion_added_concept(dl_predicate, node, is_core)
+        elif isinstance(dl_predicate, AtomicNegationConcept):
+            node = tuple_data[1]
+            node.m_number_of_negated_atomic_concepts += 1
+        elif isinstance(dl_predicate, DataRange):
+            node = tuple_data[1]
+            if self.m_tableau is not None:
+                strat = self.m_tableau.m_existential_expansion_strategy
+                strat.assertion_added_data_range(dl_predicate, node, is_core)
+        elif isinstance(dl_predicate, AtomicRole):
+            node1 = tuple_data[1]
+            node2 = tuple_data[2]
+            if self.m_tableau is not None:
+                strat = self.m_tableau.m_existential_expansion_strategy
+                strat.assertion_added_atomic_role(dl_predicate, node1, node2, is_core)
+        elif isinstance(dl_predicate, NegatedAtomicRole):
+            node = tuple_data[1]
+            node.m_number_of_negated_role_assertions += 1
+        elif isinstance(dl_predicate, DescriptionGraph):
+            pass  # Description graph handling
 
         # Notify clash manager
         self.m_tableau.m_clash_manager.tuple_added(self, tuple_data, dependency_set, is_core)

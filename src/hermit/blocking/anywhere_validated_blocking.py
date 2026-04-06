@@ -16,10 +16,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from hermit.model import AtomicConcept, AtomicRole, DLClause, DataRange, Variable
+    from hermit.model import AtomicRole, DLClause, DataRange, Variable
     from hermit.tableau import DLClauseEvaluator, ExtensionManager, Node, Tableau
 
 from .blocking_strategy import BlockingStrategy
+from hermit.model import AtomicConcept
 from .blocking_validator import BlockingValidator
 from .direct_blocking_checker import DirectBlockingChecker
 

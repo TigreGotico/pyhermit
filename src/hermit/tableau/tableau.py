@@ -471,7 +471,8 @@ class Tableau:
         self.clear()
 
         load_permanent = (
-            self.m_permanent_dl_ontology.has_nominals()
+            load_permanent_abox
+            or self.m_permanent_dl_ontology.has_nominals()
             or (
                 self.m_additional_dl_ontology is not None
                 and self.m_additional_dl_ontology.has_nominals()
@@ -784,6 +785,7 @@ class Tableau:
                 if self.m_has_description_graphs and not self.m_extension_manager.contains_clash():
                     self.m_description_graph_manager.check_graph_constraints()
                 if not self.m_extension_manager.contains_clash():
+                    self.m_permanent_hyperresolution_manager.apply_dl_clauses()
                     if self.m_additional_hyperresolution_manager is not None:
                         self.m_additional_hyperresolution_manager.apply_dl_clauses()
                 if (
