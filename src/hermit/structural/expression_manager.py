@@ -11,7 +11,6 @@ Type checking is disabled for this module pending API cleanup.
 
 from __future__ import annotations
 
-from typing import Union
 
 from hermit.owl_model.class_expression import (
     OWLClassExpression,

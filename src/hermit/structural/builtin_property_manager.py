@@ -168,7 +168,6 @@ class BuiltInPropertyManager:
             OWLDataAllValuesFrom,
             OWLThing,
         )
-        from hermit.owl_model.owl_datatype import OWLDatatype
         from hermit.owl_model.owl_data_ranges import OWLDataComplementOf
         from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
 

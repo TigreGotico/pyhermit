@@ -15,7 +15,8 @@ Type checking is disabled pending implementation review.
 
 from __future__ import annotations
 
-from typing import Iterable, TypeVar
+from typing import TypeVar
+from collections.abc import Iterable
 
 from hermit.structural.expression_manager import ExpressionManager
 from hermit.structural.normalized_axioms import NormalizedAxioms

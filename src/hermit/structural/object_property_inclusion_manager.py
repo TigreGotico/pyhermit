@@ -58,7 +58,6 @@ class ObjectPropertyInclusionManager:
 
         replacement_index = first_replacement_index
         facts_to_remove = []
-        facts_to_add = []
 
         for fact in normalized_axioms.negative_facts:
             if isinstance(fact, OWLNegativeObjectPropertyAssertionAxiom):
