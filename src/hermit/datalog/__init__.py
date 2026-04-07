@@ -66,20 +66,24 @@ class DatalogEngine:
         if not self._materialized:
             # Import here to avoid circular dependency
             from hermit.tableau.tableau import Tableau
+            from hermit.tableau.interrupt_flag import InterruptFlag
 
             # Create tableau with null existential expansion (no new nodes)
+            interrupt_flag = InterruptFlag(600000)  # 10 minute timeout
+
             tableau = Tableau(
-                interrupt_flag=None,  # type: ignore[arg-type]
-                blocking_strategy=None,
-                existential_strategy=_NullExistentialExpansionStrategy(),
-                use_model_completion=False,
-                dl_ontology=self.dl_ontology,
+                interrupt_flag=interrupt_flag,
+                tableau_monitor=None,
+                existential_expansion_strategy=_NullExistentialExpansionStrategy(),
+                use_disjunction_learning=False,
+                permanent_dl_ontology=self.dl_ontology,
+                additional_dl_ontology=None,
+                parameters={},
             )
 
             # Materialize: run tableau to fixpoint
             is_consistent = tableau.is_satisfiable(
-                load_permanent_abox=True,
-                final_check=False,
+                False,  # load_permanent_abox (positional arg)
             )
 
             if is_consistent:
