@@ -9,7 +9,7 @@
 - [x] Step 5: Implement `structural/ExpressionManager` (NNF + simplification)
 - [x] Step 6: Implement `structural/OWLNormalization` (OWL axioms → NormalizedAxioms)
 - [x] Step 7: Implement `structural/BuiltInPropertyManager` (top/bottom property injection)
-- [ ] Step 8: Implement `structural/ObjectPropertyInclusionManager` (role chain automata)
+- [x] Step 8: Implement `structural/ObjectPropertyInclusionManager` (role chain automata)
 - [ ] Step 9: Implement `datalog/` — ConjunctiveQuery, DatalogEngine, QueryResultCollector
 - [ ] Step 10: Implement `hermit/parser.py` — owlready2-backed OWL file parser
 - [ ] Step 11: Wire end-to-end — update `structural/__init__.py`, `hermit/__init__.py`, and OWLNormalization wiring
