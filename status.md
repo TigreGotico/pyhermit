@@ -8,7 +8,7 @@
 - [x] Step 4: Vendor `hermit/owl_model/` from owlapy (rewrite imports, replace pandas.Timedelta)
 - [x] Step 5: Implement `structural/ExpressionManager` (NNF + simplification)
 - [x] Step 6: Implement `structural/OWLNormalization` (OWL axioms → NormalizedAxioms)
-- [ ] Step 7: Implement `structural/BuiltInPropertyManager` (top/bottom property injection)
+- [x] Step 7: Implement `structural/BuiltInPropertyManager` (top/bottom property injection)
 - [ ] Step 8: Implement `structural/ObjectPropertyInclusionManager` (role chain automata)
 - [ ] Step 9: Implement `datalog/` — ConjunctiveQuery, DatalogEngine, QueryResultCollector
 - [ ] Step 10: Implement `hermit/parser.py` — owlready2-backed OWL file parser

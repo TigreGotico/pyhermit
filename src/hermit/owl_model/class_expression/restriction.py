@@ -13,13 +13,12 @@ from ..owl_individual import OWLIndividual
 from ..owl_datatype import OWLDatatype
 from ..owl_object import OWLObject
 from ..vocab import OWLFacet
-from datetime import datetime, date
-from pandas import Timedelta
+from datetime import datetime, date, timedelta
 
 _T = TypeVar('_T')  #:
 _F = TypeVar('_F', bound=OWLPropertyRange)  #:
 
-Literals = Union['OWLLiteral', int, float, bool, Timedelta, datetime, date, str]  #:
+Literals = Union['OWLLiteral', int, float, bool, timedelta, datetime, date, str]  #:
 
 
 class OWLRestriction(OWLAnonymousClassExpression):
