@@ -395,18 +395,20 @@ class HyperresolutionManager:
         for delta_old_retrieval in self.m_delta_old_retrievals:
             delta_old_retrieval.open()
             delta_old_tuple_buffer = delta_old_retrieval.get_tuple_buffer()
+            # Tuple arity: 2 for binary (concept assertions), 3 for ternary (role assertions)
+            # Access private _extension_table to get m_tuple_arity (distinguishes binary vs ternary)
+            tuple_arity = delta_old_retrieval._extension_table.m_tuple_arity  # type: ignore[attr-defined]
             while not delta_old_retrieval.after_last() and not self.m_extension_manager.contains_clash():
                 delta_old_predicate = delta_old_tuple_buffer[0]
                 unoptimized_compiled_dl_clause_info = (
                     self.m_tuple_consumers_by_delta_predicate.get(delta_old_predicate)
                 )
                 apply_unoptimized = True
-                # The Java original checks: deltaOldTupleBuffer[0] instanceof AtomicRole
-                # Only ternary tuples (role assertions) have node1 and node2 as Nodes.
-                # Binary tuples (concept assertions) have only 2 elements: predicate + node.
-                # Index 2 in a binary tuple is the dependency set, not a Node.
+                # Dispatch on tuple arity: only role assertions (arity 3) use the optimization.
+                # Binary tuples (arity 2) contain [predicate, node, dep_set].
+                # Ternary tuples (arity 3) contain [predicate, node1, node2, dep_set].
                 from hermit.model import AtomicRole
-                is_role_assertion = isinstance(delta_old_predicate, AtomicRole)
+                is_role_assertion = isinstance(delta_old_predicate, AtomicRole) and tuple_arity == 3
                 if (
                     unoptimized_compiled_dl_clause_info is not None
                     and delta_old_tuple_buffer[1] is not None
