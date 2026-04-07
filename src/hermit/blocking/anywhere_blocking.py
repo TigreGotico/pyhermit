@@ -16,10 +16,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from hermit.model import AtomicRole, DLClause, DataRange, Variable
-    from hermit.tableau import DLClauseEvaluator, Node, Tableau
+    from hermit.model import DLClause, Variable
+    from hermit.tableau import DLClauseEvaluator, Tableau
 
-from hermit.model import AtomicConcept
+from hermit.tableau.node import Node
+
+from hermit.model import AtomicConcept, AtomicRole, DataRange
 
 from .blocking_signature_cache import BlockingSignatureCache
 from .blocking_strategy import BlockingStrategy
