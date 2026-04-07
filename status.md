@@ -6,7 +6,7 @@
 - [x] Step 2: Fix `m_last_tableau_node` AttributeError in `tableau/branching_point.py`
 - [x] Step 3: Fix `apply_dl_clauses` binary/ternary tuple split + remove DEBUG prints in `tableau/hyperresolution_manager.py`
 - [x] Step 4: Vendor `hermit/owl_model/` from owlapy (rewrite imports, replace pandas.Timedelta)
-- [ ] Step 5: Implement `structural/ExpressionManager` (NNF + simplification)
+- [x] Step 5: Implement `structural/ExpressionManager` (NNF + simplification)
 - [ ] Step 6: Implement `structural/OWLNormalization` (OWL axioms → NormalizedAxioms)
 - [ ] Step 7: Implement `structural/BuiltInPropertyManager` (top/bottom property injection)
 - [ ] Step 8: Implement `structural/ObjectPropertyInclusionManager` (role chain automata)
