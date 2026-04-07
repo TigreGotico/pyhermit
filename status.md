@@ -13,7 +13,7 @@
 - [x] Step 9: Implement `datalog/` — ConjunctiveQuery, DatalogEngine, QueryResultCollector
 - [x] Step 10: Implement `hermit/parser.py` — owlready2-backed OWL file parser
 - [x] Step 11: Wire end-to-end — update `structural/__init__.py`, `hermit/__init__.py`, and OWLNormalization wiring
-- [ ] Step 12: Add end-to-end integration tests for Pizza and Koala ontologies
+- [x] Step 12: Add end-to-end integration tests for Pizza and Koala ontologies
 
 ## Blockers
 <!-- populated by /implement-task if something is stuck -->
