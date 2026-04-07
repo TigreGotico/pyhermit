@@ -363,7 +363,7 @@ class QuasiOrderClassification:
 
     def _initialise_known_subsumptions_using_told_subsumers(self) -> None:
         self._initialise_known_subsumptions_using_told_subsumers_from_clauses(
-            self.m_tableau.get_permanent_dl_ontology().get_dl_clauses()
+            self.m_tableau.m_permanent_dl_ontology.get_dl_clauses()
         )
 
     def _initialise_known_subsumptions_using_told_subsumers_from_clauses(
