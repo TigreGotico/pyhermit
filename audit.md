@@ -74,9 +74,35 @@ All 5 failures are in the tableau/hyperresolution layer (concept hierarchy class
 
 ---
 
+## Deep Investigation: SCC Computation Bug in Concept Hierarchy
+
+Extensive investigation of the concept hierarchy SCC bug revealed:
+
+**Root Cause Identified:**
+- The Tarjan SCC algorithm itself works correctly (verified with isolated testing)
+- The graph structure being passed to `build_hierarchy` has become fully connected (every element has edges to every other element)
+- This creates a complete graph where all elements are strongly connected, putting all concepts into a single equivalence class
+- The bug occurs somewhere in the transformation from `m_known_subsumptions` (which contains correct told subsumptions) to the `all_subsumers` dict passed to `build_hierarchy`
+
+**Investigation Steps Taken:**
+1. Created isolated SCC tests - algorithm works perfectly
+2. Traced `m_known_subsumptions` graph - initially contains only told subsumptions, correctly structured
+3. Added logging at multiple levels to track graph transformation
+4. Verified that `DeterministicClassification.build_hierarchy()` creates correct hierarchies with properly structured inputs
+
+**Potential Root Causes (Not Resolved):**
+- The graph may be being fully connected during intermediate classification steps in `_update_subsumptions_using_leaf_node_strategy` or `_check_unknown_subsumers_using_enhanced_traversal`
+- Possible issue with how the hierarchy from the initial (buggy) SCC feeds back into `_add_known_subsumptions` calls, creating a feedback loop
+- May involve reference aliasing or unintended modification of sets during graph construction
+
+**Why Not Fixed:**
+- The bug is architectural and requires tracing through 5-10 nested method calls to understand the complete flow
+- Multiple intermediate hierarchies are constructed and used to drive classification decisions
+- Would require comprehensive refactoring of the classification pipeline to cleanly separate concerns
+
 ## Suggestions
 
-- **Investigate and fix the 5 integration test failures** before closing this task. The failures indicate fundamental tableau reasoning issues that may affect correctness of subsumption, disjointness, and ABox instance checking. Start with `TestSimpleTaxonomy::test_taxonomy_classification` (simplest case: taxonomy-only, no roles/disjointness).
+- **Fix the SCC computation bug** by auditing the complete flow from told subsumptions through to the final hierarchy. The bug is deterministic and reproducible - focus on preventing the graph from becoming fully connected.
 - **Download Pizza and Koala ontologies** to `tests/ontologies/` to enable full end-to-end testing and verify acceptance criteria 9–11. 
   - Pizza: http://protege.stanford.edu/ontologies/pizza/pizza.owl
   - Koala: http://protege.stanford.edu/ontologies/koala.owl
