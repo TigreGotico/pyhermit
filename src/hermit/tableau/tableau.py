@@ -157,6 +157,19 @@ class Tableau:
             self.m_current_branching_point = -1
             self.m_nonbacktrackable_branching_point = -1
 
+            # Java field defaults — Python slots require explicit initialization
+            self.m_allocated_nodes: int = 0
+            self.m_number_of_nodes_in_tableau: int = 0
+            self.m_number_of_merged_or_pruned_nodes: int = 0
+            self.m_number_of_node_creations: int = 0
+            self.m_first_free_node: Node | None = None
+            self.m_first_tableau_node: Node | None = None
+            self.m_last_tableau_node: Node | None = None
+            self.m_last_merged_or_pruned_node: Node | None = None
+            self.m_first_ground_disjunction: Any = None
+            self.m_first_unprocessed_ground_disjunction: Any = None
+            self.m_is_current_model_deterministic: bool = True
+
             self._update_flags_dependent_on_additional_ontology()
 
             if self.m_tableau_monitor is not None:
