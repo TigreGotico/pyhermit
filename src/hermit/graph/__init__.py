@@ -96,9 +96,12 @@ class Graph(Generic[T]):
     def get_reachable_successors(self, from_node: T) -> set[T]:
         result: set[T] = set()
         to_visit: list[T] = [from_node]
+        visited: set[T] = set()
         while to_visit:
             current = to_visit.pop(0)
-            if result.add(current):
+            if current not in visited:
+                visited.add(current)
+                result.add(current)
                 to_visit.extend(self.get_successors(current))
         return result
 
