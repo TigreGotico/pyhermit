@@ -77,7 +77,12 @@ class CopyValues(Worker):
         self.m_to_index = to_index
 
     def execute(self, program_counter: int) -> int:
-        self.m_to_buffer[self.m_to_index] = self.m_from_buffer[self.m_from_index]
+        value = self.m_from_buffer[self.m_from_index]
+        # Canonicalize nodes in case they were merged
+        from hermit.tableau.node import Node
+        if isinstance(value, Node):
+            value = value.get_canonical_node()
+        self.m_to_buffer[self.m_to_index] = value
         return program_counter + 1
 
     def __str__(self) -> str:

@@ -1182,6 +1182,9 @@ class ExtensionManager:
         """Add a unary assertion (DLPredicate on a single node)."""
         if self._add_active:
             raise RuntimeError("ExtensionManager is not reentrant.")
+        # Canonicalize the node in case it was merged
+        if node is not None:
+            node = node.get_canonical_node()
         self._add_active = True
         try:
             self.m_binary_auxiliary_tuple_add[0] = dl_predicate
@@ -1210,6 +1213,9 @@ class ExtensionManager:
             return self.m_tableau.m_merging_manager.merge_nodes(
                 node0, node1, dependency_set
             )
+        # Canonicalize nodes in case they were merged
+        node0 = node0.get_canonical_node()
+        node1 = node1.get_canonical_node()
         if self._add_active:
             raise RuntimeError("ExtensionManager is not reentrant.")
         self._add_active = True
@@ -1233,6 +1239,10 @@ class ExtensionManager:
         is_core: bool,
     ) -> bool:
         """Add a ternary assertion (DLPredicate on three nodes)."""
+        # Canonicalize nodes in case they were merged
+        node0 = node0.get_canonical_node()
+        node1 = node1.get_canonical_node()
+        node2 = node2.get_canonical_node()
         if self._add_active:
             raise RuntimeError("ExtensionManager is not reentrant.")
         self.m_fourary_auxiliary_tuple_add[0] = dl_predicate

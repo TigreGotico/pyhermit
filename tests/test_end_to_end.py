@@ -15,14 +15,15 @@ from __future__ import annotations
 import pytest
 from pathlib import Path
 
-# Skip these tests if ontology files are not available
+# Check if ontology files are available
 PIZZA_ONTOLOGY = Path(__file__).parent / "ontologies" / "pizza.owl"
 KOALA_ONTOLOGY = Path(__file__).parent / "ontologies" / "koala.owl"
 
-pytest.skip(
-    allow_module_level=True,
-    reason="Pizza and Koala ontologies not yet available in tests/ontologies/",
-)
+if not PIZZA_ONTOLOGY.exists() or not KOALA_ONTOLOGY.exists():
+    pytest.skip(
+        allow_module_level=True,
+        reason="Pizza and/or Koala ontologies not available in tests/ontologies/",
+    )
 
 
 class TestPizzaOntology:
