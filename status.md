@@ -12,7 +12,7 @@
 - [x] Step 8: Implement `structural/ObjectPropertyInclusionManager` (role chain automata)
 - [x] Step 9: Implement `datalog/` — ConjunctiveQuery, DatalogEngine, QueryResultCollector
 - [x] Step 10: Implement `hermit/parser.py` — owlready2-backed OWL file parser
-- [ ] Step 11: Wire end-to-end — update `structural/__init__.py`, `hermit/__init__.py`, and OWLNormalization wiring
+- [x] Step 11: Wire end-to-end — update `structural/__init__.py`, `hermit/__init__.py`, and OWLNormalization wiring
 - [ ] Step 12: Add end-to-end integration tests for Pizza and Koala ontologies
 
 ## Blockers

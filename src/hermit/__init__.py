@@ -20,7 +20,12 @@ Basic usage::
 from __future__ import annotations
 
 __version__ = "0.1.0"
-__all__ = ["Reasoner", "Configuration"]
+__all__ = [
+    "Configuration",
+    "Reasoner",
+    "load_ontology",
+]
 
 from hermit.configuration import Configuration
 from hermit.reasoner import Reasoner
+from hermit.parser import load_ontology
