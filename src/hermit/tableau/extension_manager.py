@@ -481,19 +481,22 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         )
         if isinstance(dl_predicate, AtomicConcept):
             node = tuple_data[1]
-            node.m_number_of_positive_atomic_concepts += 1
-            if self.m_tableau is not None:
-                strat = self.m_tableau.m_existential_expansion_strategy
-                strat.assertion_added_concept(dl_predicate, node, is_core)
+            if node is not None:  # Guard against None nodes from invalid derivations
+                node.m_number_of_positive_atomic_concepts += 1
+                if self.m_tableau is not None:
+                    strat = self.m_tableau.m_existential_expansion_strategy
+                    strat.assertion_added_concept(dl_predicate, node, is_core)
         elif isinstance(dl_predicate, ExistentialConcept):
             node = tuple_data[1]
-            node.add_unprocessed_existential(dl_predicate)
-            if self.m_tableau is not None:
-                strat = self.m_tableau.m_existential_expansion_strategy
-                strat.assertion_added_concept(dl_predicate, node, is_core)
+            if node is not None:  # Guard against None nodes
+                node.add_unprocessed_existential(dl_predicate)
+                if self.m_tableau is not None:
+                    strat = self.m_tableau.m_existential_expansion_strategy
+                    strat.assertion_added_concept(dl_predicate, node, is_core)
         elif isinstance(dl_predicate, AtomicNegationConcept):
             node = tuple_data[1]
-            node.m_number_of_negated_atomic_concepts += 1
+            if node is not None:  # Guard against None nodes
+                node.m_number_of_negated_atomic_concepts += 1
         elif isinstance(dl_predicate, DataRange):
             node = tuple_data[1]
             if self.m_tableau is not None:
