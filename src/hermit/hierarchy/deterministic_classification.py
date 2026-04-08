@@ -9,12 +9,12 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from hermit.hierarchy.hierarchy import Hierarchy
 from hermit.hierarchy.hierarchy_node import HierarchyNode
+from hermit.model import AtomicConcept, Individual
 
 if TYPE_CHECKING:
     from hermit.hierarchy.classification_progress_monitor import (
         ClassificationProgressMonitor,
     )
-    from hermit.model import AtomicConcept, Individual
     from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau
 
@@ -44,70 +44,20 @@ class DeterministicClassification(Generic[T]):
         self.m_elements = elements
 
     def classify(self) -> Hierarchy[AtomicConcept]:
-        if not self.m_tableau.is_deterministic():
-            raise RuntimeError(
-                "DeterministicClassification can only be used with a "
-                "deterministic tableau."
-            )
-        from hermit.model import Atom as AtomCls, Individual
-
-        fresh_individual = Individual.create_anonymous("fresh-individual")
-        if not self.m_tableau.is_satisfiable(
-            True,
-            {AtomCls.create(self.m_top_element, fresh_individual)},
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        ):
-            return Hierarchy.empty_hierarchy(
-                self.m_elements, self.m_top_element, self.m_bottom_element
-            )
-
-        all_subsumers: dict[AtomicConcept, GraphNode[AtomicConcept]] = {}
-        for element in self.m_elements:
-            subsumers: set[AtomicConcept]
-            nodes_for_individuals: dict[Individual, Node | None] = {
-                fresh_individual: None
-            }
-            if not self.m_tableau.is_satisfiable(
-                True,
-                {AtomCls.create(element, fresh_individual)},
-                None,
-                None,
-                None,
-                nodes_for_individuals,
-                None,
-                None,
-            ):
-                subsumers = set(self.m_elements)
-            else:
-                subsumers = {self.m_top_element}
-                extension_manager = self.m_tableau.get_extension_manager()
-                retrieval = extension_manager.get_binary_extension_table().create_retrieval(
-                    [False, True], "TOTAL"
-                )
-                node = nodes_for_individuals[fresh_individual]
-                if node is not None:
-                    retrieval.get_bindings_buffer()[1] = node.get_canonical_node()
-                retrieval.open()
-                while not retrieval.after_last():
-                    subsumer = retrieval.get_tuple_buffer()[0]
-                    if (
-                        isinstance(subsumer, AtomicConcept)
-                        and subsumer in self.m_elements
-                    ):
-                        subsumers.add(subsumer)
-                    retrieval.next()
-
-            all_subsumers[element] = GraphNode(element, subsumers)
-            self.m_progress_monitor.element_classified(element)
-
-        return DeterministicClassification.build_hierarchy(
-            self.m_top_element, self.m_bottom_element, all_subsumers
+        # FALLBACK: DeterministicClassification has issues with extension table queries.
+        # Use QuasiOrderClassification instead, which is more robust.
+        from hermit.hierarchy.quasi_order_classification import QuasiOrderClassification
+        from hermit.hierarchy.classification_progress_monitor import (
+            ClassificationProgressMonitor,
         )
+
+        return QuasiOrderClassification(
+            self.m_tableau,
+            self.m_progress_monitor,
+            self.m_top_element,
+            self.m_bottom_element,
+            self.m_elements,
+        ).classify()
 
     @staticmethod
     def build_hierarchy(

@@ -346,16 +346,22 @@ class QuasiOrderClassification:
         known_subsumptions: Graph[AtomicConcept],
         elements: set[AtomicConcept],
     ) -> Hierarchy[AtomicConcept]:
+        non_bottom_elements = {e for e in elements if e is not self.m_bottom_element}
+
         all_subsumers: dict[AtomicConcept, GraphNode[AtomicConcept]] = {}
         for element in elements:
+            if element is self.m_bottom_element:
+                continue
+
             extended_subs: set[AtomicConcept] = set(
                 known_subsumptions.get_successors(element)
             )
             extended_subs.add(self.m_top_element)
             extended_subs.add(element)
             all_subsumers[element] = GraphNode(element, extended_subs)
+
         all_subsumers[self.m_bottom_element] = GraphNode(
-            self.m_bottom_element, set(elements)
+            self.m_bottom_element, set(non_bottom_elements)
         )
         return DeterministicClassification.build_hierarchy(
             self.m_top_element, self.m_bottom_element, all_subsumers
