@@ -301,10 +301,16 @@ class _SimpleRetrieval(Retrieval):
             self._end_index = self._extension_table._after_delta_new_tuple_index * slot_size
 
         self._current_index = self._start_index
+        # Populate the first matching tuple (mirrors Java open() → moveToNext())
+        self._advance()
 
     def next(self) -> None:
+        self._advance()
+
+    def _advance(self) -> None:
         table = self._extension_table.m_tuple_table
         arity = self._extension_table.m_tuple_arity
+        slot_size = arity + 1  # each tuple occupies arity+1 slots (includes dependency set)
         mask = self._bound_mask
         while self._current_index < self._end_index and self._current_index < table.size:
             match = True
@@ -317,12 +323,9 @@ class _SimpleRetrieval(Retrieval):
                         break
             if match:
                 table.retrieve_tuple(self._tuple_buffer, self._current_index)
-                self._current_index += arity
-                if self._extension_table.m_tuple_arity < len(self._tuple_buffer):
-                    # Dependency set slot
-                    pass
+                self._current_index += slot_size
                 return
-            self._current_index += arity
+            self._current_index += slot_size
         self._current_index = self._end_index  # past end
 
     def after_last(self) -> bool:
@@ -335,11 +338,11 @@ class _SimpleRetrieval(Retrieval):
         return self._bindings_buffer
 
     def get_dependency_set(self) -> DependencySet | None:
-        idx = self._current_index - self._extension_table.m_tuple_arity
+        idx = self._current_index - (self._extension_table.m_tuple_arity + 1)
         return self._extension_table.m_dependency_set_manager.get_dependency_set(idx)
 
     def is_core(self) -> bool:
-        idx = self._current_index - self._extension_table.m_tuple_arity
+        idx = self._current_index - (self._extension_table.m_tuple_arity + 1)
         return self._extension_table.m_core_manager.is_core(idx)
 
 
