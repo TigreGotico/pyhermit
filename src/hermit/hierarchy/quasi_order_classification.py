@@ -279,7 +279,7 @@ class QuasiOrderClassification:
             if isinstance(concept_object, AtomicConcept) and concept_object in self.m_elements:
                 atomic_concept = concept_object
                 node = tuple_buffer[1]
-                if node.is_active() and not node.is_blocked():
+                if node is not None and node.is_active() and not node.is_blocked():
                     if not self.m_possible_subsumptions.get_successors(atomic_concept):
                         self._read_possible_subsumers_from_node_label(
                             atomic_concept, node
@@ -301,7 +301,7 @@ class QuasiOrderClassification:
             concept_object = tuple_buffer[0]
             if isinstance(concept_object, AtomicConcept) and concept_object in self.m_elements:
                 node = tuple_buffer[1]
-                if node.is_active() and not node.is_blocked():
+                if node is not None and node.is_active() and not node.is_blocked():
                     self._prune_possible_subsumers_of_concept(
                         concept_object, node
                     )

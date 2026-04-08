@@ -277,15 +277,16 @@ class _SimpleRetrieval(Retrieval):
 
     def clear(self) -> None:
         self._current_index = -1
-        buf_size = self._extension_table.m_tuple_arity + 1
-        self._tuple_buffer = [None] * buf_size
-        self._bindings_buffer = [None] * self._arity
+        # Reset in-place to preserve shared references (evaluator CopyValues workers
+        # hold a reference to the same list object).
+        for i in range(len(self._tuple_buffer)):
+            self._tuple_buffer[i] = None
+        for i in range(len(self._bindings_buffer)):
+            self._bindings_buffer[i] = None
 
     def open(self) -> None:
-        # Set start/end indices based on view (mirrors Java ExtensionTable.UnindexedRetrieval.open())
         table = self._extension_table.m_tuple_table
         arity = self._extension_table.m_tuple_arity
-        # Convert tuple indices to element indices (each tuple occupies arity+1 slots)
         slot_size = arity + 1
         if self._view == "EXTENSION_THIS":
             self._start_index = 0
@@ -301,16 +302,11 @@ class _SimpleRetrieval(Retrieval):
             self._end_index = self._extension_table._after_delta_new_tuple_index * slot_size
 
         self._current_index = self._start_index
-        # Populate the first matching tuple (mirrors Java open() → moveToNext())
-        self._advance()
 
     def next(self) -> None:
-        self._advance()
-
-    def _advance(self) -> None:
         table = self._extension_table.m_tuple_table
         arity = self._extension_table.m_tuple_arity
-        slot_size = arity + 1  # each tuple occupies arity+1 slots (includes dependency set)
+        slot_size = arity + 1
         mask = self._bound_mask
         while self._current_index < self._end_index and self._current_index < table.size:
             match = True
@@ -381,11 +377,12 @@ class _FullRetrieval(Retrieval):
     def next(self) -> None:
         table = self._extension_table.m_tuple_table
         arity = self._arity
+        slot_size = arity + 1
         positions = self._binding_positions
         bindings = self._bindings_buffer
         while self._current_index < table.size:
             match = True
-            for i in range(arity + 1):  # +1 for dependency set slot
+            for i in range(slot_size):
                 pos = positions[i]
                 if pos >= 0:
                     expected = bindings[pos]
@@ -395,9 +392,9 @@ class _FullRetrieval(Retrieval):
                         break
             if match:
                 table.retrieve_tuple(self._tuple_buffer, self._current_index)
-                self._current_index += arity + 1
+                self._current_index += slot_size
                 return
-            self._current_index += arity + 1
+            self._current_index += slot_size
         self._current_index = table.size
 
     def after_last(self) -> bool:

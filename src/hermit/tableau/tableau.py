@@ -540,18 +540,16 @@ class Tableau:
                 self.m_dependency_set_factory.empty_set,
                 self.m_current_branching_point,
             )
+            dummy_dep = self.m_dependency_set_factory.add_branching_point(
+                self.m_dependency_set_factory.empty_set,
+                self.m_current_branching_point,
+            )
             if per_test_positive_facts_dummy_dependency:
-                from hermit.model import Atom as _Atom, AtomicConcept as _AC
-
-                for individual, dep_set in per_test_positive_facts_dummy_dependency.items():
-                    top_atom = _Atom.create(_AC.THING, individual)
-                    self._load_positive_fact(terms_to_nodes, top_atom, dep_set)
+                for atom in per_test_positive_facts_dummy_dependency:
+                    self._load_positive_fact(terms_to_nodes, atom, dummy_dep)
             if per_test_negative_facts_dummy_dependency:
-                from hermit.model import Atom as _Atom, AtomicConcept as _AC
-
-                for individual, dep_set in per_test_negative_facts_dummy_dependency.items():
-                    top_atom = _Atom.create(_AC.THING, individual)
-                    self._load_negative_fact(terms_to_nodes, top_atom, dep_set)
+                for atom in per_test_negative_facts_dummy_dependency:
+                    self._load_negative_fact(terms_to_nodes, atom, dummy_dep)
 
         # Map individuals to nodes
         if nodes_for_individuals is not None:

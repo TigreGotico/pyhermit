@@ -649,12 +649,20 @@ class InstanceManager:
 
     def _read_off_types(self, ind: Individual, node_for_individual: Node) -> bool:
         has_been_added = False
-        self.m_binary_retrieval_1_bound.get_bindings_buffer()[1] = (
+        retrieval = self.m_binary_retrieval_1_bound
+        retrieval.get_bindings_buffer()[1] = (
             node_for_individual.get_canonical_node()
         )
-        self.m_binary_retrieval_1_bound.open()
-        tuple_buffer = self.m_binary_retrieval_1_bound.get_tuple_buffer()
-        while not self.m_binary_retrieval_1_bound.after_last():
+        retrieval.open()
+        tuple_buffer = retrieval.get_tuple_buffer()
+        # _SimpleRetrieval: open() sets position but doesn't populate the buffer.
+        # next() scans forward, populates the buffer on match, and advances past it.
+        # After next(), after_last() tells us whether there are more matches AHEAD,
+        # but the buffer holds the match that was just found (if any).
+        # We use a prev_index trick: if next() advanced the index, it found a match.
+        prev_index = retrieval._current_index
+        retrieval.next()
+        while retrieval._current_index != prev_index:
             predicate = tuple_buffer[0]
             if isinstance(predicate, AtomicConcept):
                 atomic_concept = predicate
@@ -672,7 +680,8 @@ class InstanceManager:
                             element = AtomicConceptElement(None, None)
                             self.m_concept_to_element[representative] = element
                         has_been_added = True
-                        if self.m_binary_retrieval_1_bound.get_dependency_set() is None:
+                        dep_set = retrieval.get_dependency_set()
+                        if dep_set is None or dep_set.is_empty():
                             self._add_known_concept_instance(
                                 node, element, ind
                             )
@@ -682,7 +691,8 @@ class InstanceManager:
                             )
                             self.m_reading_off_found_possible_concept_instance = True
             self.m_interrupt_flag.check_interrupt()
-            self.m_binary_retrieval_1_bound.next()
+            prev_index = retrieval._current_index
+            retrieval.next()
         return has_been_added
 
     def _add_known_concept_instance(
