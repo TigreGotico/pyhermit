@@ -891,6 +891,10 @@ class Inequality:
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Inequality)
 
+    def equals(self, other: object) -> bool:
+        """Java-compatible equality check."""
+        return self.__eq__(other)
+
 
 Inequality.INSTANCE = Inequality()
 

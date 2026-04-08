@@ -170,9 +170,9 @@ class ExistentialExpansionManager:
 
         Returns True if expansion was performed (or a clash was detected).
         """
-        if at_least.get_number() == 1:
+        if at_least.number == 1:
             result: list[object | None] = [None, None]
-            if self._get_functional_expansion_node(at_least.get_on_role(), for_node, result):
+            if self._get_functional_expansion_node(at_least.on_role, for_node, result):
                 if self.m_tableau.m_tableau_monitor is not None:
                     self.m_tableau.m_tableau_monitor.existential_expansion_started(
                         at_least, for_node
@@ -185,7 +185,7 @@ class ExistentialExpansionManager:
                 )
                 self.m_binary_union_dependency_set.m_dependency_sets[1] = result[1]  # type: ignore[index]
                 self.m_extension_manager.add_role_assertion(
-                    at_least.get_on_role(),
+                    at_least.on_role,
                     for_node,
                     functionality_node,
                     self.m_binary_union_dependency_set,
@@ -211,7 +211,7 @@ class ExistentialExpansionManager:
                         at_least, for_node
                     )
                 return True
-        elif at_least.get_number() > 1 and at_least.get_on_role() in self.m_functional_roles:
+        elif at_least.number > 1 and at_least.on_role in self.m_functional_roles:
             if self.m_tableau.m_tableau_monitor is not None:
                 self.m_tableau.m_tableau_monitor.existential_expansion_started(
                     at_least, for_node
@@ -269,20 +269,20 @@ class ExistentialExpansionManager:
                 at_least_concept, for_node
             )
         )
-        cardinality = at_least_concept.get_number()
+        cardinality = at_least_concept.number
         if cardinality == 1:
             new_node = self.m_tableau.create_new_tree_node(
                 existential_dependency_set, for_node
             )
             self.m_extension_manager.add_role_assertion(
-                at_least_concept.get_on_role(),
+                at_least_concept.on_role,
                 for_node,
                 new_node,
                 existential_dependency_set,
                 True,
             )
             self.m_extension_manager.add_concept_assertion(
-                at_least_concept.get_to_concept(),
+                at_least_concept.to_concept,
                 new_node,
                 existential_dependency_set,
                 True,
@@ -294,14 +294,14 @@ class ExistentialExpansionManager:
                     existential_dependency_set, for_node
                 )
                 self.m_extension_manager.add_role_assertion(
-                    at_least_concept.get_on_role(),
+                    at_least_concept.on_role,
                     for_node,
                     new_node,
                     existential_dependency_set,
                     True,
                 )
                 self.m_extension_manager.add_concept_assertion(
-                    at_least_concept.get_to_concept(),
+                    at_least_concept.to_concept,
                     new_node,
                     existential_dependency_set,
                     True,
@@ -336,20 +336,20 @@ class ExistentialExpansionManager:
                 at_least_data_range, for_node
             )
         )
-        cardinality = at_least_data_range.get_number()
+        cardinality = at_least_data_range.number
         if cardinality == 1:
             new_node = self.m_tableau.create_new_concrete_node(
                 existential_dependency_set, for_node
             )
             self.m_extension_manager.add_role_assertion(
-                at_least_data_range.get_on_role(),
+                at_least_data_range.on_role,
                 for_node,
                 new_node,
                 existential_dependency_set,
                 True,
             )
             self.m_extension_manager.add_data_range_assertion(
-                at_least_data_range.get_to_data_range(),
+                at_least_data_range.to_data_range,
                 new_node,
                 existential_dependency_set,
                 True,
@@ -361,14 +361,14 @@ class ExistentialExpansionManager:
                     existential_dependency_set, for_node
                 )
                 self.m_extension_manager.add_role_assertion(
-                    at_least_data_range.get_on_role(),
+                    at_least_data_range.on_role,
                     for_node,
                     new_node,
                     existential_dependency_set,
                     True,
                 )
                 self.m_extension_manager.add_data_range_assertion(
-                    at_least_data_range.get_to_data_range(),
+                    at_least_data_range.to_data_range,
                     new_node,
                     existential_dependency_set,
                     True,

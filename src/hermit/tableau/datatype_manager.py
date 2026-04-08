@@ -237,7 +237,7 @@ class DatatypeManager:
             if reached_variable not in self.m_conjunction.m_active_variables:
                 self.m_conjunction.m_active_variables.add(reached_variable)
                 # Concrete root nodes act as "breakers" in the conjunction.
-                if reached_variable.m_node.node_type != "ROOT_CONSTANT_NODE":  # type: ignore[union-attr]
+                if reached_variable.m_node is not None and reached_variable.m_node.node_type != "ROOT_CONSTANT_NODE":  # type: ignore[union-attr]
                     # Look for inequalities where reached_node occurs in first position.
                     self.m_inequality01_retrieval.get_bindings_buffer()[0] = Inequality.INSTANCE
                     self.m_inequality01_retrieval.get_bindings_buffer()[1] = reached_variable.m_node
@@ -299,7 +299,7 @@ class DatatypeManager:
 
     def _add_data_range(self, variable: DVariable, data_range: DataRange) -> None:
         """Add a data range assertion to a variable."""
-        from hermit.datatypes.datatype_registry import DatatypeRegistry
+        from hermit.datatypes.registry import DatatypeRegistry
         from hermit.model import (
             AtomicNegationDataRange,
             ConstantEnumeration,
@@ -387,7 +387,7 @@ class DatatypeManager:
 
     def _normalize_as_enumeration(self, variable: DVariable) -> None:
         """Normalize when positive constant enumerations are present."""
-        from hermit.datatypes.datatype_registry import DatatypeRegistry
+        from hermit.datatypes.registry import DatatypeRegistry
 
         variable.m_has_explicit_data_values = True
         explicit_data_values = variable.m_explicit_data_values
@@ -448,7 +448,7 @@ class DatatypeManager:
 
     def _normalize_as_value_space_subset(self, variable: DVariable) -> None:
         """Normalize when positive datatype restrictions are present."""
-        from hermit.datatypes.datatype_registry import DatatypeRegistry
+        from hermit.datatypes.registry import DatatypeRegistry
 
         most_specific_datatype_uri = variable.m_most_specific_restriction.get_datatype_uri()
         variable.m_value_space_subset = DatatypeRegistry.create_value_space_subset(
@@ -477,7 +477,7 @@ class DatatypeManager:
 
     def _eliminate_trivial_inequalities(self) -> None:
         """Remove inequalities between variables with disjoint datatypes."""
-        from hermit.datatypes.datatype_registry import DatatypeRegistry
+        from hermit.datatypes.registry import DatatypeRegistry
 
         for variable1 in list(self.m_conjunction.m_active_variables):
             if variable1.m_most_specific_restriction is not None:
