@@ -112,10 +112,12 @@ class ClashManager:
         )
         is_atomic_concept_with_negations = (
             isinstance(dl_predicate_object, AtomicConcept)
+            and node0 is not None
             and node0.m_number_of_negated_atomic_concepts > 0
         )
         is_negated_concept_with_positives = (
             isinstance(dl_predicate_object, AtomicNegationConcept)
+            and node0 is not None
             and node0.m_number_of_positive_atomic_concepts > 0
         )
 
@@ -156,6 +158,7 @@ class ClashManager:
         # --- Role / negated-role clashes ---
         is_role_with_negations = (
             isinstance(dl_predicate_object, AtomicRole)
+            and node0 is not None
             and node0.m_number_of_negated_role_assertions > 0
         )
         is_negated_role = isinstance(dl_predicate_object, NegatedAtomicRole)
