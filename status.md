@@ -22,7 +22,7 @@ Target: Achieve 426/426 tests passing (100% parity). Currently 418/426 (98.1%).
 ### Phase 2a: Quick Wins (Estimate: 6 hours)
 
 - [x] Bundle Pizza & Koala ontologies into test resources
-- [ ] Fix property hierarchy classification (Bug #2: `is_sub_role_of` broken)
+- [ ] Fix property hierarchy classification (Bug #2: `is_sub_role_of` broken) — IN PROGRESS, BLOCKED
 - [ ] Debug role inclusion in hyperresolution (Bug #8: role chains in tableau)
 
 ### Phase 2b: Critical Path (Estimate: 6-10 hours)
@@ -39,4 +39,14 @@ Target: Achieve 426/426 tests passing (100% parity). Currently 418/426 (98.1%).
 - [ ] Publish to PyPI as hermit-reasoner v1.0.0
 
 ## Blockers
-<!-- populated by /implement-task if something is stuck -->
+
+- **Bug #2 (property hierarchy classification)**: Role hierarchy not being computed correctly from DL clauses
+  - **Root cause**: `QuasiOrderClassificationForRoles._initialise_known_subsumptions_using_told_subsumers_from_clauses()` is not properly extracting subsumption relationships from DL clauses despite correct role collection
+  - **Current state**: Roles are being collected from both head and body atoms, but the hierarchy shows all roles at top level with no subsumption edges
+  - **Needs**: Detailed debugging of why subsumption relationships are not being inferred during hierarchy computation
+  - **Impact**: 1 test failing (TestPropertySubsumption::test_property_hierarchy)
+  - **Next steps**: 
+    1. Add debug logging to `_initialise_known_subsumptions_using_told_subsumers_from_clauses()` to verify DL clauses are being processed
+    2. Check if `_add_known_subsumption()` is actually being called
+    3. Verify mappings between roles and proxy concepts are correct
+    4. Consider if issue is in QuasiOrderClassification base class instead of subclass
