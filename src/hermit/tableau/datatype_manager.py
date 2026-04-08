@@ -28,6 +28,10 @@ if TYPE_CHECKING:
 class DatatypeManager:
     """Manages datatype constraint checking during tableau expansion."""
 
+    @staticmethod
+    def _get_index_for(hash_code: int, table_length: int) -> int:
+        return hash_code % table_length if table_length > 0 else 0
+
     def __init__(self, tableau: Tableau) -> None:
         self.m_interrupt_flag = tableau.m_interrupt_flag
         self.m_tableau_monitor = tableau.m_tableau_monitor

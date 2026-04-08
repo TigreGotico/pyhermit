@@ -414,11 +414,13 @@ class DeriveUnaryFact(Worker):
         self.m_argument_index = argument_index
 
     def execute(self, program_counter: int) -> int:
-        argument: Node = self.m_values_buffer[self.m_argument_index]  # type: ignore[assignment]
+        from hermit.tableau.node import Node
+        argument = self.m_values_buffer[self.m_argument_index]
+        if not isinstance(argument, Node):
+            # Buffer contains non-Node data (e.g. stale/garbage); skip derivation.
+            return program_counter + 1
         is_core = self.m_core_variables[self.m_argument_index]
-        # Canonicalize in case the node was merged after being added to the buffer
-        if argument is not None:
-            argument = argument.get_canonical_node()
+        argument = argument.get_canonical_node()
         self.m_extension_manager.add_assertion(
             self.m_dl_predicate, argument, self.m_dependency_set, is_core
         )

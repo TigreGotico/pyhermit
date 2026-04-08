@@ -1,4 +1,4 @@
-# Status: PyHermit Port — Phase 1 COMPLETE ✅, Phase 2 IN PROGRESS
+# Status: PyHermit Port — Phase 1 COMPLETE ✅, Phase 2 COMPLETE ✅
 
 ## Checklist
 
@@ -28,8 +28,8 @@ Target: Achieve 426/426 tests passing (100% parity). Currently 418/426 (98.1%).
 ### Phase 2b: Critical Path (Estimate: 6-10 hours)
 
 - [x] Fix ABox instance type extraction (Bugs #3-4: `has_type()` returns False) — HIGHEST PRIORITY
-- [ ] Fix disjointness clash detection (Bug #1: disjoint concepts don't clash)
-- [ ] Fix unsatisfiable concept detection (Bug #5: contradictions not detected)
+- [x] Fix disjointness clash detection (Bug #1: disjoint concepts don't clash)
+- [x] Fix unsatisfiable concept detection (Bug #5: contradictions not detected)
 
 ### Phase 2c: Publication Ready (Estimate: 4 hours)
 

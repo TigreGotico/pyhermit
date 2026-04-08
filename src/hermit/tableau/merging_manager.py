@@ -303,10 +303,11 @@ class MergingManager:
 class _UnionDependencySet:
     """Minimal union-of-two dependency sets used inline by MergingManager."""
 
-    __slots__ = ("m_dependency_sets",)
+    __slots__ = ("m_dependency_sets", "m_number_of_constituents")
 
     def __init__(self, n: int) -> None:
         self.m_dependency_sets: list[Any] = [None] * n
+        self.m_number_of_constituents = n
 
     def contains_branching_point(self, branching_point: int) -> bool:
         for ds in self.m_dependency_sets:

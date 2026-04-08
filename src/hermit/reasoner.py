@@ -391,7 +391,7 @@ class Reasoner:
         fresh = Individual.create_anonymous("fresh-individual")
         assertions: set[Atom] = {Atom.create(c1, fresh), Atom.create(c2, fresh)}
         return not self._get_tableau_with_facts(assertions).is_satisfiable(
-            True, False, None, None, None, None, None,
+            True, True, None, None, None, None, None,
             ReasoningTaskDescription(True, "disjointness of {0} and {1}", c1, c2),
         )
 
