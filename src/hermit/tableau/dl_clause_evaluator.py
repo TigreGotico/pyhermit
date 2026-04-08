@@ -416,6 +416,9 @@ class DeriveUnaryFact(Worker):
     def execute(self, program_counter: int) -> int:
         argument: Node = self.m_values_buffer[self.m_argument_index]  # type: ignore[assignment]
         is_core = self.m_core_variables[self.m_argument_index]
+        # Canonicalize in case the node was merged after being added to the buffer
+        if argument is not None:
+            argument = argument.get_canonical_node()
         self.m_extension_manager.add_assertion(
             self.m_dl_predicate, argument, self.m_dependency_set, is_core
         )
@@ -456,6 +459,11 @@ class DeriveBinaryFact(Worker):
     def execute(self, program_counter: int) -> int:
         argument1: Node = self.m_values_buffer[self.m_argument_index1]  # type: ignore[assignment]
         argument2: Node = self.m_values_buffer[self.m_argument_index2]  # type: ignore[assignment]
+        # Canonicalize in case nodes were merged after being added to the buffer
+        if argument1 is not None:
+            argument1 = argument1.get_canonical_node()
+        if argument2 is not None:
+            argument2 = argument2.get_canonical_node()
         self.m_extension_manager.add_assertion(
             self.m_dl_predicate,
             argument1,
@@ -504,6 +512,13 @@ class DeriveTernaryFact(Worker):
         argument1: Node = self.m_values_buffer[self.m_argument_index1]  # type: ignore[assignment]
         argument2: Node = self.m_values_buffer[self.m_argument_index2]  # type: ignore[assignment]
         argument3: Node = self.m_values_buffer[self.m_argument_index3]  # type: ignore[assignment]
+        # Canonicalize in case nodes were merged after being added to the buffer
+        if argument1 is not None:
+            argument1 = argument1.get_canonical_node()
+        if argument2 is not None:
+            argument2 = argument2.get_canonical_node()
+        if argument3 is not None:
+            argument3 = argument3.get_canonical_node()
         self.m_extension_manager.add_assertion(
             self.m_dl_predicate,
             argument1,
