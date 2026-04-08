@@ -240,11 +240,11 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
 
     def _is_satisfied(self, at_least: AtLeast, for_node: Node) -> SatType:
         """Check whether *at_least* is satisfied for *for_node*."""
-        cardinality = at_least.get_number()
+        cardinality = at_least.number
         if cardinality <= 0:
             return SatType.PERMANENTLY_SATISFIED
 
-        on_role: Role = at_least.get_on_role()
+        on_role: Role = at_least.on_role
         retrieval: ExtRetrieval
         to_node_index: int
         if isinstance(on_role, AtomicRole):
@@ -266,7 +266,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
                 to_node: Node = tuple_buffer[to_node_index]  # type: ignore[assignment]
                 if isinstance(at_least, AtLeastDataRange):
                     at_least_dr: AtLeastDataRange = at_least
-                    to_data_range = at_least_dr.get_to_data_range()
+                    to_data_range = at_least_dr.to_data_range
                     if self.m_extension_manager.contains_data_range_assertion(  # type: ignore[union-attr]
                         to_data_range, to_node
                     ):
@@ -281,7 +281,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
                         return SatType.CURRENTLY_SATISFIED
                 else:
                     at_least_c: AtLeastConcept = at_least  # type: ignore[assignment]
-                    to_concept = at_least_c.get_to_concept()
+                    to_concept = at_least_c.to_concept
                     if (
                         not to_node.is_blocked or for_node.is_parent_of(to_node)
                     ) and self.m_extension_manager.contains_concept_assertion(  # type: ignore[union-attr]
@@ -307,7 +307,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
                 to_node = tuple_buffer[to_node_index]  # type: ignore[assignment]
                 if isinstance(at_least, AtLeastDataRange):
                     at_least_dr = at_least
-                    to_data_range = at_least_dr.get_to_data_range()
+                    to_data_range = at_least_dr.to_data_range
                     if self.m_extension_manager.contains_data_range_assertion(  # type: ignore[union-attr]
                         to_data_range, to_node
                     ):
@@ -321,7 +321,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
                         self.m_auxiliary_nodes1.append(to_node)
                 else:
                     at_least_c = at_least  # type: ignore[assignment]
-                    to_concept = at_least_c.get_to_concept()
+                    to_concept = at_least_c.to_concept
                     if (
                         not to_node.is_blocked or for_node.is_parent_of(to_node)
                     ) and self.m_extension_manager.contains_concept_assertion(  # type: ignore[union-attr]
