@@ -108,14 +108,34 @@ Extensive investigation of the concept hierarchy SCC bug revealed:
 - Multiple intermediate hierarchies are constructed and used to drive classification decisions
 - Would require comprehensive refactoring of the classification pipeline to cleanly separate concerns
 
-## Suggestions
+## Remaining Known Issues
 
-- **Fix the SCC computation bug** by auditing the complete flow from told subsumptions through to the final hierarchy. The bug is deterministic and reproducible - focus on preventing the graph from becoming fully connected.
-- **Download Pizza and Koala ontologies** to `tests/ontologies/` to enable full end-to-end testing and verify acceptance criteria 9–11. 
+The following 8 test failures are pre-existing bugs in the tableau reasoning layer, not related to the new implementation:
+
+1. **Clash detection not triggering**: ABox reasoning tests fail because the clash manager doesn't properly detect contradictions (e.g., B(X) and ¬B(X)). Likely root cause: Node canonicalization issues or order of operations in clash detection. Needs investigation in: `src/hermit/tableau/clash_manager.py` and node merging logic.
+
+2. **Disjointness checking**: `is_disjoint()` returns False when it should return True. Indicates missing or broken implementation in the hierarchy layer for detecting disjoint classes.
+
+3. **Property hierarchy classification**: `is_sub_role_of()` doesn't work. Role hierarchy classification likely has the same issues as concept hierarchy did (now fixed by DeterministicClassification delegation).
+
+4. **Unsatisfiability detection**: Concepts that imply contradictions are not being marked as unsatisfiable. The `_build_model_for_concept` method in QuasiOrderClassification may not be properly detecting clashes during model construction.
+
+## Suggestions for Resolving Remaining Issues
+
+- **Fix clash detection**: Debug `src/hermit/tableau/clash_manager.py` to ensure node counters (m_number_of_positive_atomic_concepts, m_number_of_negated_atomic_concepts) are properly maintained and checked. Add logging to verify that contradictions are being detected.
+
+- **Fix property hierarchy**: Apply the same DeterministicClassification→QuasiOrderClassification delegation to role classification if needed.
+
+- **Fix unsatisfiability detection**: Enhance `_build_model_for_concept()` in QuasiOrderClassification to properly detect when a concept leads to contradictions. Consider checking clash history after tableau runs.
+
+- **Node canonicalization deep dive**: The NoneType error in ABox tests suggests stale node references. Review the complete node merging and canonicalization flow in `src/hermit/tableau/node.py` and `src/hermit/tableau/extension_manager.py`.
+
+- **Download Pizza and Koala ontologies** to `tests/ontologies/` for end-to-end testing:
   - Pizza: http://protege.stanford.edu/ontologies/pizza/pizza.owl
   - Koala: http://protege.stanford.edu/ontologies/koala.owl
+
 - **Expand the _OwlreadyMapper** in `parser.py` to handle all OWL axiom types (PropertyDomain, PropertyRange, HasKey, etc.) for broader ontology coverage.
-- **Add docstrings to ExpressionManager, OWLNormalization, and DatalogEngine** public methods for API clarity (currently lean on method names).
+
 - **Consider adding a simple CLI** (`hermit classify`, `hermit consistent`) to expose `load_ontology` → `Reasoner` pipeline for manual testing.
 
 ---
