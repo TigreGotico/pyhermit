@@ -797,6 +797,8 @@ class Reasoner:
                 "Initial tableau for reading-off known and possible class instances.",
             ),
         )
+        # Update the instance manager with the nodes discovered by the tableau
+        self._instance_manager.update_nodes_for_individuals(nodes_mapping)
         if not is_consistent:
             self._instance_manager.set_inconsistent()
         else:

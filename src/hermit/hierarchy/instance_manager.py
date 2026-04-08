@@ -20,6 +20,7 @@ from hermit.hierarchy.role_element_manager import RoleElement, RoleElementManage
 from hermit.model import (
     AtomicConcept,
     AtomicRole,
+    Individual,
     Inequality,
     InverseRole,
     Prefixes,
@@ -27,7 +28,7 @@ from hermit.model import (
 )
 
 if TYPE_CHECKING:
-    from hermit.model import DLClause, Individual
+    from hermit.model import DLClause
     from hermit.tableau.interrupt_flag import InterruptFlag
     from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau
@@ -1905,3 +1906,9 @@ class InstanceManager:
 
     def get_nodes_for_individuals(self) -> dict[Individual, Node | None]:
         return self.m_nodes_for_individuals
+
+    def update_nodes_for_individuals(self, nodes_mapping: dict[Any, Any]) -> None:
+        """Update the nodes for individuals from tableau results."""
+        for individual, node in nodes_mapping.items():
+            if isinstance(individual, Individual):
+                self.m_nodes_for_individuals[individual] = node
