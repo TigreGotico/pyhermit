@@ -15,8 +15,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hermit.model import AtomicRole, DLClause, DataRange, Variable
-    from hermit.tableau import DLClauseEvaluator, Node, Tableau
+    from hermit.tableau import DLClauseEvaluator, Tableau
 
+from hermit.tableau.node import Node
 from .blocking_signature_cache import BlockingSignatureCache
 from .blocking_strategy import BlockingStrategy
 from hermit.model import AtomicConcept, AtomicRole, DataRange

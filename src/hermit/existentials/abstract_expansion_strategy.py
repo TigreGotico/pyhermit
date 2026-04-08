@@ -103,7 +103,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
         while node is not None and (
             not extensions_changed or not self.m_expand_node_at_a_time
         ):
-            if node.is_active() and not node.is_blocked and node.has_unprocessed_existentials():
+            if node.is_active() and not node.is_blocked() and node.has_unprocessed_existentials():
                 # The node's set of unprocessed existentials may be changed during
                 # operation, so make a local copy to loop over.
                 self.m_processed_existentials.clear()
@@ -264,6 +264,9 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
             tuple_buffer = retrieval.get_tuple_buffer()
             while not retrieval.after_last():
                 to_node: Node = tuple_buffer[to_node_index]  # type: ignore[assignment]
+                if to_node is None:
+                    retrieval.next()
+                    continue
                 if isinstance(at_least, AtLeastDataRange):
                     at_least_dr: AtLeastDataRange = at_least
                     to_data_range = at_least_dr.to_data_range
