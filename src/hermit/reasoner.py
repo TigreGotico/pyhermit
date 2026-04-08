@@ -741,25 +741,19 @@ class Reasoner:
         force_quasi_order: bool,
     ) -> Hierarchy[Role]:
         elements: set[AtomicConcept] = set(concepts_for_roles.values())
-        if tableau.m_use_disjunction_learning and not force_quasi_order:
-            from hermit.hierarchy.deterministic_classification import (
-                DeterministicClassification,
-            )
-
-            atomic_hierarchy = DeterministicClassification(
-                tableau, progress_monitor, top_element, bottom_element, elements
-            ).classify()
-        else:
-            atomic_hierarchy = QuasiOrderClassificationForRoles(
-                tableau,
-                progress_monitor,
-                top_element,
-                bottom_element,
-                elements,
-                has_inverses,
-                concepts_for_roles,
-                roles_for_concepts,
-            ).classify()
+        # Always use QuasiOrderClassificationForRoles — DeterministicClassification
+        # delegates to plain QuasiOrderClassification which lacks the role-specific
+        # subsumption extraction from DL clauses.
+        atomic_hierarchy = QuasiOrderClassificationForRoles(
+            tableau,
+            progress_monitor,
+            top_element,
+            bottom_element,
+            elements,
+            has_inverses,
+            concepts_for_roles,
+            roles_for_concepts,
+        ).classify()
 
         class _RoleTransformer:
             def transform(self, ac: AtomicConcept) -> Role:
