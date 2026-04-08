@@ -235,7 +235,7 @@ class DatatypeManager:
         while not self.m_extension_manager.contains_clash() and self.m_auxiliary_variable_list:
             reached_variable = self.m_auxiliary_variable_list.pop()
             if reached_variable not in self.m_conjunction.m_active_variables:
-                self.m_conjunction.m_active_variables.append(reached_variable)
+                self.m_conjunction.m_active_variables.add(reached_variable)
                 # Concrete root nodes act as "breakers" in the conjunction.
                 if reached_variable.m_node.node_type != "ROOT_CONSTANT_NODE":  # type: ignore[union-attr]
                     # Look for inequalities where reached_node occurs in first position.
@@ -479,12 +479,10 @@ class DatatypeManager:
         """Remove inequalities between variables with disjoint datatypes."""
         from hermit.datatypes.datatype_registry import DatatypeRegistry
 
-        for index1 in range(len(self.m_conjunction.m_active_variables) - 1, -1, -1):
-            variable1 = self.m_conjunction.m_active_variables[index1]
+        for variable1 in list(self.m_conjunction.m_active_variables):
             if variable1.m_most_specific_restriction is not None:
                 datatype_uri1 = variable1.m_most_specific_restriction.get_datatype_uri()
-                for index2 in range(len(variable1.m_unequal_to_direct) - 1, -1, -1):
-                    variable2 = variable1.m_unequal_to_direct[index2]
+                for variable2 in list(variable1.m_unequal_to_direct):
                     if variable2.m_most_specific_restriction is not None and DatatypeRegistry.is_disjoint_with(
                         datatype_uri1,
                         variable2.m_most_specific_restriction.get_datatype_uri(),
@@ -511,10 +509,9 @@ class DatatypeManager:
 
     def _enumerate_value_space_subsets(self) -> None:
         """Enumerate explicit data values from value space subsets."""
-        for index in range(len(self.m_conjunction.m_active_variables) - 1, -1, -1):
+        for variable in list(self.m_conjunction.m_active_variables):
             if self.m_extension_manager.contains_clash():
                 return
-            variable = self.m_conjunction.m_active_variables[index]
             if variable.m_value_space_subset is not None:
                 variable.m_has_explicit_data_values = True
                 variable.m_value_space_subset.enumerate_data_values(

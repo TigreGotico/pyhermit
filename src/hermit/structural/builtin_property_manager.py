@@ -80,10 +80,10 @@ class BuiltInPropertyManager:
         from hermit.owl_model.owl_individual import OWLNamedIndividual
         from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
 
-        top_prop = OWLObjectProperty(IRI(BuiltInPropertyManager.TOP_OBJECT_PROPERTY_IRI))
+        top_prop = OWLObjectProperty(IRI.create(BuiltInPropertyManager.TOP_OBJECT_PROPERTY_IRI))
 
         # Add axiom: ⊤ ⊑ ∃owl:topObjectProperty.{internal:topIndividual}
-        top_individual = OWLNamedIndividual(IRI("internal:nam#topIndividual"))
+        top_individual = OWLNamedIndividual(IRI("internal:nam#", "topIndividual"))
         one_of = OWLObjectOneOf(top_individual)
         some_values = OWLObjectSomeValuesFrom(top_prop, one_of)
 
@@ -112,7 +112,7 @@ class BuiltInPropertyManager:
         from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
 
         bottom_prop = OWLObjectProperty(
-            IRI(BuiltInPropertyManager.BOTTOM_OBJECT_PROPERTY_IRI)
+            IRI.create(BuiltInPropertyManager.BOTTOM_OBJECT_PROPERTY_IRI)
         )
 
         # Add axiom: ⊤ ⊑ ∀owl:bottomObjectProperty.⊥
@@ -141,11 +141,11 @@ class BuiltInPropertyManager:
         from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
 
         top_data_prop = OWLDataProperty(
-            IRI(BuiltInPropertyManager.TOP_DATA_PROPERTY_IRI)
+            IRI.create(BuiltInPropertyManager.TOP_DATA_PROPERTY_IRI)
         )
 
         # Create an anonymous datatype and constant for the built-in axiom
-        anonymous_datatype = OWLDatatype(IRI("internal:anonymous-constants"))
+        anonymous_datatype = OWLDatatype(IRI("internal:", "anonymous-constants"))
         literal = OWLLiteral("internal:constant", anonymous_datatype)
         one_of = OWLDataOneOf(literal)
         some_values = OWLDataSomeValuesFrom(top_data_prop, one_of)
@@ -172,12 +172,12 @@ class BuiltInPropertyManager:
         from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
 
         bottom_data_prop = OWLDataProperty(
-            IRI(BuiltInPropertyManager.BOTTOM_DATA_PROPERTY_IRI)
+            IRI.create(BuiltInPropertyManager.BOTTOM_DATA_PROPERTY_IRI)
         )
 
         # Top datatype for complementation
-        from hermit.owl_model.owl_datatype import TopOWLDatatype
-        top_datatype = TopOWLDatatype()
+        from hermit.owl_model.owl_literal import TopOWLDatatype
+        top_datatype = TopOWLDatatype
         complement = OWLDataComplementOf(top_datatype)
 
         all_values = OWLDataAllValuesFrom(bottom_data_prop, complement)
@@ -208,12 +208,14 @@ class _BuiltInPropertyChecker:
                 self._check_class_expression(inclusion)
 
         # Check property inclusions
-        for obj_prop in normalized_axioms.object_property_inclusions:
-            self._check_object_property(obj_prop)
+        for inclusion in normalized_axioms.simple_object_property_inclusions:
+            for obj_prop in inclusion:
+                self._check_object_property(obj_prop)
 
         # Check data property inclusions
-        for data_prop in normalized_axioms.data_property_inclusions:
-            self._check_data_property(data_prop)
+        for inclusion in normalized_axioms.data_property_inclusions:
+            for data_prop in inclusion:
+                self._check_data_property(data_prop)
 
         # Check facts
         for fact in normalized_axioms.positive_concept_facts:  # type: ignore[attr-defined]
@@ -269,7 +271,7 @@ class _BuiltInPropertyChecker:
         )
 
         if isinstance(expr, OWLObjectComplementOf):
-            self._check_class_expression(expr.operand())
+            self._check_class_expression(expr.get_operand())
         elif isinstance(expr, OWLObjectIntersectionOf):
             for operand in expr.operands():
                 self._check_class_expression(operand)
@@ -277,36 +279,36 @@ class _BuiltInPropertyChecker:
             for operand in expr.operands():
                 self._check_class_expression(operand)
         elif isinstance(expr, OWLObjectSomeValuesFrom):
-            self._check_object_property(expr.property())
-            self._check_class_expression(expr.filler())
+            self._check_object_property(expr.get_property())
+            self._check_class_expression(expr.get_filler())
         elif isinstance(expr, OWLObjectAllValuesFrom):
-            self._check_object_property(expr.property())
-            self._check_class_expression(expr.filler())
+            self._check_object_property(expr.get_property())
+            self._check_class_expression(expr.get_filler())
         elif isinstance(expr, OWLObjectHasValue):
-            self._check_object_property(expr.property())
+            self._check_object_property(expr.get_property())
         elif isinstance(expr, OWLObjectHasSelf):
-            self._check_object_property(expr.property())
+            self._check_object_property(expr.get_property())
         elif isinstance(expr, OWLObjectMinCardinality):
-            self._check_object_property(expr.property())
-            self._check_class_expression(expr.filler())
+            self._check_object_property(expr.get_property())
+            self._check_class_expression(expr.get_filler())
         elif isinstance(expr, OWLObjectMaxCardinality):
-            self._check_object_property(expr.property())
-            self._check_class_expression(expr.filler())
+            self._check_object_property(expr.get_property())
+            self._check_class_expression(expr.get_filler())
         elif isinstance(expr, OWLObjectExactCardinality):
-            self._check_object_property(expr.property())
-            self._check_class_expression(expr.filler())
+            self._check_object_property(expr.get_property())
+            self._check_class_expression(expr.get_filler())
         elif isinstance(expr, OWLDataSomeValuesFrom):
-            self._check_data_property(expr.property())
+            self._check_data_property(expr.get_property())
         elif isinstance(expr, OWLDataAllValuesFrom):
-            self._check_data_property(expr.property())
+            self._check_data_property(expr.get_property())
         elif isinstance(expr, OWLDataHasValue):
-            self._check_data_property(expr.property())
+            self._check_data_property(expr.get_property())
         elif isinstance(expr, OWLDataMinCardinality):
-            self._check_data_property(expr.property())
+            self._check_data_property(expr.get_property())
         elif isinstance(expr, OWLDataMaxCardinality):
-            self._check_data_property(expr.property())
+            self._check_data_property(expr.get_property())
         elif isinstance(expr, OWLDataExactCardinality):
-            self._check_data_property(expr.property())
+            self._check_data_property(expr.get_property())
 
     def _check_object_property(self, prop: object) -> None:
         """Check if an object property is a built-in property."""
@@ -314,7 +316,7 @@ class _BuiltInPropertyChecker:
             return
 
         try:
-            prop_iri = str(prop.iri()) if hasattr(prop, "iri") else str(prop)
+            prop_iri = prop.iri.as_str() if hasattr(prop, "iri") else str(prop)
         except Exception:
             return
 
@@ -329,7 +331,7 @@ class _BuiltInPropertyChecker:
             return
 
         try:
-            prop_iri = str(prop.iri()) if hasattr(prop, "iri") else str(prop)
+            prop_iri = prop.iri.as_str() if hasattr(prop, "iri") else str(prop)
         except Exception:
             return
 

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from hermit.tableau import DLClauseEvaluator, ExtensionManager, Node, Tableau
 
 from .blocking_strategy import BlockingStrategy
-from hermit.model import AtomicConcept
+from hermit.model import AtomicConcept, AtomicRole, DataRange
 from .blocking_validator import BlockingValidator
 from .direct_blocking_checker import DirectBlockingChecker
 

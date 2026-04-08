@@ -27,6 +27,12 @@ if TYPE_CHECKING:
     )
     from hermit.tableau import ExtensionManager, Node, Tableau
 
+from hermit.model import (
+    AtLeastConcept,
+    AtomicConcept,
+    AtomicRole,
+    Variable,
+)
 from .validated_single_direct_blocking_checker import ValidatedBlockingObject
 
 

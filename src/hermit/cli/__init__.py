@@ -483,6 +483,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Pretty-print as Functional-Style Syntax ontology",
     )
     p_class.add_argument(
+        "-C", "--classes", action="store_true",
+        help="Classify concept hierarchy (default when no other flag given)",
+    )
+    p_class.add_argument(
         "-O", "--object-properties", action="store_true",
         help="Also classify object properties",
     )

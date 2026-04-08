@@ -805,7 +805,25 @@ class _OWLLiteralImplDuration(_OWLDateAndTimeLiteralInterface):
         super().__init__(value, type_)
 
     def get_literal(self) -> str:
-        return self._v.isoformat()
+        total_seconds = int(self._v.total_seconds())
+        days, remainder = divmod(abs(total_seconds), 86400)
+        hours, remainder = divmod(remainder, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        sign = "-" if total_seconds < 0 else ""
+        parts = f"P"
+        if days:
+            parts += f"{days}D"
+        if hours or minutes or seconds:
+            parts += "T"
+            if hours:
+                parts += f"{hours}H"
+            if minutes:
+                parts += f"{minutes}M"
+            if seconds:
+                parts += f"{seconds}S"
+        if parts == "P":
+            parts = "PT0S"
+        return sign + parts
 
     def is_duration(self) -> bool:
         return True

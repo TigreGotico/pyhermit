@@ -86,7 +86,7 @@ class ReasoningTaskDescription:
     def __str__(self) -> str:
         from hermit.model import Prefixes
 
-        return self.get_task_description(Prefixes.STANDARD_PREFIXES)
+        return self.get_task_description(Prefixes())
 
     # ------------------------------------------------------------------
     # Factory helpers

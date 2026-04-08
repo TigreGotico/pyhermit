@@ -257,4 +257,4 @@ class OWLNormalization:
         """Generate a fresh named atomic concept."""
         iri_str = f"{base_name}#{self._replacement_counter}"
         self._replacement_counter += 1
-        return OWLClass(IRI(iri_str))
+        return OWLClass(IRI(f"{base_name}#", str(self._replacement_counter - 1)))

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 from .blocking_signature_cache import BlockingSignatureCache
 from .blocking_strategy import BlockingStrategy
-from hermit.model import AtomicConcept
+from hermit.model import AtomicConcept, AtomicRole, DataRange
 from .direct_blocking_checker import DirectBlockingChecker
 
 

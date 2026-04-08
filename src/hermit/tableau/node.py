@@ -457,8 +457,8 @@ class Node:
         if existential_concept is self.m_unprocessed_existentials[-1]:
             self.m_unprocessed_existentials.pop()
         else:
-            removed = self.m_unprocessed_existentials.remove(existential_concept)
-            assert removed
+            assert existential_concept in self.m_unprocessed_existentials
+            self.m_unprocessed_existentials.remove(existential_concept)
         if len(self.m_unprocessed_existentials) == 0:
             assert self.m_tableau is not None
             self.m_tableau.put_existential_concepts_buffer(
