@@ -405,6 +405,12 @@ class Reasoner:
             return True
         if sub is AtomicRole.BOTTOM_OBJECT_ROLE or sup is AtomicRole.TOP_OBJECT_ROLE:
             return True
+        # Use cached hierarchy if available
+        if self._object_role_hierarchy is not None:
+            sub_node = self._object_role_hierarchy.get_node_for_element(sub)
+            if sub_node is not None:
+                return sub_node.is_equivalent_element(sup) or sub_node.is_ancestor_element(sup)
+        # Tableau test
         fresh_a = Individual.create_anonymous("fresh-individual-A")
         fresh_b = Individual.create_anonymous("fresh-individual-B")
         sub_assertion = sub.get_role_assertion(fresh_a, fresh_b)
@@ -600,13 +606,28 @@ class Reasoner:
         if self._object_role_hierarchy is not None:
             return
 
-        # Collect object roles from DL clauses
-        roles_for_concepts: dict[Role, AtomicConcept] = {}
-        concepts_for_roles: dict[AtomicConcept, Role] = {}
+        # Collect object roles from DL clauses (both head and body atoms)
+        concepts_for_roles: dict[Role, AtomicConcept] = {}
+        roles_for_concepts: dict[AtomicConcept, Role] = {}
         relevant_roles: set[Role] = set()
 
         for clause in self._dl_ontology.dl_clauses:
+            # Collect from head atoms
             for atom in clause.head_atoms:
+                if isinstance(atom.predicate, AtomicRole):
+                    role: Role = atom.predicate
+                    if role not in (
+                        AtomicRole.TOP_OBJECT_ROLE,
+                        AtomicRole.BOTTOM_OBJECT_ROLE,
+                        AtomicRole.TOP_DATA_ROLE,
+                        AtomicRole.BOTTOM_DATA_ROLE,
+                    ):
+                        relevant_roles.add(role)
+                        if self._dl_ontology.has_inverse_roles():
+                            inv = role.get_inverse()
+                            relevant_roles.add(inv)
+            # Also collect from body atoms
+            for atom in clause.body_atoms:
                 if isinstance(atom.predicate, AtomicRole):
                     role: Role = atom.predicate
                     if role not in (
@@ -630,13 +651,13 @@ class Reasoner:
                     concept = AtomicConcept.create("internal:prop#inv#" + inv_role.iri)
                 else:
                     continue
-            roles_for_concepts[role] = concept
-            concepts_for_roles[concept] = role
+            concepts_for_roles[role] = concept
+            roles_for_concepts[concept] = role
 
-        roles_for_concepts[AtomicRole.TOP_OBJECT_ROLE] = AtomicConcept.THING
-        concepts_for_roles[AtomicConcept.THING] = AtomicRole.TOP_OBJECT_ROLE
-        roles_for_concepts[AtomicRole.BOTTOM_OBJECT_ROLE] = AtomicConcept.NOTHING
-        concepts_for_roles[AtomicConcept.NOTHING] = AtomicRole.BOTTOM_OBJECT_ROLE
+        concepts_for_roles[AtomicRole.TOP_OBJECT_ROLE] = AtomicConcept.THING
+        roles_for_concepts[AtomicConcept.THING] = AtomicRole.TOP_OBJECT_ROLE
+        concepts_for_roles[AtomicRole.BOTTOM_OBJECT_ROLE] = AtomicConcept.NOTHING
+        roles_for_concepts[AtomicConcept.NOTHING] = AtomicRole.BOTTOM_OBJECT_ROLE
 
         if not self.is_consistent():
             all_roles: set[Role] = set(roles_for_concepts.keys())
@@ -666,8 +687,8 @@ class Reasoner:
             AtomicConcept.NOTHING,
             set(roles_for_concepts.keys()),
             self._dl_ontology.has_inverse_roles(),
-            roles_for_concepts,
             concepts_for_roles,
+            roles_for_concepts,
             self._configuration.force_quasi_order_classification,
         )
 

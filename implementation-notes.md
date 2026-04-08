@@ -1,4 +1,30 @@
-# Implementation Notes: Finish the pyhermit Port
+# Implementation Notes: PyHermit Port — Phase 1 + Phase 2
+
+## Phase 1 Completion Notes
+
+All 12 planned steps completed and committed. Critical bug fixes applied:
+
+1. **DeterministicClassification parameter order bug** — `is_satisfiable()` was called with atoms as the 4th boolean parameter, causing all concepts to be marked unsatisfiable. Fixed by delegating to QuasiOrderClassification which correctly computes hierarchies.
+
+2. **Node canonicalization missing in DL clause evaluator** — Nodes from `values_buffer` were stale after merging. Added `get_canonical_node()` calls in all three worker execute() methods (DeriveUnaryFact, DeriveBinaryFact, DeriveTernaryFact).
+
+3. **Clash detection crashes on None nodes** — ClashManager accessed node attributes without checking if `node0` was None, causing AttributeError. Added defensive None checks before accessing `m_number_of_negated_atomic_concepts`, `m_number_of_positive_atomic_concepts`, `m_number_of_negated_role_assertions`.
+
+4. **Node mapping not propagated to InstanceManager** — Tableau discovers individual-to-node mappings during initialization but wasn't sharing them with InstanceManager. Added `update_nodes_for_individuals()` method wired into `_initialise_class_instance_manager()`.
+
+## Phase 2 Bug Tracking
+
+**8 pre-existing tableau bugs remain** (documented in [FEATURE_PARITY.md](FEATURE_PARITY.md)):
+
+1. **Disjointness clash detection** — Concepts marked `disjoint(A, B)` don't trigger clash when both asserted
+2. **Property hierarchy classification** — `is_sub_role_of(r, s)` returns False when should be True
+3. **ABox instance type checking (3 tests)** — `has_type()` returns False; type extraction from extension tables broken
+4. **Unsatisfiable concept detection** — Concepts implying contradictions not marked unsatisfiable
+5. **Subsumption by bottom** — `is_sub_class_of(C, Nothing)` returns False
+6. **Role inclusion in hyperresolution** — `test_hyperresolution_with_role_inclusion` fails
+7. **Others** — documented in FEATURE_PARITY.md
+
+**Critical path:** Fix bugs #3-4 (ABox types) first — 4-6 hour effort, highest impact on test suite and user-facing functionality.
 
 ## Patterns to Use
 

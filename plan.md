@@ -1,6 +1,32 @@
-# Plan: Finish the pyhermit Port
+# Plan: PyHermit Port — Phase 1 Complete, Phase 2 In Progress
 
-## Approach
+## Phase 1 Status: COMPLETE ✅
+
+**Completion Date:** 2026-04-08  
+**Test Results:** 418/426 passing (98.1%)  
+**All 12 originally planned steps:** ✅ DONE
+
+Phase 1 focused on implementing the missing structural layers (normalization, clausification) and wiring them end-to-end. This enabled the reasoner to handle OWL 2 DL ontologies from file parse through tableau reasoning. All major components now work correctly; 8 pre-existing tableau bugs remain (outside the scope of structural/datalog implementation).
+
+---
+
+## Phase 2 Approach: Fix Remaining Tableau Bugs
+
+Work systematically through the 5 bugs blocking test parity:
+
+1. **Bug #2 (property hierarchy)** — Apply QuasiOrderClassification to role hierarchies (3 hours)
+2. **Bug #8 (role inclusion)** — Debug hyperresolution role integration (2 hours)
+3. **Bugs #3-4 (ABox types)** — Debug extension table type extraction ← **CRITICAL PATH** (4-6 hours)
+4. **Bug #1 (disjointness)** — Enhance clash detection (3-4 hours)
+5. **Bug #5 (unsatisfiability)** — Improve contradiction detection (2-3 hours)
+
+**Estimated total effort:** 15-20 hours (2-3 days of focused debugging)
+
+See [FEATURE_PARITY.md](FEATURE_PARITY.md) for detailed roadmap with time estimates for each bug.
+
+---
+
+## Phase 1 Approach (Completed)
 
 Work in dependency order: fix blocking bugs first so the existing test suite is green, then
 layer in the new components bottom-up (owl_model vendor → ExpressionManager →
