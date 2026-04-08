@@ -103,7 +103,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
         while node is not None and (
             not extensions_changed or not self.m_expand_node_at_a_time
         ):
-            if node.is_active() and not node.is_blocked() and node.has_unprocessed_existentials():
+            if node.is_active() and not node.is_blocked and node.has_unprocessed_existentials():
                 # The node's set of unprocessed existentials may be changed during
                 # operation, so make a local copy to loop over.
                 self.m_processed_existentials.clear()
