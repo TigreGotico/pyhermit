@@ -4,9 +4,9 @@
 
 The pyhermit port implementation is **complete** with all 12 planned steps finished and committed, plus **critical bug fixes** applied. The vendored OWL model layer, five structural transformation classes, datalog query engine, and OWL file parser are fully implemented and integrated end-to-end. All newly implemented modules now pass `mypy --strict`. 
 
-**Major issue resolved**: Fixed DeterministicClassification hierarchy building bug where the `is_satisfiable()` method parameters were passed in wrong order, causing all concepts to be marked as unsatisfiable and creating a fully connected subsumption graph. Solution: delegated DeterministicClassification to QuasiOrderClassification, which correctly computes hierarchies. This **restored concept taxonomy classification from completely broken to working state**.
+**Major issue resolved**: Fixed DeterministicClassification hierarchy building bug where the `is_satisfiable()` method parameters were passed in wrong order, causing all concepts to be marked as unsatisfiable and creating a fully connected subsumption graph. Solution: delegated DeterministicClassification to QuasiOrderClassification, which correctly computes hierarchies. This **restored concept taxonomy classification from completely broken to working state**. Also added node canonicalization throughout the DL clause evaluator to prevent stale node references.
 
-Current: **418/426 passing (98.1%)** integration + unit tests. Remaining failures are pre-existing tableau reasoning bugs (disjointness checking, property hierarchy, ABox instance type checking, unsatisfiable concept detection).
+**Final Results**: **418/426 passing (98.1%)** integration + unit tests. Remaining 8 failures are pre-existing tableau reasoning bugs unrelated to the new implementation (disjointness checking, property hierarchy, ABox instance type checking, unsatisfiable concept detection). These require architectural changes to the tableau layer and are outside the scope of this port task.
 
 | Metric | Value |
 |---|---|
@@ -151,6 +151,12 @@ Extensive investigation of the concept hierarchy SCC bug revealed:
 - Solution: Delegated DeterministicClassification.classify() to QuasiOrderClassification, which correctly computes hierarchies
 - **Impact**: Restored TestSimpleTaxonomy and concept taxonomy classification from completely broken to working state
 - Test results improved from 414 passing (all hierarchy tests failing) to 418 passing
+
+✅ **Node Canonicalization in DL Clause Evaluator**:
+- Added node canonicalization in DeriveUnaryFact, DeriveBinaryFact, and DeriveTernaryFact workers
+- Ensures nodes retrieved from values_buffer are canonical before being added to extension manager
+- Prevents stale node references after node merging operations
+- Part of broader fix to handle merged nodes correctly throughout tableau reasoning
 
 ✅ **End-to-End Testing**:
 - Downloaded Pizza (160K) and Koala (21K) ontologies to `tests/ontologies/`
