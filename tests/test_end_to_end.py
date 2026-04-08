@@ -51,8 +51,8 @@ class TestPizzaOntology:
             reasoner.precompute_inferences(class_hierarchy=True)
             yield reasoner
             reasoner.dispose()
-        except FileNotFoundError:
-            pytest.skip("Pizza ontology not available")
+        except (FileNotFoundError, ImportError):
+            pytest.skip("Pizza ontology not available or owlready2 not installed")
 
     def test_pizza_is_consistent(self, reasoner):
         """The Pizza ontology should be consistent."""
@@ -122,8 +122,8 @@ class TestKoalaOntology:
             reasoner.precompute_inferences(class_hierarchy=True)
             yield reasoner
             reasoner.dispose()
-        except FileNotFoundError:
-            pytest.skip("Koala ontology not available")
+        except (FileNotFoundError, ImportError):
+            pytest.skip("Koala ontology not available or owlready2 not installed")
 
     def test_koala_is_consistent(self, reasoner):
         """The Koala ontology should be consistent."""
