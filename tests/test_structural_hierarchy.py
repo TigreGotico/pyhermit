@@ -1155,7 +1155,9 @@ class TestOWLNormalization:
         cls = OWLClass(IRI.create("http://ex.org#A"))
         axiom = OWLClassAssertionAxiom(ind, cls)
         result = norm.process_ontology([axiom])
-        assert len(result.positive_facts) == 1
+        # ClassAssertion now routes to positive_concept_facts (typed list), not positive_facts
+        assert len(result.positive_concept_facts) == 1
+        assert len(result.positive_facts) == 0
 
 
     def test_process_sub_object_property(self):
@@ -1243,7 +1245,12 @@ class TestOWLNormalization:
             OWLDataPropertyAssertionAxiom(a, p, lit),
         ]
         result = norm.process_ontology(axioms)
-        assert len(result.positive_facts) == 4
+        # Individual axioms now route to typed lists, not positive_facts
+        assert len(result.same_individual_facts) == 1
+        assert len(result.different_individuals_facts) == 1
+        assert len(result.positive_role_facts) == 1
+        assert len(result.positive_data_facts) == 1
+        assert len(result.positive_facts) == 0
 
 
     def test_process_negative_assertions(self):
@@ -1535,6 +1542,38 @@ class TestObjectPropertyInclusionManager:
         axioms = NormalizedAxioms()
         idx = mgr.rewrite_negative_object_property_assertions(axioms, 0)
         assert idx == 0
+
+    def test_rewrite_negative_assertions_with_complex_property(self):
+        from hermit.structural.object_property_inclusion_manager import (
+            ObjectPropertyInclusionManager,
+        )
+        from hermit.structural.normalized_axioms import NormalizedAxioms
+        from hermit.model import AtomicRole, Individual
+        from hermit.owl_model.owl_axiom import OWLNegativeObjectPropertyAssertionAxiom
+        from hermit.owl_model.owl_property import OWLObjectProperty
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+
+        mgr = ObjectPropertyInclusionManager()
+        role = AtomicRole.create("http://ex#likes")
+        mgr.complex_properties.add(role)
+
+        ind_a = Individual.create("http://ex#a")
+        ind_b = Individual.create("http://ex#b")
+        owl_a = OWLNamedIndividual("http://ex#a")
+        owl_b = OWLNamedIndividual("http://ex#b")
+        owl_prop = OWLObjectProperty("http://ex#likes")
+
+        neg_fact = OWLNegativeObjectPropertyAssertionAxiom(owl_a, owl_prop, owl_b)
+
+        axioms = NormalizedAxioms()
+        axioms.negative_facts.append(neg_fact)
+
+        idx = mgr.rewrite_negative_object_property_assertions(axioms, 0)
+        # The negative fact was complex and should be replaced
+        assert idx == 1  # one fresh concept allocated
+        assert neg_fact not in axioms.negative_facts
+        # A fresh positive concept fact should have been added
+        assert len(axioms.positive_concept_facts) == 1
 
     def test_rewrite_axioms(self):
         from hermit.structural.object_property_inclusion_manager import (
