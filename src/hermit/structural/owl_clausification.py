@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Any
 from hermit.model import (
     AtLeastConcept,
     AtLeastDataRange,
+    AtMostConcept,
     Atom,
     AtomicConcept,
     AtomicNegationConcept,
@@ -154,6 +155,12 @@ class OWLClausification:
                 concept.accept(clausifier)
             dl_clause = clausifier.get_dl_clause()
             dl_clauses.add(dl_clause.get_safe_version(AtomicConcept.THING))
+            # Flush pairwise clauses emitted by visit_at_most_concept
+            extra = getattr(clausifier, "_extra_clauses", None)
+            if extra:
+                for ec in extra:
+                    dl_clauses.add(ec.get_safe_version(AtomicConcept.THING))
+                extra.clear()
 
         # -- Data range inclusion clauses --
         data_range_clausifier = NormalizedDataRangeAxiomClausifier(
@@ -497,6 +504,59 @@ class NormalizedAxiomClausifier:
         """AtLeastDataRange -> AtLeastDataRange(X) in head."""
         if not concept.is_always_false():
             self._head_atoms.append(Atom.create(concept, X))
+
+    def visit_at_most_concept(self, concept: AtMostConcept) -> None:
+        """AtMostConcept (≤n R.C) -> pairwise inequality DL clauses.
+
+        For ≤n R.C: generate n+1 fresh Y-variables.  For each pair (Yi, Yj)
+        with i < j, emit a separate DL clause:
+
+            A(X) ∧ R(X, Yi) ∧ C(Yi) ∧ R(X, Yj) ∧ C(Yj) → Yi ≠ Yj
+
+        The body atom A(X) is whatever is currently in self._body_atoms
+        (the subclass of the current GCI).  The method temporarily builds
+        each pairwise clause and accumulates them in self._head_atoms as a
+        sentinel — the caller (clausify()) must flush each clause immediately.
+
+        Implementation note: for ≤0 R.C we emit one clause:
+            A(X) ∧ R(X, Y) ∧ C(Y) → ⊥   (empty head = contradiction)
+        """
+        n = concept.number
+        role = concept.on_role
+        filler = concept.to_concept
+
+        # Save current body (the A(X) guard from the GCI subclass)
+        saved_body = list(self._body_atoms)
+
+        if n == 0:
+            # ≤0 R.C: A(X) ∧ R(X,Y) ∧ C(Y) → ⊥
+            y_var = Variable.create("Y")
+            body = tuple(saved_body) + (
+                Atom.create(role, X, y_var),
+                Atom.create(filler, y_var),
+            )
+            self._extra_clauses: list[DLClause]
+            if not hasattr(self, "_extra_clauses"):
+                self._extra_clauses = []
+            self._extra_clauses.append(DLClause.create((), body))
+        else:
+            # ≤n R.C: pairwise inequality for n+1 witnesses
+            y_vars = [Variable.create(f"Y{i}") for i in range(n + 1)]
+            if not hasattr(self, "_extra_clauses"):
+                self._extra_clauses = []
+            for i in range(n + 1):
+                for j in range(i + 1, n + 1):
+                    body = tuple(saved_body) + (
+                        Atom.create(role, X, y_vars[i]),
+                        Atom.create(filler, y_vars[i]),
+                        Atom.create(role, X, y_vars[j]),
+                        Atom.create(filler, y_vars[j]),
+                    )
+                    head = (Atom.create(Inequality.INSTANCE, y_vars[i], y_vars[j]),)
+                    self._extra_clauses.append(DLClause.create(head, body))
+
+        # No head atoms from this visit — the clauses are in _extra_clauses
+        # The caller must consume _extra_clauses after get_dl_clause()
 
     def visit_exists_description_graph(self, concept: ExistsDescriptionGraph) -> None:
         """ExistsDescriptionGraph -> head atom."""

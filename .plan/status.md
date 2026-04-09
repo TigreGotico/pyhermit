@@ -3,7 +3,7 @@
 ## Checklist
 
 - [x] **Step 1** — Add `AtMostConcept` to `src/hermit/model/__init__.py` with `accept()`, `create()`, exported from `hermit.model`
-- [ ] **Step 2** — Add `visit_at_most_concept()` to `NormalizedAxiomClausifier` in `src/hermit/structural/owl_clausification.py`; emit pairwise inequality DL clauses
+- [x] **Step 2** — Add `visit_at_most_concept()` to `NormalizedAxiomClausifier` in `src/hermit/structural/owl_clausification.py`; emit pairwise inequality DL clauses
 - [ ] **Step 3** — Fix `_owl_expr_to_internal()` in `normalized_axioms.py`: `OWLObjectMaxCardinality` → `AtMostConcept`; `OWLObjectExactCardinality` → `[AtLeastConcept, AtMostConcept]`; remove synthetic approximations
 - [ ] **Step 4** — Emit two-variable DL clauses for `∀R.C` in `OWLNormalization._process_sub_class_of()`; add `direct_dl_clauses: list[DLClause]` to `NormalizedAxioms`; consume in `OWLClausification.clausify()`
 - [ ] **Step 5** — Fix `¬(complex)` via NNF push-in: `OWLObjectComplementOf(complex)` → correct NNF expansion instead of synthetic hash concept
