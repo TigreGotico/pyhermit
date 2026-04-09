@@ -748,12 +748,12 @@ class _OWLDateAndTimeLiteralInterface(_OWLLiteralBasicsInterface):
         if isinstance(value, date) or type_ == DateOWLDatatype:
             if isinstance(value, str):
                 if value[-1] == "Z":
-                    value = value.replace("Z", "+00:00")
+                    value = value[:-1]  # Remove Z from date (dates don't support timezone)
                 value = date.fromisoformat(value)
         if isinstance(value, time) or type_ == TimeOWLDatatype:
             if isinstance(value, str):
                 if value[-1] == "Z":
-                    value = value.replace("Z", "+00:00")
+                    value = value[:-1]  # Remove Z from time (times don't support timezone in all Python versions)
                 value = time.fromisoformat(value)
         if isinstance(value, timedelta) or type_ == DurationOWLDatatype:
             value = timedelta(value) if isinstance(value, str) else value
