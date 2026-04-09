@@ -206,11 +206,106 @@ class DatatypeRegistry:
     def is_disjoint_with(cls, datatype_iri1: str, datatype_iri2: str) -> bool:
         """Check if two datatype value spaces are disjoint.
 
-        For now, different datatype IRIs are not considered disjoint
-        (conservative: assume overlap unless proven otherwise).
+        Returns True if the value spaces are definitely disjoint,
+        False if they might overlap or we're unsure.
         """
-        # Different built-in XSD datatypes are generally disjoint
-        # but for this port we use a conservative approach
+        if datatype_iri1 == datatype_iri2:
+            return False
+
+        # Define groups of mutually disjoint types
+        # String types
+        string_types = {
+            "http://www.w3.org/2001/XMLSchema#string",
+            "http://www.w3.org/2001/XMLSchema#normalizedString",
+            "http://www.w3.org/2001/XMLSchema#token",
+            "http://www.w3.org/2001/XMLSchema#Name",
+            "http://www.w3.org/2001/XMLSchema#NCName",
+            "http://www.w3.org/2001/XMLSchema#ENTITY",
+            "http://www.w3.org/2001/XMLSchema#ID",
+            "http://www.w3.org/2001/XMLSchema#IDREF",
+            "http://www.w3.org/2001/XMLSchema#NMTOKEN",
+            "http://www.w3.org/2001/XMLSchema#language",
+        }
+
+        # Numeric types
+        numeric_types = {
+            "http://www.w3.org/2001/XMLSchema#integer",
+            "http://www.w3.org/2001/XMLSchema#decimal",
+            "http://www.w3.org/2001/XMLSchema#float",
+            "http://www.w3.org/2001/XMLSchema#double",
+            "http://www.w3.org/2001/XMLSchema#long",
+            "http://www.w3.org/2001/XMLSchema#int",
+            "http://www.w3.org/2001/XMLSchema#short",
+            "http://www.w3.org/2001/XMLSchema#byte",
+            "http://www.w3.org/2001/XMLSchema#positiveInteger",
+            "http://www.w3.org/2001/XMLSchema#nonPositiveInteger",
+            "http://www.w3.org/2001/XMLSchema#negativeInteger",
+            "http://www.w3.org/2001/XMLSchema#nonNegativeInteger",
+            "http://www.w3.org/2001/XMLSchema#unsignedLong",
+            "http://www.w3.org/2001/XMLSchema#unsignedInt",
+            "http://www.w3.org/2001/XMLSchema#unsignedShort",
+            "http://www.w3.org/2001/XMLSchema#unsignedByte",
+        }
+
+        # Boolean type
+        boolean_type = "http://www.w3.org/2001/XMLSchema#boolean"
+
+        # Date/Time types
+        datetime_types = {
+            "http://www.w3.org/2001/XMLSchema#dateTime",
+            "http://www.w3.org/2001/XMLSchema#date",
+            "http://www.w3.org/2001/XMLSchema#time",
+            "http://www.w3.org/2001/XMLSchema#gYear",
+            "http://www.w3.org/2001/XMLSchema#gYearMonth",
+            "http://www.w3.org/2001/XMLSchema#gMonthDay",
+            "http://www.w3.org/2001/XMLSchema#gDay",
+            "http://www.w3.org/2001/XMLSchema#gMonth",
+        }
+
+        # Binary types
+        binary_types = {
+            "http://www.w3.org/2001/XMLSchema#hexBinary",
+            "http://www.w3.org/2001/XMLSchema#base64Binary",
+        }
+
+        # Check if they're in different groups
+        in_strings_1 = datatype_iri1 in string_types
+        in_strings_2 = datatype_iri2 in string_types
+        in_numeric_1 = datatype_iri1 in numeric_types
+        in_numeric_2 = datatype_iri2 in numeric_types
+        is_boolean_1 = datatype_iri1 == boolean_type
+        is_boolean_2 = datatype_iri2 == boolean_type
+        in_datetime_1 = datatype_iri1 in datetime_types
+        in_datetime_2 = datatype_iri2 in datetime_types
+        in_binary_1 = datatype_iri1 in binary_types
+        in_binary_2 = datatype_iri2 in binary_types
+
+        # Check for disjoint groups
+        # Strings are disjoint from numbers, booleans, dates, and binaries
+        if (in_strings_1 and (in_numeric_2 or is_boolean_2 or in_datetime_2 or in_binary_2)):
+            return True
+        if (in_strings_2 and (in_numeric_1 or is_boolean_1 or in_datetime_1 or in_binary_1)):
+            return True
+
+        # Numbers are disjoint from booleans, dates, and binaries
+        if (in_numeric_1 and (is_boolean_2 or in_datetime_2 or in_binary_2)):
+            return True
+        if (in_numeric_2 and (is_boolean_1 or in_datetime_1 or in_binary_1)):
+            return True
+
+        # Booleans are disjoint from dates and binaries
+        if (is_boolean_1 and (in_datetime_2 or in_binary_2)):
+            return True
+        if (is_boolean_2 and (in_datetime_1 or in_binary_1)):
+            return True
+
+        # Dates are disjoint from binaries
+        if (in_datetime_1 and in_binary_2):
+            return True
+        if (in_datetime_2 and in_binary_1):
+            return True
+
+        # Otherwise, assume overlap is possible
         return False
 
     @classmethod
@@ -224,15 +319,31 @@ class DatatypeRegistry:
         if datatype_iri1 == datatype_iri2:
             return True
 
-        # Specific subtype relationships:
-        # Integer types are subsets of Decimal and Float types
-        int_iri = "http://www.w3.org/2001/XMLSchema#integer"
-        decimal_iri = "http://www.w3.org/2001/XMLSchema#decimal"
-        float_iri = "http://www.w3.org/2001/XMLSchema#float"
-        double_iri = "http://www.w3.org/2001/XMLSchema#double"
+        XSD = "http://www.w3.org/2001/XMLSchema#"
 
-        if datatype_iri1 == int_iri and datatype_iri2 in [decimal_iri, float_iri, double_iri]:
-            return True
+        # Define type hierarchy for XSD types
+        # Maps each type to its parent type(s)
+        type_hierarchy = {
+            XSD + "long": [XSD + "integer", XSD + "decimal"],
+            XSD + "int": [XSD + "long", XSD + "integer", XSD + "decimal"],
+            XSD + "short": [XSD + "int", XSD + "long", XSD + "integer", XSD + "decimal"],
+            XSD + "byte": [XSD + "short", XSD + "int", XSD + "long", XSD + "integer", XSD + "decimal"],
+            XSD + "nonNegativeInteger": [XSD + "integer", XSD + "decimal"],
+            XSD + "positiveInteger": [XSD + "nonNegativeInteger", XSD + "integer", XSD + "decimal"],
+            XSD + "unsignedLong": [XSD + "nonNegativeInteger", XSD + "integer", XSD + "decimal"],
+            XSD + "unsignedInt": [XSD + "unsignedLong", XSD + "nonNegativeInteger", XSD + "integer", XSD + "decimal"],
+            XSD + "unsignedShort": [XSD + "unsignedInt", XSD + "unsignedLong", XSD + "nonNegativeInteger", XSD + "integer", XSD + "decimal"],
+            XSD + "unsignedByte": [XSD + "unsignedShort", XSD + "unsignedInt", XSD + "unsignedLong", XSD + "nonNegativeInteger", XSD + "integer", XSD + "decimal"],
+            XSD + "nonPositiveInteger": [XSD + "integer", XSD + "decimal"],
+            XSD + "negativeInteger": [XSD + "nonPositiveInteger", XSD + "integer", XSD + "decimal"],
+            XSD + "integer": [XSD + "decimal"],
+            XSD + "decimal": [XSD + "float", XSD + "double"],
+            XSD + "float": [XSD + "double"],
+        }
+
+        # Check if datatype_iri1 is in the parent list of datatype_iri2
+        if datatype_iri1 in type_hierarchy:
+            return datatype_iri2 in type_hierarchy[datatype_iri1]
 
         # For other cases, assume not a subset
         return False
@@ -246,17 +357,10 @@ class DatatypeRegistry:
         Returns the intersection of the value space with the restriction.
         """
         # Extract facets from the datatype restriction
-        if hasattr(datatype_restriction, 'datatype_iri'):
-            dr_iri = datatype_restriction.datatype_iri
-        else:
-            dr_iri = datatype_restriction.get_datatype_uri()
+        dr_iri = datatype_restriction.get_datatype_uri()
 
-        if hasattr(datatype_restriction, '_facet_uris'):
-            facet_uris = datatype_restriction._facet_uris
-            facet_values = datatype_restriction._facet_values
-        else:
-            facet_uris = ()
-            facet_values = ()
+        facet_uris = getattr(datatype_restriction, '_facet_uris', ())
+        facet_values = getattr(datatype_restriction, '_facet_values', ())
 
         # Create a value space subset for this restriction
         restriction_space = cls.create_value_space_subset(
@@ -275,17 +379,10 @@ class DatatypeRegistry:
         Returns the intersection of the value space with the complement of the restriction.
         """
         # Extract facets from the datatype restriction
-        if hasattr(datatype_restriction, 'datatype_iri'):
-            dr_iri = datatype_restriction.datatype_iri
-        else:
-            dr_iri = datatype_restriction.get_datatype_uri()
+        dr_iri = datatype_restriction.get_datatype_uri()
 
-        if hasattr(datatype_restriction, '_facet_uris'):
-            facet_uris = datatype_restriction._facet_uris
-            facet_values = datatype_restriction._facet_values
-        else:
-            facet_uris = ()
-            facet_values = ()
+        facet_uris = getattr(datatype_restriction, '_facet_uris', ())
+        facet_values = getattr(datatype_restriction, '_facet_values', ())
 
         # Create a value space subset for this restriction
         restriction_space = cls.create_value_space_subset(

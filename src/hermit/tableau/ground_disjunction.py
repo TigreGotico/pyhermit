@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hermit.model import DLPredicate
-    from hermit.prefixes import Prefixes
+    from hermit.model import Prefixes
     from hermit.tableau.dependency_set import DependencySet
     from hermit.tableau.ground_disjunction_header import GroundDisjunctionHeader
     from hermit.tableau.node import Node
@@ -226,11 +226,11 @@ class GroundDisjunction:
     def to_string(self, prefixes: Prefixes | None = None) -> str:
         """Return a string representation."""
         from hermit.model import Equality
-        from hermit.prefixes import Prefixes as Pfx
+        from hermit.model import Prefixes as Pfx
         from hermit.tableau.node import Node
 
         if prefixes is None:
-            prefixes = Pfx.STANDARD_PREFIXES
+            prefixes = Pfx.SEMANTIC_WEB_PREFIXES
         parts = []
         for disjunct_index in range(self.get_number_of_disjuncts()):
             if disjunct_index != 0:
@@ -274,6 +274,6 @@ class GroundDisjunction:
         return "".join(parts)
 
     def __str__(self) -> str:
-        from hermit.prefixes import Prefixes as Pfx
+        from hermit.model import Prefixes as Pfx
 
-        return self.to_string(Pfx.STANDARD_PREFIXES)
+        return self.to_string(Pfx.SEMANTIC_WEB_PREFIXES)

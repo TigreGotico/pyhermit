@@ -876,7 +876,7 @@ class ExtensionManager:
             self.m_ternary_auxiliary_tuple_contains[1] = node_from
             self.m_ternary_auxiliary_tuple_contains[2] = node_to
         else:
-            self.m_ternary_auxiliary_tuple_contains[0] = role.get_inverse_of()
+            self.m_ternary_auxiliary_tuple_contains[0] = role.inverse_of
             self.m_ternary_auxiliary_tuple_contains[1] = node_to
             self.m_ternary_auxiliary_tuple_contains[2] = node_from
         return self.m_ternary_extension_table.contains_tuple(
@@ -1000,7 +1000,7 @@ class ExtensionManager:
             self.m_ternary_auxiliary_tuple_contains[1] = node_from
             self.m_ternary_auxiliary_tuple_contains[2] = node_to
         else:
-            self.m_ternary_auxiliary_tuple_contains[0] = role.get_inverse_of()
+            self.m_ternary_auxiliary_tuple_contains[0] = role.inverse_of
             self.m_ternary_auxiliary_tuple_contains[1] = node_to
             self.m_ternary_auxiliary_tuple_contains[2] = node_from
         return self.m_ternary_extension_table.get_dependency_set(
@@ -1129,7 +1129,7 @@ class ExtensionManager:
             )
         else:
             return self.add_assertion_binary(
-                role.get_inverse_of(), node_to, node_from, dependency_set, is_core
+                role.inverse_of, node_to, node_from, dependency_set, is_core
             )
 
     def add_assertion(

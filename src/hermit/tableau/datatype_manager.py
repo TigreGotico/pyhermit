@@ -17,7 +17,7 @@ if TYPE_CHECKING:
         DatatypeRestriction,
         DLOntology,
     )
-    from hermit.prefixes import Prefixes
+    from hermit.model import Prefixes
     from hermit.tableau.dependency_set import DependencySet
     from hermit.tableau.extension_manager import Retrieval
     from hermit.tableau.node import Node
@@ -200,7 +200,7 @@ class DatatypeManager:
         while not self.m_extension_manager.contains_clash() and not self.m_inequality_delta_old_retrieval.after_last():
             from hermit.model import Inequality
 
-            if Inequality.INSTANCE.equals(tuple_buffer[0]):
+            if tuple_buffer[0] is Inequality.INSTANCE:
                 node1: Node = tuple_buffer[1]  # type: ignore[assignment]
                 node2: Node = tuple_buffer[2]  # type: ignore[assignment]
                 if not node1.node_type.is_abstract and not node2.node_type.is_abstract:  # type: ignore[union-attr]
@@ -453,7 +453,7 @@ class DatatypeManager:
         restriction = variable.m_most_specific_restriction
         most_specific_datatype_uri = restriction.get_datatype_uri()
         variable.m_value_space_subset = DatatypeRegistry.create_value_space_subset(
-            restriction.datatype_iri,
+            most_specific_datatype_uri,
             restriction._facet_uris,
             restriction._facet_values
         )
@@ -746,10 +746,10 @@ class DConjunction:
         return True
 
     def __str__(self, prefixes: Prefixes | None = None) -> str:
-        from hermit.prefixes import Prefixes as Pfx
+        from hermit.model import Prefixes as Pfx
 
         if prefixes is None:
-            prefixes = Pfx.STANDARD_PREFIXES
+            prefixes = Pfx.SEMANTIC_WEB_PREFIXES
         parts = []
         first = True
         active_list = list(self.m_active_variables)
@@ -889,10 +889,10 @@ class DVariable:
         return True
 
     def __str__(self, prefixes: Prefixes | None = None) -> str:
-        from hermit.prefixes import Prefixes as Pfx
+        from hermit.model import Prefixes as Pfx
 
         if prefixes is None:
-            prefixes = Pfx.STANDARD_PREFIXES
+            prefixes = Pfx.SEMANTIC_WEB_PREFIXES
         parts = ["["]
         first = True
         for item in self.m_positive_constant_enumerations:

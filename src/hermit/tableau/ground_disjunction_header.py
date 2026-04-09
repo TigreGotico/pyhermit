@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hermit.model import DLPredicate
-    from hermit.prefixes import Prefixes
+    from hermit.model import Prefixes
 
 
 class DisjunctIndexWithBacktrackings:
@@ -155,10 +155,10 @@ class GroundDisjunctionHeader:
 
     def __str__(self, prefixes: Prefixes | None = None) -> str:
         """Return a string representation."""
-        from hermit.prefixes import Prefixes as Pfx
+        from hermit.model import Prefixes as Pfx
 
         if prefixes is None:
-            prefixes = Pfx.STANDARD_PREFIXES
+            prefixes = Pfx.SEMANTIC_WEB_PREFIXES
         parts = []
         for disjunct_index in range(len(self.m_dl_predicates)):
             if disjunct_index > 0:

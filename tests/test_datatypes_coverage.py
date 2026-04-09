@@ -2522,8 +2522,8 @@ class TestDatatypeManagerInit:
 
     def test_normalize_as_value_space_subset_clash(self):
         """Test _normalize_as_value_space_subset sets clash when empty subset."""
-        from unittest.mock import MagicMock
-        import sys
+        from unittest.mock import MagicMock, patch
+        from hermit.model import DatatypeRestriction
 
         t = _make_mock_tableau()
         dm = DatatypeManager(t)
@@ -2531,27 +2531,27 @@ class TestDatatypeManagerInit:
         mock_node = MagicMock()
         v.m_node = mock_node
 
-        mock_dr = MagicMock()
+        mock_dr = MagicMock(spec=DatatypeRestriction)
         mock_dr.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr._facet_uris = ()
+        mock_dr._facet_values = ()
         v.m_positive_datatype_restrictions = [mock_dr]
         v.m_most_specific_restriction = mock_dr
 
-        mock_registry = sys.modules.get("hermit.datatypes.datatype_registry")
-        if mock_registry:
-            mock_subset = MagicMock()
-            # has_cardinality_at_least(1) returns False → clash
-            mock_subset.has_cardinality_at_least = MagicMock(return_value=False)
-            mock_registry.DatatypeRegistry.create_value_space_subset = MagicMock(
-                return_value=mock_subset
-            )
+        mock_subset = MagicMock()
+        # has_cardinality_at_least(1) returns False → clash
+        mock_subset.has_cardinality_at_least = MagicMock(return_value=False)
 
-        dm._normalize_as_value_space_subset(v)
+        with patch('hermit.datatypes.registry.DatatypeRegistry.create_value_space_subset',
+                   return_value=mock_subset):
+            dm._normalize_as_value_space_subset(v)
+
         dm.m_extension_manager.set_clash.assert_called()
 
     def test_normalize_as_value_space_subset_with_forbidden(self):
         """Test _normalize_as_value_space_subset filters forbidden values."""
-        from unittest.mock import MagicMock
-        import sys
+        from unittest.mock import MagicMock, patch
+        from hermit.model import DatatypeRestriction
 
         t = _make_mock_tableau()
         dm = DatatypeManager(t)
@@ -2559,23 +2559,23 @@ class TestDatatypeManagerInit:
         mock_node = MagicMock()
         v.m_node = mock_node
 
-        mock_dr = MagicMock()
+        mock_dr = MagicMock(spec=DatatypeRestriction)
         mock_dr.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr._facet_uris = ()
+        mock_dr._facet_values = ()
         v.m_positive_datatype_restrictions = [mock_dr]
         v.m_most_specific_restriction = mock_dr
         v.m_forbidden_data_values = [99]
 
-        mock_registry = sys.modules.get("hermit.datatypes.datatype_registry")
-        if mock_registry:
-            mock_subset = MagicMock()
-            mock_subset.has_cardinality_at_least = MagicMock(return_value=True)
-            # 99 is NOT in the value space (contains_data_value returns False)
-            mock_subset.contains_data_value = MagicMock(return_value=False)
-            mock_registry.DatatypeRegistry.create_value_space_subset = MagicMock(
-                return_value=mock_subset
-            )
+        mock_subset = MagicMock()
+        mock_subset.has_cardinality_at_least = MagicMock(return_value=True)
+        # 99 is NOT in the value space (contains_data_value returns False)
+        mock_subset.contains_data_value = MagicMock(return_value=False)
 
-        dm._normalize_as_value_space_subset(v)
+        with patch('hermit.datatypes.registry.DatatypeRegistry.create_value_space_subset',
+                   return_value=mock_subset):
+            dm._normalize_as_value_space_subset(v)
+
         # Forbidden value not in subset → removed
         assert 99 not in v.m_forbidden_data_values
 
