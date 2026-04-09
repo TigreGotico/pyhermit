@@ -4,10 +4,11 @@ Welcome to the comprehensive PyHermit examples collection. This folder contains 
 
 ## Overview
 
-**Total Examples: 15**
+**Total Examples: 20**
 - **Beginner Track (01-05):** Learn core concepts (consistency, subsumption, properties, instances, cardinality)
 - **Intermediate Track (06-10):** Real-world patterns (disjointness, complex reasoning, OWL loading, configuration)
 - **Advanced Track (11-14, 17):** Integration and special topics (e-commerce, design patterns, testing, inverse roles, contradictions)
+- **Advanced+ Track (15-16, 18-20):** Advanced reasoning patterns (multiple inheritance, queries, nominalsI, performance, multi-domain)
 
 All examples are **self-contained and runnable**:
 ```bash
@@ -25,7 +26,7 @@ python examples/01_hello_world.py
 
 ### Run all examples
 ```bash
-for i in {01..14} 17; do
+for i in {01..14} 15 16 17 18 19 20; do
     python examples/${i}_*.py
 done
 ```
@@ -181,26 +182,86 @@ python examples/03_object_properties.py > output.txt 2>&1
 - **Learning Time:** 20 minutes
 - **Difficulty:** Advanced
 
+### Advanced+ Track (15-16, 18-20)
+
+#### 15_multiple_inheritance.py
+**Purpose:** Complex hierarchies with multiple parents
+- Multiple inheritance (diamond problem)
+- Path-based subsumption
+- Common ancestor detection
+- Automatic inference through inheritance paths
+- **Key Concepts:** Multiple inheritance, transitive closure, diamond hierarchies
+- **Learning Time:** 20 minutes
+- **Difficulty:** Advanced
+
+#### 16_query_patterns.py
+**Purpose:** Practical query patterns for real applications
+- Hierarchical instance retrieval
+- Type-based filtering
+- Role relationship chaining
+- Business logic patterns
+- Performance optimization tips
+- **Key Concepts:** Query design, filtering, aggregation, statistics
+- **Learning Time:** 25 minutes
+- **Difficulty:** Advanced
+
+#### 18_nominal_classes.py
+**Purpose:** Enumerated classes and fixed value sets
+- Defining classes as unions of individuals (OneOf)
+- Exhaustiveness constraints
+- Configuration enumerations
+- Practical use cases (status codes, colors, days)
+- **Key Concepts:** Nominals, enumeration, fixed sets, classification
+- **Learning Time:** 20 minutes
+- **Difficulty:** Intermediate-Advanced
+
+#### 19_performance_analysis.py
+**Purpose:** Performance benchmarking and optimization
+- Measuring reasoning time
+- Comparing blocking strategies
+- Impact of ontology complexity
+- Precomputation benefits
+- Scalability analysis
+- **Key Concepts:** Performance profiling, optimization, blocking strategies
+- **Learning Time:** 25 minutes
+- **Difficulty:** Advanced
+
+#### 20_multi_domain_reasoning.py
+**Purpose:** Integrating multiple domain ontologies
+- Cross-domain relationships
+- Linking concepts across domains
+- Domain-specific hierarchies
+- Integration patterns
+- Real-world medical example
+- **Key Concepts:** Ontology composition, domain integration, cross-domain inference
+- **Learning Time:** 25 minutes
+- **Difficulty:** Advanced
+
 ## Feature Matrix: Which Examples Cover What?
 
-| Feature | 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 | 09 | 10 | 11 | 12 | 13 | 14 | 17 |
-|---------|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| **Basic Ontology** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **Subsumption** | ✓ | ✓ | ✓ |   | ✓ |   | ✓ | ✓ | ✓ | ✓ | ✓ |   | ✓ |   |   |
-| **Object Properties** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   |
-| **Existential Restrictions** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   |   |   |   |
-| **Cardinality** |   |   |   |   | ✓ |   |   |   |   | ✓ | ✓ |   |   |   |   |
-| **Disjointness** |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   | ✓ |
-| **Instance ABox** |   |   | ✓ | ✓ | ✓ | ✓ | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   |
-| **Type Checking** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   |
-| **Role Relationships** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   |
-| **Consistency Checking** | ✓ |   |   | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **Class Hierarchy** |   | ✓ |   | ✓ |   |   | ✓ | ✓ | ✓ | ✓ | ✓ |   | ✓ |   |   |
-| **File Loading** |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |
-| **Inverse Roles** |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |
-| **Design Patterns** |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |
-| **Testing** |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |
-| **Inconsistency Detection** |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |
+| Feature | 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 | 09 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---------|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+| **Basic Ontology** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Subsumption** | ✓ | ✓ | ✓ |   | ✓ |   | ✓ | ✓ | ✓ | ✓ | ✓ |   | ✓ |   | ✓ | ✓ |   |   |   |   |
+| **Object Properties** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   | ✓ |   |   |   | ✓ |
+| **Existential Restrictions** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   |   |   |   |   |   |   |   |   |
+| **Cardinality** |   |   |   |   | ✓ |   |   |   |   | ✓ | ✓ |   |   |   |   |   |   |   |   |   |
+| **Disjointness** |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |
+| **Instance ABox** |   |   | ✓ | ✓ | ✓ | ✓ | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   | ✓ |   | ✓ |   | ✓ |
+| **Type Checking** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ | ✓ | ✓ |   | ✓ |   | ✓ |
+| **Role Relationships** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   | ✓ |   |   |   | ✓ |
+| **Consistency Checking** | ✓ |   |   | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Class Hierarchy** |   | ✓ |   | ✓ |   |   | ✓ | ✓ | ✓ | ✓ | ✓ |   | ✓ |   | ✓ | ✓ |   |   |   |   |
+| **File Loading** |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   |   |   |   |   |
+| **Inverse Roles** |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |
+| **Multiple Inheritance** |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |
+| **Query Patterns** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |
+| **Design Patterns** |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   |
+| **Nominal Classes** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |
+| **Performance Analysis** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |
+| **Multi-Domain Integration** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |
+| **Testing** |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |
+| **Inconsistency Detection** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |
 
 ## Learning Paths
 
@@ -356,7 +417,7 @@ Fido hasOwner Alice: True
 
 ## Testing
 
-All 15 examples pass successfully:
+All 20 examples pass successfully:
 ```
 ✓ Example 01 - hello_world
 ✓ Example 02 - class_hierarchy  
@@ -372,7 +433,12 @@ All 15 examples pass successfully:
 ✓ Example 12 - integration_patterns
 ✓ Example 13 - testing_and_validation
 ✓ Example 14 - inverse_roles
+✓ Example 15 - multiple_inheritance
+✓ Example 16 - query_patterns
 ✓ Example 17 - contradictions_and_clashes
+✓ Example 18 - nominal_classes
+✓ Example 19 - performance_analysis
+✓ Example 20 - multi_domain_reasoning
 ```
 
 ## Performance Notes
@@ -380,8 +446,9 @@ All 15 examples pass successfully:
 - Examples 01-07: < 100ms each
 - Examples 08-10: < 500ms each (more complex ontologies)
 - Examples 11-14, 17: < 1s each (real-world complexity)
+- Examples 15-16, 18-20: < 2s each (advanced reasoning patterns, benchmarking)
 
-**Total runtime for all examples: < 10 seconds**
+**Total runtime for all 20 examples: < 30 seconds**
 
 ## Documentation Files
 
