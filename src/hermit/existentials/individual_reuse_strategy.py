@@ -78,7 +78,7 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
             )
             self.m_indices_by_branching_point = new_indices
         self.m_indices_by_branching_point[start] = (
-            self.m_reuse_backtracking_table.size
+            self.m_reuse_backtracking_table.first_free_tuple_index
         )
 
     def backtrack(self) -> None:
@@ -87,7 +87,7 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
             self.m_tableau.m_current_branching_point + 1
         ]
         for index in range(
-            self.m_reuse_backtracking_table.size - 1, required_first_free - 1, -1
+            self.m_reuse_backtracking_table.first_free_tuple_index - 1, required_first_free - 1, -1
         ):
             reuse_concept = self.m_reuse_backtracking_table.get_tuple_object(
                 index, 0
@@ -137,10 +137,10 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
     def _try_parent_reuse(
         self, at_least_concept: AtLeastConcept, node: Node
     ) -> bool:
-        if at_least_concept.get_number() == 1:
+        if at_least_concept.number == 1:
             parent = node.parent
             if parent is not None and self.m_extension_manager.contains_concept_assertion(  # type: ignore[union-attr]
-                at_least_concept.get_to_concept(), parent
+                at_least_concept.to_concept, parent
             ):
                 dependency_set = self.m_extension_manager.get_concept_assertion_dependency_set(  # type: ignore[union-attr]
                     at_least_concept, node
@@ -156,14 +156,14 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
                         node,
                         True,
                     )
-                    self.m_tableau.push_branching_point(branching_point)  # type: ignore[union-attr]
+                    self.m_tableau._push_branching_point(branching_point)  # type: ignore[union-attr]
                     dependency_set = (
                         self.m_tableau.m_dependency_set_factory.add_branching_point(  # type: ignore[union-attr]
                             dependency_set, branching_point.level
                         )
                     )
                 self.m_extension_manager.add_role_assertion(  # type: ignore[union-attr]
-                    at_least_concept.get_on_role(),
+                    at_least_concept.on_role,
                     node,
                     parent,
                     dependency_set,
@@ -175,14 +175,14 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
     def _expand_with_model_reuse(
         self, at_least_concept: AtLeastConcept, node: Node
     ) -> bool:
-        to_concept = at_least_concept.get_to_concept()
+        to_concept = at_least_concept.to_concept
         if not isinstance(to_concept, AtomicConcept):
             return False
-        from hermit.prefixes import Prefixes
+        from hermit.model import Prefixes
 
-        if Prefixes.is_internal_iri(to_concept.get_iri()):
+        if Prefixes.is_internal_iri(to_concept.iri):
             return False
-        if at_least_concept.get_number() == 1 and (
+        if at_least_concept.number == 1 and (
             to_concept in self.m_do_reuse_concepts_always
             or to_concept not in self.m_dont_reuse_concepts_this_run
         ):
@@ -211,14 +211,14 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
                         node,
                         False,
                     )
-                    self.m_tableau.push_branching_point(branching_point)  # type: ignore[union-attr]
+                    self.m_tableau._push_branching_point(branching_point)  # type: ignore[union-attr]
                     dependency_set = (
                         self.m_tableau.m_dependency_set_factory.add_branching_point(  # type: ignore[union-attr]
                             dependency_set, branching_point.level
                         )
                     )
                 # Create a root node so that keys are not applicable
-                existential_node = self.m_tableau.create_new_ni_node(  # type: ignore[union-attr]
+                existential_node = self.m_tableau._create_new_ni_node(  # type: ignore[union-attr]
                     dependency_set
                 )
                 reuse_info = NodeBranchingPointPair(
@@ -245,7 +245,7 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
                         )
                     )
             self.m_extension_manager.add_role_assertion(  # type: ignore[union-attr]
-                at_least_concept.get_on_role(),
+                at_least_concept.on_role,
                 node,
                 existential_node,
                 dependency_set,
@@ -287,7 +287,7 @@ class IndividualReuseBranchingPoint:
         self, tableau: Tableau, clash_dependency_set: DependencySet
     ) -> None:
         if not self.m_was_parent_reuse:
-            to_concept = self.m_existential.get_to_concept()
+            to_concept = self.m_existential.to_concept
             assert isinstance(to_concept, AtomicConcept)
             # Access the strategy's dont-reuse set via the tableau
             strategy = tableau.m_existential_expansion_strategy
@@ -304,13 +304,13 @@ class IndividualReuseBranchingPoint:
             dependency_set, self.m_node
         )
         tableau.m_extension_manager.add_concept_assertion(
-            self.m_existential.get_to_concept(),
+            self.m_existential.to_concept,
             existential_node,
             dependency_set,
             True,
         )
         tableau.m_extension_manager.add_role_assertion(
-            self.m_existential.get_on_role(),
+            self.m_existential.on_role,
             self.m_node,
             existential_node,
             dependency_set,
