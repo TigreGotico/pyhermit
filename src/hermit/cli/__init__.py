@@ -69,11 +69,148 @@ def _load_dl_ontology(path: str) -> DLOntology:
 
 
 def _dl_ontology_from_json(data: dict[str, Any]) -> DLOntology:
-    """Very basic JSON -> DLOntology loader (placeholder)."""
-    # A full implementation would parse the JSON structure back into
-    # DLClause, Atom, etc. objects.  For now, return an empty ontology.
+    """Deserialize a DLOntology from its JSON representation.
+
+    JSON schema::
+
+        {
+          "ontology_iri": "urn:example",
+          "dl_clauses": [
+            {"head": [<atom>, ...], "body": [<atom>, ...]}
+          ],
+          "positive_facts": [<atom>, ...],
+          "negative_facts": [<atom>, ...]
+        }
+
+    Atom::  {"predicate": <predicate>, "args": [<term>, ...]}
+
+    Predicate (one of):
+        {"type": "concept", "iri": "..."}
+        {"type": "neg_concept", "iri": "..."}
+        {"type": "role", "iri": "..."}
+        {"type": "inv_role", "iri": "..."}
+        {"type": "equality"}
+        {"type": "inequality"}
+
+    Term (one of):
+        {"type": "var", "name": "X"}
+        {"type": "individual", "iri": "..."}
+    """
+    from hermit.model import (
+        Atom,
+        AtomicConcept,
+        AtomicNegationConcept,
+        AtomicRole,
+        DLClause,
+        Equality,
+        Individual,
+        Inequality,
+        InverseRole,
+        Variable,
+    )
+
+    def _parse_predicate(p: dict[str, Any]) -> Any:
+        t = p["type"]
+        if t == "concept":
+            return AtomicConcept.create(p["iri"])
+        if t == "neg_concept":
+            return AtomicNegationConcept.create(AtomicConcept.create(p["iri"]))
+        if t == "role":
+            return AtomicRole.create(p["iri"])
+        if t == "inv_role":
+            return InverseRole.create(AtomicRole.create(p["iri"]))
+        if t == "equality":
+            return Equality.INSTANCE
+        if t == "inequality":
+            return Inequality.INSTANCE
+        raise ValueError(f"Unknown predicate type: {t!r}")
+
+    def _parse_term(t: dict[str, Any]) -> Any:
+        kind = t["type"]
+        if kind == "var":
+            return Variable.create(t["name"])
+        if kind == "individual":
+            return Individual.create(t["iri"])
+        raise ValueError(f"Unknown term type: {kind!r}")
+
+    def _parse_atom(a: dict[str, Any]) -> Atom:
+        pred = _parse_predicate(a["predicate"])
+        args = tuple(_parse_term(t) for t in a["args"])
+        return Atom.create(pred, *args)
+
+    def _parse_clause(c: dict[str, Any]) -> DLClause:
+        head = tuple(_parse_atom(a) for a in c.get("head", []))
+        body = tuple(_parse_atom(a) for a in c.get("body", []))
+        return DLClause.create(head, body)
+
     ontology_iri = data.get("ontology_iri")
-    return DLOntology(ontology_iri=ontology_iri)
+    dl_clauses = frozenset(_parse_clause(c) for c in data.get("dl_clauses", []))
+    positive_facts = frozenset(_parse_atom(a) for a in data.get("positive_facts", []))
+    negative_facts = frozenset(_parse_atom(a) for a in data.get("negative_facts", []))
+    return DLOntology(
+        ontology_iri=ontology_iri,
+        dl_clauses=dl_clauses,
+        positive_facts=positive_facts,
+        negative_facts=negative_facts,
+    )
+
+
+def _dl_ontology_to_json(ontology: DLOntology) -> dict[str, Any]:
+    """Serialize a DLOntology to its JSON representation.
+
+    See :func:`_dl_ontology_from_json` for the schema.
+    """
+    from hermit.model import (
+        AtomicConcept,
+        AtomicNegationConcept,
+        AtomicRole,
+        Equality,
+        Individual,
+        Inequality,
+        InverseRole,
+        Variable,
+    )
+
+    def _serial_predicate(p: Any) -> dict[str, Any]:
+        if isinstance(p, AtomicNegationConcept):
+            return {"type": "neg_concept", "iri": p.negated.iri}
+        if isinstance(p, AtomicConcept):
+            return {"type": "concept", "iri": p.iri}
+        if isinstance(p, InverseRole):
+            return {"type": "inv_role", "iri": p.get_inverse().iri}
+        if isinstance(p, AtomicRole):
+            return {"type": "role", "iri": p.iri}
+        if p is Equality.INSTANCE:
+            return {"type": "equality"}
+        if p is Inequality.INSTANCE:
+            return {"type": "inequality"}
+        raise ValueError(f"Cannot serialize predicate: {p!r}")
+
+    def _serial_term(t: Any) -> dict[str, Any]:
+        if isinstance(t, Variable):
+            return {"type": "var", "name": t.name}
+        if isinstance(t, Individual):
+            return {"type": "individual", "iri": t.iri}
+        raise ValueError(f"Cannot serialize term: {t!r}")
+
+    def _serial_atom(a: Any) -> dict[str, Any]:
+        return {
+            "predicate": _serial_predicate(a.predicate),
+            "args": [_serial_term(a.argument(i)) for i in range(a.arity())],
+        }
+
+    def _serial_clause(c: Any) -> dict[str, Any]:
+        return {
+            "head": [_serial_atom(a) for a in c.head_atoms],
+            "body": [_serial_atom(a) for a in c.body_atoms],
+        }
+
+    return {
+        "ontology_iri": ontology.ontology_iri,
+        "dl_clauses": [_serial_clause(c) for c in sorted(ontology.dl_clauses, key=str)],
+        "positive_facts": [_serial_atom(a) for a in sorted(ontology.positive_facts, key=str)],
+        "negative_facts": [_serial_atom(a) for a in sorted(ontology.negative_facts, key=str)],
+    }
 
 
 # ---------------------------------------------------------------------------
