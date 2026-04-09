@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hermit-reasoner"
-version = "0.1.0"
+version = "0.2.0"
 description = "A conformant OWL 2 DL tableau reasoner — Python port of HermiT"
 readme = "README.md"
 license = "Apache-2.0"
@@ -15,7 +15,7 @@ authors = [
 ]
 keywords = ["owl", "owl2", "reasoner", "semantic-web", "description-logic", "knowledge-graph", "ontology"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
@@ -32,6 +32,9 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
+owlready2 = [
+    "owlready2>=0.45",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
