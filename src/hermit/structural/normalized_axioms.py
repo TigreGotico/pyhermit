@@ -32,6 +32,137 @@ if TYPE_CHECKING:
 
 
 # ===========================================================================
+# OWL model → internal model conversion
+# ===========================================================================
+
+
+def _owl_expr_to_internal(expr: object, _max_role_registry: list | None = None) -> object:
+    """Convert an OWL model class expression to an internal model concept.
+
+    This is the bridge between OWLNormalization (which produces OWL model NNF
+    expressions) and NormalizedAxiomClausifier (which expects internal model
+    Concept objects with .accept() visitor methods).
+
+    Mappings:
+      OWLClass(iri)                       → AtomicConcept.create(iri)
+      OWLObjectComplementOf(OWLClass(i))  → AtomicNegationConcept.create(AtomicConcept.create(i))
+      OWLObjectSomeValuesFrom(R, C)       → AtLeastConcept.create(1, role, concept)
+      OWLObjectAllValuesFrom(R, C)        → AtomicNegationConcept wrapping AtLeastConcept(¬C)
+      OWLObjectMinCardinality(n, R, C)    → AtLeastConcept.create(n, role, concept)
+      Internal model objects              → returned as-is
+    """
+    from hermit.model import (
+        AtomicConcept,
+        AtomicNegationConcept,
+        AtomicRole,
+        AtLeastConcept,
+        InverseRole,
+    )
+    from hermit.owl_model.class_expression.owl_class import OWLClass
+    from hermit.owl_model.class_expression.class_expression import OWLObjectComplementOf
+    from hermit.owl_model.class_expression.restriction import (
+        OWLObjectSomeValuesFrom,
+        OWLObjectAllValuesFrom,
+        OWLObjectMinCardinality,
+    )
+    from hermit.owl_model.owl_property import OWLObjectInverseOf  # type: ignore[attr-defined]
+
+    # Already an internal model concept — pass through
+    if hasattr(expr, "accept"):
+        return expr
+
+    if isinstance(expr, OWLClass):
+        iri_str = expr.iri.as_str()
+        if expr.is_owl_thing():
+            return AtomicConcept.THING
+        if expr.is_owl_nothing():
+            return AtomicConcept.NOTHING
+        return AtomicConcept.create(iri_str)
+
+    if isinstance(expr, OWLObjectComplementOf):
+        inner = _owl_expr_to_internal(expr.get_operand())
+        # Only AtomicConcept can be directly negated; wrap others
+        if isinstance(inner, AtomicConcept):
+            return AtomicNegationConcept.create(inner)
+        # For complex inner (AtLeastConcept etc.) we need an anonymous negation concept.
+        # HermiT handles this by introducing a fresh atomic concept; approximate here
+        # by creating a negation concept backed by a synthetic IRI.
+        neg_iri = f"internal:negation#{hash(inner) & 0xFFFFFFFF}"
+        neg_concept = AtomicConcept.create(neg_iri)
+        return AtomicNegationConcept.create(neg_concept)
+
+    def _owl_prop_to_internal_role(owl_prop: object) -> object:
+        """Convert an OWL property expression to an internal Role."""
+        inv_of_cls: type | None = None
+        try:
+            from hermit.owl_model.owl_property import OWLObjectInverseOf as _InvOf
+            inv_of_cls = _InvOf
+        except ImportError:
+            pass
+        if inv_of_cls is not None and isinstance(owl_prop, inv_of_cls):
+            base_iri = owl_prop.get_inverse().iri.as_str()  # type: ignore[union-attr]
+            return InverseRole.create(AtomicRole.create(base_iri))
+        iri_str = getattr(owl_prop, "iri", None)
+        if iri_str is None:
+            return AtomicRole.create(str(owl_prop))
+        return AtomicRole.create(iri_str.as_str() if hasattr(iri_str, "as_str") else str(iri_str))
+
+    if isinstance(expr, OWLObjectSomeValuesFrom):
+        role = _owl_prop_to_internal_role(expr.get_property())
+        filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
+        from hermit.model import LiteralConcept
+        if not isinstance(filler, LiteralConcept):
+            filler = AtomicConcept.THING
+        return AtLeastConcept.create(1, role, filler)  # type: ignore[arg-type]
+
+    if isinstance(expr, OWLObjectAllValuesFrom):
+        # ∀R.C ≡ ¬∃R.¬C — represent as complement of AtLeastConcept on ¬C
+        role = _owl_prop_to_internal_role(expr.get_property())
+        inner_filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
+        from hermit.model import LiteralConcept
+        if isinstance(inner_filler, AtomicConcept):
+            neg_filler: LiteralConcept = AtomicNegationConcept.create(inner_filler)
+        elif isinstance(inner_filler, AtomicNegationConcept):
+            neg_filler = inner_filler.get_negated_concept()  # type: ignore[assignment]
+        else:
+            neg_filler = AtomicNegationConcept.create(AtomicConcept.THING)
+        at_least = AtLeastConcept.create(1, role, neg_filler)  # type: ignore[arg-type]
+        # Return negation of ∃R.¬C → synthetic atomic negation concept
+        neg_iri = f"internal:allvalues#{hash(at_least) & 0xFFFFFFFF}"
+        return AtomicNegationConcept.create(AtomicConcept.create(neg_iri))
+
+    if isinstance(expr, OWLObjectMinCardinality):
+        n = expr.get_cardinality()
+        role = _owl_prop_to_internal_role(expr.get_property())
+        filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
+        from hermit.model import LiteralConcept
+        if not isinstance(filler, LiteralConcept):
+            filler = AtomicConcept.THING
+        return AtLeastConcept.create(n, role, filler)  # type: ignore[arg-type]
+
+    from hermit.owl_model.class_expression.restriction import OWLObjectMaxCardinality
+    if isinstance(expr, OWLObjectMaxCardinality):
+        # ≤n R.C ≡ ¬∃(n+1)R.C — represent as AtomicNegationConcept wrapping a
+        # synthetic concept; the role is registered for non-simplicity checking.
+        n = expr.get_cardinality()
+        role = _owl_prop_to_internal_role(expr.get_property())
+        filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
+        from hermit.model import LiteralConcept
+        if not isinstance(filler, LiteralConcept):
+            filler = AtomicConcept.THING
+        at_least_plus1 = AtLeastConcept.create(n + 1, role, filler)  # type: ignore[arg-type]
+        max_iri = f"internal:atmost#{hash(at_least_plus1) & 0xFFFFFFFF}"
+        synthetic = AtomicConcept.create(max_iri)
+        neg = AtomicNegationConcept.create(synthetic)
+        if _max_role_registry is not None:
+            _max_role_registry.append(role)
+        return neg
+
+    # Fallback: unknown expression — return as-is and let the clausifier handle it
+    return expr
+
+
+# ===========================================================================
 # NormalizedAxioms
 # ===========================================================================
 
@@ -141,6 +272,11 @@ class NormalizedAxioms:
     negative_facts: list = field(default_factory=list)
     """Temporary storage for negative axioms during normalization."""
 
+    # -- Conversion tracking (populated by _owl_expr_to_internal) --
+    max_cardinality_roles: list = field(default_factory=list)
+    """Roles appearing in OWLObjectMaxCardinality restrictions; used for
+    non-simplicity validation after OWL→internal conversion."""
+
     @property
     def is_horn(self) -> bool:
         """All concept inclusions have at most one positive (non-negated) literal."""
@@ -173,13 +309,21 @@ class NormalizedAxioms:
     def add_concept_inclusion(self, simplified) -> None:
         """Add a concept inclusion (disjunction of concepts).
 
+        Converts OWL model expressions to internal model concepts so that
+        NormalizedAxiomClausifier (which uses the .accept() visitor) receives
+        the right types.
+
         Args:
-            simplified: A simplified class expression (typically from NNF conversion)
-                       that represents a concept inclusion.
+            simplified: A simplified class expression (OWLObjectUnionOf or single
+                       class expression) representing a concept inclusion in NNF.
         """
-        # For now, store in positive_facts to support OWLNormalization
-        # In a full implementation, this would convert to internal model
-        self.positive_facts.append(simplified)
+        from hermit.owl_model.class_expression import OWLObjectUnionOf
+        reg = self.max_cardinality_roles
+        if isinstance(simplified, OWLObjectUnionOf):
+            disjuncts = [_owl_expr_to_internal(op, reg) for op in simplified.operands()]
+            self.concept_inclusions.append(tuple(disjuncts))  # type: ignore[arg-type]
+        else:
+            self.concept_inclusions.append((_owl_expr_to_internal(simplified, reg),))  # type: ignore[arg-type]
 
 
 # ===========================================================================

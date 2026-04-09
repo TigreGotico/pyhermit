@@ -291,8 +291,14 @@ class ObjectPropertyInclusionManager:
                 inv = InverseRole.create(atomic)
                 return atomic in complex_props or inv in complex_props
 
+        def _is_non_simple_internal_role(role: object) -> bool:
+            """Check if an internal model role is non-simple."""
+            return role in complex_props
+
         def _check_expr(expr: object) -> None:
             """Recursively check a class expression for non-simple violations."""
+            from hermit.model import AtLeastConcept as _AtLeastConcept
+
             if isinstance(expr, OWLObjectCardinalityRestriction):
                 prop = expr.get_property()
                 if _is_non_simple_owl_prop(prop):
@@ -306,6 +312,14 @@ class ObjectPropertyInclusionManager:
                     raise ValueError(
                         f"Non-simple property '{prop}' appears in a Self restriction "
                         f"(OWL 2 violation)"
+                    )
+            elif isinstance(expr, _AtLeastConcept):
+                # Already-converted internal model cardinality restriction
+                role = expr._on_role  # type: ignore[attr-defined]
+                if _is_non_simple_internal_role(role):
+                    raise ValueError(
+                        f"Non-simple property '{role}' appears in a cardinality "
+                        f"restriction (OWL 2 violation)"
                     )
             # Recurse into unions/intersections
             operands = getattr(expr, "_operands", None) or []
@@ -325,6 +339,14 @@ class ObjectPropertyInclusionManager:
             if isinstance(fact, _OWLObjectUnionOf):
                 for op in fact.operands():
                     _check_expr(op)
+
+        # max_cardinality_roles: roles from OWLObjectMaxCardinality after OWL→internal conversion
+        for role in normalized_axioms.max_cardinality_roles:
+            if _is_non_simple_internal_role(role):
+                raise ValueError(
+                    f"Non-simple property '{role}' appears in a max-cardinality "
+                    f"restriction (OWL 2 violation)"
+                )
 
 
 class _Automaton:

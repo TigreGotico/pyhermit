@@ -158,7 +158,7 @@ class MergingManager:
                 if self.m_tableau_monitor is not None:
                     self.m_tableau_monitor.node_pruned(node)
                 self.m_tableau.prune_node(node)
-            node = node._next_tableau_node
+            node = node.m_next_tableau_node
 
         # --- Copy unary assertions ---
         self.m_binary_union_dependency_set.m_dependency_sets[1] = dependency_set
