@@ -773,6 +773,8 @@ class InstanceManager:
             self.m_interrupt_flag.start_task()
             try:
                 self._initialize_individuals_for_nodes()
+                # DEBUG: Check if individuals_for_nodes was populated
+                # print(f"DEBUG: After _initialize_individuals_for_nodes(), m_individuals_for_nodes has {len(self.m_individuals_for_nodes)} entries")
                 if not self.m_classes_initialised:
                     self._initialize_same_as()
                 completed_steps = self._read_off_property_instances_by_individual(
@@ -897,6 +899,7 @@ class InstanceManager:
         )
         self.m_ternary_retrieval_1_bound.open()
         tuple_buffer = self.m_ternary_retrieval_1_bound.get_tuple_buffer()
+        assertion_count = 0
         while not self.m_ternary_retrieval_1_bound.after_last():
             role_object = tuple_buffer[0]
             successor_node = tuple_buffer[2]
@@ -1862,18 +1865,48 @@ class InstanceManager:
     def _is_role_instance(
         self, role: Role, individual1: Individual, individual2: Individual
     ) -> bool:
+        from hermit.model import Atom as AtomCls, AtomicRole
+        from hermit.tableau.node import Node
+
         ind1 = individual1
         ind2 = individual2
+        actual_role = role
         if isinstance(role, InverseRole):
             ind1, ind2 = ind2, ind1
-        result = not self.m_reasoner.get_tableau().is_satisfiable(
+            actual_role = role.m_inverted_role
+
+        # Get the tableau and extension manager
+        tableau = self.m_reasoner.get_tableau()
+        extension_manager = tableau.m_extension_manager
+
+        # Get nodes for the individuals from the instance manager
+        # Note: must use the (possibly swapped) ind1 and ind2 for inverse roles
+        ind1_node = self.m_nodes_for_individuals.get(ind1)
+        ind2_node = self.m_nodes_for_individuals.get(ind2)
+
+        # If we can get the actual nodes, check the extension manager
+        if ind1_node is not None and ind2_node is not None:
+            result = extension_manager.contains_assertion_binary(
+                actual_role, ind1_node, ind2_node
+            )
+            if self.m_tableau_monitor is not None:
+                if result:
+                    self.m_tableau_monitor.possible_instance_is_instance()
+                else:
+                    self.m_tableau_monitor.possible_instance_is_not_instance()
+            return result
+
+        # Fallback: run a satisfiability test with the role assertion as a negative fact
+        # to check if the role holds (if its negation causes contradiction)
+        role_atom = AtomCls.create(actual_role, ind1, ind2)
+        result = not tableau.is_satisfiable(
             True,
             True,
             None,
             None,
             None,
-            None,
-            None,
+            {role_atom},  # Add role as negative fact
+            {ind1: None, ind2: None},  # Use the (possibly swapped) individuals for nodes mapping
             None,
         )
         if self.m_tableau_monitor is not None:

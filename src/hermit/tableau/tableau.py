@@ -944,8 +944,7 @@ class Tableau:
             branching_point: The branching point to push.
         """
         assert (
-            self.m_current_branching_point + 1 == branching_point.m_level
-            or self.m_current_branching_point + 1 == branching_point.level
+            self.m_current_branching_point + 1 == branching_point.level
         )
         if self.m_tableau_monitor is not None:
             self.m_tableau_monitor.push_branching_point_started(branching_point)

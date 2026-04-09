@@ -433,11 +433,9 @@ class QuasiOrderClassification:
             fresh_individual = Individual.create_anonymous("fresh-individual")
             subconcept_assertion = AtomCls.create(picked_element, fresh_individual)
             superconcept_assertions: set[AtomCls] = set()
-            superconcepts: list[object] = []
             for unknown_sup_node in unknown_possible_subsumers:
                 atom = AtomCls.create(unknown_sup_node, fresh_individual)
                 superconcept_assertions.add(atom)
-                superconcepts.append(atom.predicate)
 
             checked_node: dict[Individual, Node | None] = {
                 fresh_individual: None
@@ -448,10 +446,10 @@ class QuasiOrderClassification:
                 {subconcept_assertion},
                 None,
                 None,
-                superconcepts,  # type: ignore[arg-type]
+                superconcept_assertions,
                 checked_node,
                 self._get_subsumed_by_list_test_description(
-                    picked_element, superconcepts
+                    picked_element, [a.predicate for a in superconcept_assertions]
                 ),
             )
             if not is_subsumed_by:

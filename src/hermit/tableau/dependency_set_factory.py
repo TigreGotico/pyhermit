@@ -233,6 +233,10 @@ class DependencySetFactory:
         num_sets = len(self._merge_sets)
         self._merge_array.clear()
 
+        # Handle case where there are no merge sets (empty dependency)
+        if num_sets == 0:
+            return self.empty_set
+
         while True:
             first_set = self._merge_sets[0]
             maximal = first_set._branching_point

@@ -848,23 +848,27 @@ class ConjunctionCompiler:
         self.m_variables: list[Variable] = []
         self.m_bound_so_far: set[Variable] = set()
         number_of_real_atoms = 0
+
+        # Collect ALL variables from body and head first
+        # This ensures all variables are available when compiling
+        seen_variables: set[Variable] = set()
         for body_index in range(len(self.m_body_atoms)):
             atom = self.m_body_atoms[body_index]
             for argument_index in range(atom.get_arity()):
                 variable = atom.get_argument_variable(argument_index)
-                if (
-                    variable is not None
-                    and variable not in self.m_variables
-                    and self._occurs_in_body_atoms_after(variable, body_index + 1)
-                ):
+                if variable is not None and variable not in seen_variables:
                     self.m_variables.append(variable)
+                    seen_variables.add(variable)
             if not atom.get_dl_predicate().equals(NodeIDLessEqualThan.INSTANCE) and not isinstance(
                 atom.get_dl_predicate(), NodeIDsAscendingOrEqual
             ):
                 number_of_real_atoms += 1
+
+        # Add head variables that haven't been seen yet
         for variable in head_variables:
-            if variable not in self.m_variables:
+            if variable not in seen_variables:
                 self.m_variables.append(variable)
+                seen_variables.add(variable)
         if union_dependency_sets_by_size is not None:
             uds = union_dependency_sets_by_size.get(number_of_real_atoms)
             if uds is None:
@@ -1040,7 +1044,12 @@ class ConjunctionCompiler:
         for argument_index in range(atom.get_arity()):
             variable = atom.get_argument_variable(argument_index)
             if variable is not None and variable not in self.m_bound_so_far:
-                variable_index = self.m_variables.index(variable)
+                try:
+                    variable_index = self.m_variables.index(variable)
+                except ValueError:
+                    # Variable not yet in m_variables, skip it
+                    # (This can happen for variables that only appear in the head)
+                    continue
                 if variable_index != -1:
                     self.m_workers.append(
                         CopyValues(

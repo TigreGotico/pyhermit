@@ -97,38 +97,58 @@ class GroundDisjunction:
 
     def is_pruned(self) -> bool:
         """Return True if any argument node is pruned."""
+        from hermit.tableau.node import Node
+
         for arg in self.m_arguments:
-            if arg.is_pruned():
+            # Only check nodes, not other argument types
+            if isinstance(arg, Node) and arg.is_pruned():
                 return True
         return False
 
     def is_satisfied(self, tableau: Tableau) -> bool:
         """Check if any disjunct is currently satisfied in the tableau."""
         from hermit.model import AnnotatedEquality
+        from hermit.tableau.node import Node
 
         extension_manager = tableau.m_extension_manager
         for disjunct_index in range(self.get_number_of_disjuncts()):
             dl_predicate = self.get_dl_predicate(disjunct_index)
             arity = dl_predicate.get_arity()
             if arity == 1:
-                if extension_manager.contains_assertion(
-                    dl_predicate, self.get_argument(disjunct_index, 0).get_canonical_node()
+                arg0 = self.get_argument(disjunct_index, 0)
+                # Handle case where argument might be a node or stored directly
+                if isinstance(arg0, Node):
+                    arg0_node = arg0.get_canonical_node()
+                else:
+                    arg0_node = arg0
+                if extension_manager.contains_assertion_unary(
+                    dl_predicate, arg0_node
                 ):
                     return True
             elif arity == 2:
-                if extension_manager.contains_assertion(
+                arg0 = self.get_argument(disjunct_index, 0)
+                arg1 = self.get_argument(disjunct_index, 1)
+                arg0_node = arg0.get_canonical_node() if isinstance(arg0, Node) else arg0
+                arg1_node = arg1.get_canonical_node() if isinstance(arg1, Node) else arg1
+                if extension_manager.contains_assertion_binary(
                     dl_predicate,
-                    self.get_argument(disjunct_index, 0).get_canonical_node(),
-                    self.get_argument(disjunct_index, 1).get_canonical_node(),
+                    arg0_node,
+                    arg1_node,
                 ):
                     return True
             elif arity == 3:
                 if isinstance(dl_predicate, AnnotatedEquality):
-                    if extension_manager.contains_assertion(
+                    arg0 = self.get_argument(disjunct_index, 0)
+                    arg1 = self.get_argument(disjunct_index, 1)
+                    arg2 = self.get_argument(disjunct_index, 2)
+                    arg0_node = arg0.get_canonical_node() if isinstance(arg0, Node) else arg0
+                    arg1_node = arg1.get_canonical_node() if isinstance(arg1, Node) else arg1
+                    arg2_node = arg2.get_canonical_node() if isinstance(arg2, Node) else arg2
+                    if extension_manager.contains_assertion_ternary(
                         dl_predicate,
-                        self.get_argument(disjunct_index, 0).get_canonical_node(),
-                        self.get_argument(disjunct_index, 1).get_canonical_node(),
-                        self.get_argument(disjunct_index, 2).get_canonical_node(),
+                        arg0_node,
+                        arg1_node,
+                        arg2_node,
                     ):
                         return True
                 else:
@@ -145,49 +165,59 @@ class GroundDisjunction:
         Returns True if the assertion was newly added.
         """
         from hermit.model import AnnotatedEquality
+        from hermit.tableau.node import Node
 
         dl_predicate = self.get_dl_predicate(disjunct_index)
         arity = dl_predicate.get_arity()
         if arity == 1:
-            dependency_set = self.get_argument(disjunct_index, 0).add_canonical_node_dependency_set(
-                dependency_set
-            )
-            return tableau.m_extension_manager.add_assertion(
+            arg0 = self.get_argument(disjunct_index, 0)
+            if not isinstance(arg0, Node):
+                # Skip non-node arguments (shouldn't happen, but be safe)
+                return False
+            dependency_set = arg0.add_canonical_node_dependency_set(dependency_set)
+            arg0_node = arg0.get_canonical_node()
+            return tableau.m_extension_manager.add_concept_assertion(
                 dl_predicate,
-                self.get_argument(disjunct_index, 0).get_canonical_node(),
+                arg0_node,
                 dependency_set,
                 self.is_core(disjunct_index),
             )
         elif arity == 2:
-            dependency_set = self.get_argument(disjunct_index, 0).add_canonical_node_dependency_set(
-                dependency_set
-            )
-            dependency_set = self.get_argument(disjunct_index, 1).add_canonical_node_dependency_set(
-                dependency_set
-            )
-            return tableau.m_extension_manager.add_assertion(
+            arg0 = self.get_argument(disjunct_index, 0)
+            arg1 = self.get_argument(disjunct_index, 1)
+            if not isinstance(arg0, Node) or not isinstance(arg1, Node):
+                # Skip if arguments aren't nodes
+                return False
+            dependency_set = arg0.add_canonical_node_dependency_set(dependency_set)
+            dependency_set = arg1.add_canonical_node_dependency_set(dependency_set)
+            arg0_node = arg0.get_canonical_node()
+            arg1_node = arg1.get_canonical_node()
+            return tableau.m_extension_manager.add_role_assertion(
                 dl_predicate,
-                self.get_argument(disjunct_index, 0).get_canonical_node(),
-                self.get_argument(disjunct_index, 1).get_canonical_node(),
+                arg0_node,
+                arg1_node,
                 dependency_set,
                 self.is_core(disjunct_index),
             )
         elif arity == 3:
             if isinstance(dl_predicate, AnnotatedEquality):
-                dependency_set = self.get_argument(
-                    disjunct_index, 0
-                ).add_canonical_node_dependency_set(dependency_set)
-                dependency_set = self.get_argument(
-                    disjunct_index, 1
-                ).add_canonical_node_dependency_set(dependency_set)
-                dependency_set = self.get_argument(
-                    disjunct_index, 2
-                ).add_canonical_node_dependency_set(dependency_set)
+                arg0 = self.get_argument(disjunct_index, 0)
+                arg1 = self.get_argument(disjunct_index, 1)
+                arg2 = self.get_argument(disjunct_index, 2)
+                if not isinstance(arg0, Node) or not isinstance(arg1, Node) or not isinstance(arg2, Node):
+                    # Skip if arguments aren't nodes
+                    return False
+                dependency_set = arg0.add_canonical_node_dependency_set(dependency_set)
+                dependency_set = arg1.add_canonical_node_dependency_set(dependency_set)
+                dependency_set = arg2.add_canonical_node_dependency_set(dependency_set)
+                arg0_node = arg0.get_canonical_node()
+                arg1_node = arg1.get_canonical_node()
+                arg2_node = arg2.get_canonical_node()
                 return tableau.m_extension_manager.add_annotated_equality(
                     dl_predicate,
-                    self.get_argument(disjunct_index, 0).get_canonical_node(),
-                    self.get_argument(disjunct_index, 1).get_canonical_node(),
-                    self.get_argument(disjunct_index, 2).get_canonical_node(),
+                    arg0_node,
+                    arg1_node,
+                    arg2_node,
                     dependency_set,
                 )
             raise RuntimeError("Unsupported predicate arity.")
@@ -197,6 +227,7 @@ class GroundDisjunction:
         """Return a string representation."""
         from hermit.model import Equality
         from hermit.prefixes import Prefixes as Pfx
+        from hermit.tableau.node import Node
 
         if prefixes is None:
             prefixes = Pfx.STANDARD_PREFIXES
@@ -206,17 +237,21 @@ class GroundDisjunction:
                 parts.append(" v ")
             dl_predicate = self.get_dl_predicate(disjunct_index)
             if Equality.INSTANCE.equals(dl_predicate):
-                parts.append(str(self.get_argument(disjunct_index, 0).node_id))
+                arg0 = self.get_argument(disjunct_index, 0)
+                arg1 = self.get_argument(disjunct_index, 1)
+                parts.append(str(arg0.node_id if isinstance(arg0, Node) else arg0))
                 parts.append(" == ")
-                parts.append(str(self.get_argument(disjunct_index, 1).node_id))
+                parts.append(str(arg1.node_id if isinstance(arg1, Node) else arg1))
             else:
                 from hermit.model import AnnotatedEquality
 
                 if isinstance(dl_predicate, AnnotatedEquality):
+                    arg0 = self.get_argument(disjunct_index, 0)
+                    arg1 = self.get_argument(disjunct_index, 1)
                     parts.append("[")
-                    parts.append(str(self.get_argument(disjunct_index, 0).node_id))
+                    parts.append(str(arg0.node_id if isinstance(arg0, Node) else arg0))
                     parts.append(" == ")
-                    parts.append(str(self.get_argument(disjunct_index, 1).node_id))
+                    parts.append(str(arg1.node_id if isinstance(arg1, Node) else arg1))
                     parts.append("]@atMost(")
                     parts.append(str(dl_predicate.get_cardinality()))
                     parts.append(" ")
@@ -224,7 +259,8 @@ class GroundDisjunction:
                     parts.append(" ")
                     parts.append(dl_predicate.get_to_concept().to_string(prefixes))
                     parts.append(")(")
-                    parts.append(str(self.get_argument(disjunct_index, 2).node_id))
+                    arg2 = self.get_argument(disjunct_index, 2)
+                    parts.append(str(arg2.node_id if isinstance(arg2, Node) else arg2))
                     parts.append(")")
                 else:
                     parts.append(dl_predicate.to_string(prefixes))
@@ -232,7 +268,8 @@ class GroundDisjunction:
                     for argument_index in range(dl_predicate.get_arity()):
                         if argument_index != 0:
                             parts.append(",")
-                        parts.append(str(self.get_argument(disjunct_index, argument_index).node_id))
+                        arg = self.get_argument(disjunct_index, argument_index)
+                        parts.append(str(arg.node_id if isinstance(arg, Node) else arg))
                     parts.append(")")
         return "".join(parts)
 

@@ -30,6 +30,7 @@ from hermit.model import (
     DLOntology,
     Individual,
     Inequality,
+    InverseRole,
     Prefixes,
     Role,
 )
@@ -483,6 +484,36 @@ class Reasoner:
         """Check whether (subject, obj) is in the extension of ``role``."""
         if not self.is_consistent():
             return True
+
+        # Handle InverseRole: if querying with an inverse role, swap and check forward role
+        if isinstance(role, InverseRole):
+            forward_role = role.inverse_of
+            # First check direct facts in ontology
+            for fact in self._dl_ontology.get_positive_facts():
+                if (fact.predicate == forward_role and
+                    fact.predicate.get_arity() >= 2 and
+                    fact.argument(0) == obj and
+                    fact.argument(1) == subject):
+                    return True
+            # Then check instance manager with swapped arguments
+            self._initialise_class_instance_manager()
+            if self._instance_manager is None:
+                return False
+            return bool(
+                self._instance_manager.has_object_role_relationship(
+                    forward_role, obj, subject
+                )
+            )
+
+        # For normal roles, check direct facts first
+        for fact in self._dl_ontology.get_positive_facts():
+            if (fact.predicate == role and
+                fact.predicate.get_arity() >= 2 and
+                fact.argument(0) == subject and
+                fact.argument(1) == obj):
+                return True
+
+        # Then check using the instance manager
         self._initialise_class_instance_manager()
         if self._instance_manager is None:
             return False
@@ -819,6 +850,10 @@ class Reasoner:
         else:
             self._instance_manager.initialize_know_and_possible_class_instances(
                 tableau, self._configuration.reasoner_progress_monitor, 0, 1
+            )
+            # Also initialize property instances to populate role relationships
+            self._instance_manager.initialize_know_and_possible_property_instances(
+                tableau, self._configuration.reasoner_progress_monitor, 0, 0, 1
             )
         if self._is_consistent is None:
             self._is_consistent = is_consistent
