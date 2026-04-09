@@ -369,7 +369,9 @@ class AnywhereValidatedBlocking(BlockingStrategy):
                 self.m_last_validated_unchanged_node = node
 
     def model_found(self) -> None:
-        pass
+        # Reset incremental-validation bookmark so that the next reasoning run
+        # starts validation from the beginning of the node list.
+        self.m_last_validated_unchanged_node = None
 
     def is_exact(self) -> bool:
         return False
