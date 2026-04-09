@@ -27,6 +27,8 @@ if TYPE_CHECKING:
     )
     from hermit.tableau import ExtensionManager, Node, Tableau
 
+from abc import ABC, abstractmethod
+
 from hermit.model import (
     AtLeastConcept,
     AtomicConcept,
@@ -85,11 +87,11 @@ class _YConstraint:
         return True
 
 
-class _ConsequenceAtom:
-    """Base class for consequence atoms."""
+class _ConsequenceAtom(ABC):
+    """Abstract base class for consequence atoms."""
 
-    def is_satisfied(self, extension_manager: ExtensionManager, dl_clause_info: DLClauseInfo, blocked_x: Node) -> bool:
-        raise NotImplementedError
+    @abstractmethod
+    def is_satisfied(self, extension_manager: ExtensionManager, dl_clause_info: DLClauseInfo, blocked_x: Node) -> bool: ...
 
 
 class _SimpleConsequenceAtom(_ConsequenceAtom):
@@ -565,8 +567,8 @@ class BlockingValidator:
                             return False
             elif hasattr(item, "number"):  # AtLeastConcept
                 if (
-                    self.m_extension_manager.contains_role_assertion(item.on_role(), blocker, blocker_parent)
-                    and self.m_extension_manager.contains_concept_assertion(item.to_concept(), blocker_parent)
+                    self.m_extension_manager.contains_role_assertion(item.on_role, blocker, blocker_parent)
+                    and self.m_extension_manager.contains_concept_assertion(item.to_concept, blocker_parent)
                 ):
                     if not self._is_satisfied_at_least_for_blocked(item, blocked_x, blocker, blocker_parent):
                         return False
@@ -580,8 +582,8 @@ class BlockingValidator:
     def _is_satisfied_at_least_for_blocked(
         self, atleast: AtLeastConcept, blocked_x: Node, blocker: Node, blocker_parent: Node
     ) -> bool:
-        r = atleast.on_role()
-        c = atleast.to_concept()
+        r = atleast.on_role
+        c = atleast.to_concept
         blocked_x_parent = blocked_x.parent
 
         if self.m_extension_manager.contains_role_assertion(r, blocked_x, blocked_x_parent) \
@@ -771,8 +773,8 @@ class BlockingValidator:
     def _check_at_least_for_nonblocked(self, atleast: AtLeastConcept, nonblocked: Node) -> None:
         suitable_successors = 0
         required_successors = atleast.number
-        r = atleast.on_role()
-        c = atleast.to_concept()
+        r = atleast.on_role
+        c = atleast.to_concept
 
         from hermit.model import InverseRole
 
