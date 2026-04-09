@@ -47,8 +47,8 @@ class BlockingSignature(ABC):
         """Return ``True`` if this signature blocks the given *node*."""
         ...
 
-    def __hash__(self) -> int:
-        raise NotImplementedError
+    @abstractmethod
+    def __hash__(self) -> int: ...
 
-    def __eq__(self, other: object) -> bool:
-        raise NotImplementedError
+    @abstractmethod
+    def __eq__(self, other: object) -> bool: ...
