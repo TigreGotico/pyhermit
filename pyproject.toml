@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hermit-reasoner"
-version = "0.2.0"
+version = "0.3.0"
 description = "A conformant OWL 2 DL tableau reasoner — Python port of HermiT"
 readme = "README.md"
 license = "Apache-2.0"

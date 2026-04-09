@@ -80,7 +80,7 @@ def _iri_str(owl_obj: object) -> str | None:
     return iri.as_str() if hasattr(iri, "as_str") else str(iri)
 
 
-def _owl_ind_to_internal(owl_ind: object) -> "Individual | None":
+def _owl_ind_to_internal(owl_ind: object) -> Individual | None:
     """Convert an OWL named individual to an internal Individual."""
     from hermit.model import Individual
     iri = _iri_str(owl_ind)
@@ -89,12 +89,12 @@ def _owl_ind_to_internal(owl_ind: object) -> "Individual | None":
     return Individual.create(iri)
 
 
-def _owl_prop_to_role(owl_prop: object) -> "Role | None":
+def _owl_prop_to_role(owl_prop: object) -> Role | None:
     """Convert an OWL model property expression to an internal model Role.
 
     Returns an AtomicRole or InverseRole, or None if conversion fails.
     """
-    from hermit.model import AtomicRole, InverseRole, Role
+    from hermit.model import AtomicRole, InverseRole
     from hermit.owl_model.owl_property import OWLObjectProperty, OWLObjectInverseOf
 
     if isinstance(owl_prop, OWLObjectProperty):
@@ -482,7 +482,6 @@ class OWLNormalization:
         self, axiom: OWLSameIndividualAxiom, result: NormalizedAxioms
     ) -> None:
         """Route SameIndividual axiom to same_individual_facts."""
-        from hermit.model import Individual
         raw = [_owl_ind_to_internal(i) for i in axiom.individuals()]
         inds: list[Individual] = [i for i in raw if i is not None]
         for i in range(len(inds)):
@@ -494,7 +493,6 @@ class OWLNormalization:
         self, axiom: OWLDifferentIndividualsAxiom, result: NormalizedAxioms
     ) -> None:
         """Route DifferentIndividuals axiom to different_individuals_facts."""
-        from hermit.model import Individual
         raw = [_owl_ind_to_internal(i) for i in axiom.individuals()]
         inds: list[Individual] = [i for i in raw if i is not None]
         for i in range(len(inds)):

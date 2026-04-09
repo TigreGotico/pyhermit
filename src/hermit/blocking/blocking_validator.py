@@ -91,7 +91,9 @@ class _ConsequenceAtom(ABC):
     """Abstract base class for consequence atoms."""
 
     @abstractmethod
-    def is_satisfied(self, extension_manager: ExtensionManager, dl_clause_info: DLClauseInfo, blocked_x: Node) -> bool: ...
+    def is_satisfied(
+        self, extension_manager: ExtensionManager, dl_clause_info: DLClauseInfo, blocked_x: Node
+    ) -> bool: ...
 
 
 class _SimpleConsequenceAtom(_ConsequenceAtom):

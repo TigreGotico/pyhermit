@@ -134,7 +134,7 @@ class ObjectPropertyInclusionManager:
         normalized_axioms.positive_concept_facts.extend(new_positive_concept_facts)
 
         if hasattr(normalized_axioms, "dl_clauses"):
-            getattr(normalized_axioms, "dl_clauses").extend(new_clauses)
+            normalized_axioms.dl_clauses.extend(new_clauses)
         elif hasattr(normalized_axioms, "rules"):
             # Store in positive_facts for later clausification
             for clause in new_clauses:

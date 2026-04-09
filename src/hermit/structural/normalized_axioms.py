@@ -139,7 +139,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
         # Cannot negate complex concept — return as overapproximation
         return AtomicConcept.THING
 
-    def _owl_prop_to_internal_role(owl_prop: object) -> "Role":
+    def _owl_prop_to_internal_role(owl_prop: object) -> Role:
         """Convert an OWL property expression to an internal Role."""
         inv_of_cls: type | None = None
         try:
@@ -222,7 +222,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
     return expr
 
 
-def _owl_prop_to_internal_role_standalone(owl_prop: object) -> "Role":
+def _owl_prop_to_internal_role_standalone(owl_prop: object) -> Role:
     """Convert an OWL property expression to an internal Role (standalone helper)."""
     from hermit.model import AtomicRole, InverseRole
     try:
