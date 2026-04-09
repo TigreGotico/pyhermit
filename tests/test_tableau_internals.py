@@ -1064,14 +1064,16 @@ from hermit.tableau.ground_disjunction import GroundDisjunction
 class TestGroundDisjunction:
     def _make_gd(self):
         """Create a GroundDisjunction with mocked dependencies."""
+        from hermit.tableau.node import Node
+
         header = MagicMock()
         header.m_dl_predicates = [MagicMock(), MagicMock()]
         header.m_disjunct_start = [0, 1]
 
-        node1 = MagicMock()
+        node1 = MagicMock(spec=Node)
         node1.is_pruned.return_value = False
         node1.node_id = 1
-        node2 = MagicMock()
+        node2 = MagicMock(spec=Node)
         node2.is_pruned.return_value = False
         node2.node_id = 2
 
@@ -1155,6 +1157,7 @@ class TestGroundDisjunctionSatisfied:
     def _make_gd_with_arity(self, arities, pred_classes=None):
         """Create a GroundDisjunction with predicates of given arities."""
         import sys
+        from hermit.tableau.node import Node
 
         header = MagicMock()
         preds = []
@@ -1170,7 +1173,7 @@ class TestGroundDisjunctionSatisfied:
             preds.append(pred)
             disjunct_start.append(offset)
             for _ in range(arity):
-                node = MagicMock()
+                node = MagicMock(spec=Node)
                 node.is_pruned.return_value = False
                 node.node_id = len(args)
                 node.get_canonical_node.return_value = node
@@ -1198,20 +1201,20 @@ class TestGroundDisjunctionSatisfied:
     def test_is_satisfied_arity1_false(self):
         gd = self._make_gd_with_arity([1])
         tableau = MagicMock()
-        tableau.m_extension_manager.contains_assertion.return_value = False
+        tableau.m_extension_manager.contains_assertion_unary.return_value = False
         assert not gd.is_satisfied(tableau)
 
     def test_is_satisfied_arity2(self):
         gd = self._make_gd_with_arity([2])
         tableau = MagicMock()
-        tableau.m_extension_manager.contains_assertion.return_value = True
+        tableau.m_extension_manager.contains_assertion_binary.return_value = True
         assert gd.is_satisfied(tableau)
 
     def test_is_satisfied_arity3_annotated_equality(self):
         from hermit.model import AnnotatedEquality
         gd = self._make_gd_with_arity([3], [AnnotatedEquality])
         tableau = MagicMock()
-        tableau.m_extension_manager.contains_assertion.return_value = True
+        tableau.m_extension_manager.contains_assertion_ternary.return_value = True
         assert gd.is_satisfied(tableau)
 
     def test_is_satisfied_arity3_not_annotated(self):
@@ -1231,14 +1234,14 @@ class TestGroundDisjunctionSatisfied:
     def test_add_disjunct_arity1(self):
         gd = self._make_gd_with_arity([1])
         tableau = MagicMock()
-        tableau.m_extension_manager.add_assertion.return_value = True
+        tableau.m_extension_manager.add_concept_assertion.return_value = True
         result = gd.add_disjunct_to_tableau(tableau, 0, MagicMock())
         assert result is True
 
     def test_add_disjunct_arity2(self):
         gd = self._make_gd_with_arity([2])
         tableau = MagicMock()
-        tableau.m_extension_manager.add_assertion.return_value = True
+        tableau.m_extension_manager.add_role_assertion.return_value = True
         result = gd.add_disjunct_to_tableau(tableau, 0, MagicMock())
         assert result is True
 

@@ -2603,7 +2603,7 @@ class TestIndividualReuseStrategy:
 
         # Mock the backtracking table
         mock_table = MagicMock()
-        mock_table.size = 1
+        mock_table.first_free_tuple_index = 1
         mock_table.get_tuple_object.return_value = concept
         strategy.m_reuse_backtracking_table = mock_table
 
