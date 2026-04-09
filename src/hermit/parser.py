@@ -16,10 +16,11 @@ Pipeline::
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from hermit.owl_model.owl_axiom import OWLAxiom
+    from hermit.owl_model.class_expression import OWLClassExpression
 
 
 def load_ontology(path: str | Path) -> list[OWLAxiom]:
@@ -37,7 +38,7 @@ def load_ontology(path: str | Path) -> list[OWLAxiom]:
         ValueError: If the file cannot be parsed as OWL
     """
     try:
-        import owlready2
+        import owlready2  # type: ignore[import-untyped]
     except ImportError as e:
         raise ImportError(
             "owlready2 is required for OWL file parsing. "
@@ -67,10 +68,10 @@ class _OwlreadyMapper:
     understands.
     """
 
-    def __init__(self, owlready2_module: object) -> None:
-        self._or2 = owlready2_module
+    def __init__(self, owlready2_module: Any) -> None:
+        self._or2: Any = owlready2_module
 
-    def extract_axioms(self, onto: object) -> list[OWLAxiom]:
+    def extract_axioms(self, onto: Any) -> list[OWLAxiom]:
         """Extract all logical axioms from an owlready2 ontology."""
         axioms: list[OWLAxiom] = []
         self._extract_class_axioms(onto, axioms)
@@ -83,7 +84,7 @@ class _OwlreadyMapper:
     # Class expression mapping
     # ------------------------------------------------------------------
 
-    def _map_class_expression(self, expr: object) -> object | None:
+    def _map_class_expression(self, expr: Any) -> OWLClassExpression | None:
         """Convert an owlready2 class expression to an OWL model class expression.
 
         Handles: named classes, restrictions (some/all/min/max/exactly/hasSelf/hasValue),
@@ -123,22 +124,22 @@ class _OwlreadyMapper:
 
         # And (Intersection)
         if isinstance(expr, or2.And):
-            operands = [self._map_class_expression(c) for c in getattr(expr, "Classes", [])]
-            operands = [o for o in operands if o is not None]
-            if len(operands) >= 2:
-                return OWLObjectIntersectionOf(operands)
-            if len(operands) == 1:
-                return operands[0]
+            raw_ops = [self._map_class_expression(c) for c in getattr(expr, "Classes", [])]
+            ops: list[OWLClassExpression] = [o for o in raw_ops if o is not None]
+            if len(ops) >= 2:
+                return OWLObjectIntersectionOf(ops)
+            if len(ops) == 1:
+                return ops[0]
             return None
 
         # Or (Union)
         if isinstance(expr, or2.Or):
-            operands = [self._map_class_expression(c) for c in getattr(expr, "Classes", [])]
-            operands = [o for o in operands if o is not None]
-            if len(operands) >= 2:
-                return OWLObjectUnionOf(operands)
-            if len(operands) == 1:
-                return operands[0]
+            raw_ops2 = [self._map_class_expression(c) for c in getattr(expr, "Classes", [])]
+            ops2: list[OWLClassExpression] = [o for o in raw_ops2 if o is not None]
+            if len(ops2) >= 2:
+                return OWLObjectUnionOf(ops2)
+            if len(ops2) == 1:
+                return ops2[0]
             return None
 
         # OneOf (nominals)
@@ -211,7 +212,7 @@ class _OwlreadyMapper:
     # Class-level axioms
     # ------------------------------------------------------------------
 
-    def _extract_class_axioms(self, onto: object, axioms: list) -> None:
+    def _extract_class_axioms(self, onto: Any, axioms: list[OWLAxiom]) -> None:
         """Extract SubClassOf, EquivalentClasses, DisjointClasses."""
         from hermit.owl_model.owl_axiom import (
             OWLSubClassOfAxiom,
@@ -254,7 +255,7 @@ class _OwlreadyMapper:
                     owl_classes.append(OWLClass(e_iri))
             if len(owl_classes) >= 2:
                 try:
-                    axioms.append(OWLDisjointClassesAxiom(owl_classes))
+                    axioms.append(OWLDisjointClassesAxiom(list(owl_classes)))
                 except Exception:
                     pass
 
@@ -262,7 +263,7 @@ class _OwlreadyMapper:
     # Individual-level axioms
     # ------------------------------------------------------------------
 
-    def _extract_individual_axioms(self, onto: object, axioms: list) -> None:
+    def _extract_individual_axioms(self, onto: Any, axioms: list[OWLAxiom]) -> None:
         """Extract ClassAssertion, ObjectPropertyAssertion, SameIndividual, DifferentIndividuals."""
         or2 = self._or2
         from hermit.owl_model.owl_axiom import (
@@ -337,7 +338,7 @@ class _OwlreadyMapper:
     # Object property axioms
     # ------------------------------------------------------------------
 
-    def _extract_object_property_axioms(self, onto: object, axioms: list) -> None:
+    def _extract_object_property_axioms(self, onto: Any, axioms: list[OWLAxiom]) -> None:
         """Extract property characteristics and sub-property axioms."""
         or2 = self._or2
         from hermit.owl_model.owl_axiom import (
@@ -410,7 +411,7 @@ class _OwlreadyMapper:
     # Data property axioms
     # ------------------------------------------------------------------
 
-    def _extract_data_property_axioms(self, onto: object, axioms: list) -> None:
+    def _extract_data_property_axioms(self, onto: Any, axioms: list[OWLAxiom]) -> None:
         """Extract data property sub-property and characteristic axioms."""
         or2 = self._or2
         from hermit.owl_model.owl_axiom import (

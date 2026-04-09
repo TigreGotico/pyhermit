@@ -60,7 +60,7 @@ class ObjectPropertyInclusionManager:
         replacement_index = first_replacement_index
         facts_to_remove = []
         new_clauses: list[DLClause] = []
-        new_positive_concept_facts: list[tuple] = []
+        new_positive_concept_facts: list[tuple[Individual, AtomicConcept]] = []
 
         var_x = Variable.create("X")
         var_y = Variable.create("Y")
@@ -84,7 +84,9 @@ class ObjectPropertyInclusionManager:
             if isinstance(cp, AtomicRole):
                 complex_prop_iris[cp.iri] = cp
             elif isinstance(cp, InverseRole):
-                complex_prop_iris[cp.get_inverse().iri] = cp
+                inv = cp.get_inverse()
+                if isinstance(inv, AtomicRole):
+                    complex_prop_iris[inv.iri] = cp
 
         for fact in normalized_axioms.negative_facts:
             if not isinstance(fact, OWLNegativeObjectPropertyAssertionAxiom):
@@ -116,10 +118,10 @@ class ObjectPropertyInclusionManager:
             new_positive_concept_facts.append((subject_ind, fresh_concept))
 
             # DL clause: F_i(X) ∧ op(X, Y) → Y ≠ obj
-            head_atom = Atom.create(Inequality.INSTANCE, var_y, obj_ind)
+            head_atom = Atom.create(Inequality.INSTANCE, var_y, obj_ind)  # type: ignore[arg-type]
             body_atoms = (
                 Atom.create(fresh_concept, var_x),
-                Atom.create(role_pred, var_x, var_y),
+                Atom.create(role_pred, var_x, var_y),  # type: ignore[arg-type]
             )
             new_clauses.append(DLClause.create((head_atom,), body_atoms))
             facts_to_remove.append(fact)
@@ -132,7 +134,7 @@ class ObjectPropertyInclusionManager:
         normalized_axioms.positive_concept_facts.extend(new_positive_concept_facts)
 
         if hasattr(normalized_axioms, "dl_clauses"):
-            normalized_axioms.dl_clauses.extend(new_clauses)  # type: ignore[attr-defined]
+            getattr(normalized_axioms, "dl_clauses").extend(new_clauses)
         elif hasattr(normalized_axioms, "rules"):
             # Store in positive_facts for later clausification
             for clause in new_clauses:
@@ -196,8 +198,8 @@ class ObjectPropertyInclusionManager:
         # always add inverses of complex properties until stable
         complex_set = set(directly_complex)
         # seed inverses of initial complex properties
-        for prop in list(complex_set):
-            complex_set.add(_get_inverse(prop))
+        for cprop in list(complex_set):
+            complex_set.add(_get_inverse(cprop))
         changed = True
         while changed:
             changed = False
@@ -256,7 +258,7 @@ class ObjectPropertyInclusionManager:
 
     @staticmethod
     def _check_concept_inclusions_for_non_simple(
-        normalized_axioms: NormalizedAxioms, complex_props: set
+        normalized_axioms: NormalizedAxioms, complex_props: set[object]
     ) -> None:
         """Scan concept inclusions for non-simple properties in cardinality/self restrictions."""
         from hermit.owl_model.class_expression.restriction import (
@@ -315,7 +317,7 @@ class ObjectPropertyInclusionManager:
                     )
             elif isinstance(expr, _AtLeastConcept):
                 # Already-converted internal model cardinality restriction
-                role = expr._on_role  # type: ignore[attr-defined]
+                role = getattr(expr, "_on_role", None)
                 if _is_non_simple_internal_role(role):
                     raise ValueError(
                         f"Non-simple property '{role}' appears in a cardinality "
@@ -323,8 +325,9 @@ class ObjectPropertyInclusionManager:
                     )
             # Recurse into unions/intersections
             operands = getattr(expr, "_operands", None) or []
-            if callable(getattr(expr, "operands", None)):
-                operands = list(expr.operands())
+            operands_fn = getattr(expr, "operands", None)
+            if callable(operands_fn):
+                operands = list(operands_fn())
             for op in operands:
                 _check_expr(op)
 
@@ -398,8 +401,9 @@ class _Automaton:
         for label in word:
             next_states = set()
             for state in current_states:
-                if hasattr(state, "transitions") and label in state.transitions:  # type: ignore[attr-defined]
-                    next_states.update(state.transitions[label])  # type: ignore[attr-defined]
+                transitions = getattr(state, "transitions", None)
+                if transitions is not None and label in transitions:
+                    next_states.update(transitions[label])
             current_states = next_states
             if not current_states:
                 return False

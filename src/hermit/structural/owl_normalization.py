@@ -9,8 +9,11 @@ Transforms OWL axioms into NormalizedAxioms by:
 
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 from collections.abc import Iterable
+
+if TYPE_CHECKING:
+    from hermit.model import Individual, Role
 
 from hermit.structural.expression_manager import ExpressionManager
 from hermit.structural.normalized_axioms import NormalizedAxioms
@@ -77,7 +80,7 @@ def _iri_str(owl_obj: object) -> str | None:
     return iri.as_str() if hasattr(iri, "as_str") else str(iri)
 
 
-def _owl_ind_to_internal(owl_ind: object) -> object | None:
+def _owl_ind_to_internal(owl_ind: object) -> "Individual | None":
     """Convert an OWL named individual to an internal Individual."""
     from hermit.model import Individual
     iri = _iri_str(owl_ind)
@@ -86,12 +89,12 @@ def _owl_ind_to_internal(owl_ind: object) -> object | None:
     return Individual.create(iri)
 
 
-def _owl_prop_to_role(owl_prop: object) -> object | None:
+def _owl_prop_to_role(owl_prop: object) -> "Role | None":
     """Convert an OWL model property expression to an internal model Role.
 
     Returns an AtomicRole or InverseRole, or None if conversion fails.
     """
-    from hermit.model import AtomicRole, InverseRole
+    from hermit.model import AtomicRole, InverseRole, Role
     from hermit.owl_model.owl_property import OWLObjectProperty, OWLObjectInverseOf
 
     if isinstance(owl_prop, OWLObjectProperty):
@@ -213,14 +216,16 @@ class OWLNormalization:
         elif isinstance(axiom, OWLInverseObjectPropertiesAxiom):
             # InverseObjectProperties(S, S-): S- ≡ S⁻¹
             # Add simple inclusions: S- ⊑ S⁻¹ and S ⊑ (S-)⁻¹
-            from hermit.model import InverseRole
+            from hermit.model import AtomicRole, InverseRole
             first = _owl_prop_to_role(axiom.get_first_property())
             second = _owl_prop_to_role(axiom.get_second_property())
             if first is not None and second is not None:
                 # second ⊑ first⁻¹
-                result.simple_object_property_inclusions.append((second, InverseRole.create(first)))
+                first_atomic = first if isinstance(first, AtomicRole) else AtomicRole.create(str(first))
+                second_atomic = second if isinstance(second, AtomicRole) else AtomicRole.create(str(second))
+                result.simple_object_property_inclusions.append((second, InverseRole.create(first_atomic)))
                 # first ⊑ second⁻¹
-                result.simple_object_property_inclusions.append((first, InverseRole.create(second)))
+                result.simple_object_property_inclusions.append((first, InverseRole.create(second_atomic)))
             result.positive_facts.append(axiom)
         else:
             # Unknown axiom type: pass through
@@ -238,9 +243,9 @@ class OWLNormalization:
         if isinstance(complement, OWLObjectUnionOf):
             # Flatten: ¬A ⊔ C ⊔ B becomes one inclusion
             operands = list(complement.operands()) + [super_expr]
-            inclusion = OWLObjectUnionOf(operands)
+            inclusion = OWLObjectUnionOf(operands)  # type: ignore[arg-type]
         else:
-            inclusion = OWLObjectUnionOf([complement, super_expr])
+            inclusion = OWLObjectUnionOf([complement, super_expr])  # type: ignore[list-item]
 
         # Simplify and normalize
         simplified = self._expression_manager.get_simplified(inclusion)
@@ -287,12 +292,13 @@ class OWLNormalization:
     def _process_sub_property_chain(self, axiom: object, result: NormalizedAxioms) -> None:
         """Process SubPropertyChainOf([R1,...,Rn], S): complex property inclusion."""
         from hermit.structural.normalized_axioms import ComplexObjectPropertyInclusion
-        chain = [_owl_prop_to_role(p) for p in axiom.get_property_chain()]
-        sup = _owl_prop_to_role(axiom.get_super_property())
+        chain = [_owl_prop_to_role(p) for p in axiom.get_property_chain()]  # type: ignore[attr-defined]
+        sup = _owl_prop_to_role(axiom.get_super_property())  # type: ignore[attr-defined]
         if sup is not None and all(r is not None for r in chain) and len(chain) >= 2:
+            chain_roles = [r for r in chain if r is not None]
             result.complex_object_property_inclusions.append(
                 ComplexObjectPropertyInclusion(
-                    sub_object_properties=tuple(chain),
+                    sub_object_properties=tuple(chain_roles),
                     super_object_property=sup,
                 )
             )
@@ -391,8 +397,9 @@ class OWLNormalization:
         self, axiom: OWLSameIndividualAxiom, result: NormalizedAxioms
     ) -> None:
         """Route SameIndividual axiom to same_individual_facts."""
-        inds = [_owl_ind_to_internal(i) for i in axiom.individuals()]
-        inds = [i for i in inds if i is not None]
+        from hermit.model import Individual
+        raw = [_owl_ind_to_internal(i) for i in axiom.individuals()]
+        inds: list[Individual] = [i for i in raw if i is not None]
         for i in range(len(inds)):
             result.named_individuals.add(inds[i])
             for j in range(i + 1, len(inds)):
@@ -402,8 +409,9 @@ class OWLNormalization:
         self, axiom: OWLDifferentIndividualsAxiom, result: NormalizedAxioms
     ) -> None:
         """Route DifferentIndividuals axiom to different_individuals_facts."""
-        inds = [_owl_ind_to_internal(i) for i in axiom.individuals()]
-        inds = [i for i in inds if i is not None]
+        from hermit.model import Individual
+        raw = [_owl_ind_to_internal(i) for i in axiom.individuals()]
+        inds: list[Individual] = [i for i in raw if i is not None]
         for i in range(len(inds)):
             result.named_individuals.add(inds[i])
             for j in range(i + 1, len(inds)):

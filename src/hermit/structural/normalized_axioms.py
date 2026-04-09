@@ -90,7 +90,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[object] | None 
         neg_concept = AtomicConcept.create(neg_iri)
         return AtomicNegationConcept.create(neg_concept)
 
-    def _owl_prop_to_internal_role(owl_prop: object) -> Role:  # type: ignore[return]
+    def _owl_prop_to_internal_role(owl_prop: object) -> "Role":
         """Convert an OWL property expression to an internal Role."""
         inv_of_cls: type | None = None
         try:
@@ -101,7 +101,12 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[object] | None 
         if inv_of_cls is not None and isinstance(owl_prop, inv_of_cls):
             base_prop = getattr(owl_prop, "get_inverse", lambda: None)()
             base_iri_obj = getattr(base_prop, "iri", None)
-            base_iri = base_iri_obj.as_str() if hasattr(base_iri_obj, "as_str") else str(base_iri_obj)
+            if base_iri_obj is None:
+                base_iri = str(base_prop)
+            elif hasattr(base_iri_obj, "as_str"):
+                base_iri = str(base_iri_obj.as_str())
+            else:
+                base_iri = str(base_iri_obj)
             return InverseRole.create(AtomicRole.create(base_iri))
         iri_str = getattr(owl_prop, "iri", None)
         if iri_str is None:
@@ -114,7 +119,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[object] | None 
         from hermit.model import LiteralConcept
         if not isinstance(filler, LiteralConcept):
             filler = AtomicConcept.THING
-        return AtLeastConcept.create(1, role, filler)  # type: ignore[arg-type]
+        return AtLeastConcept.create(1, role, filler)
 
     if isinstance(expr, OWLObjectAllValuesFrom):
         # TODO: ∀R.C is approximated — needs AtMostConcept or OWLNormalization-level handling.
@@ -136,7 +141,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[object] | None 
             neg_filler = inner_filler.negated
         else:
             neg_filler = AtomicNegationConcept.create(AtomicConcept.THING)
-        at_least = AtLeastConcept.create(1, role, neg_filler)  # type: ignore[arg-type]
+        at_least = AtLeastConcept.create(1, role, neg_filler)
         # Return negation of ∃R.¬C → synthetic atomic negation concept
         neg_iri = f"internal:allvalues#{hash(at_least) & 0xFFFFFFFF}"
         return AtomicNegationConcept.create(AtomicConcept.create(neg_iri))
@@ -148,7 +153,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[object] | None 
         from hermit.model import LiteralConcept
         if not isinstance(filler, LiteralConcept):
             filler = AtomicConcept.THING
-        return AtLeastConcept.create(n, role, filler)  # type: ignore[arg-type]
+        return AtLeastConcept.create(n, role, filler)
 
     from hermit.owl_model.class_expression.restriction import OWLObjectMaxCardinality
     if isinstance(expr, OWLObjectMaxCardinality):
@@ -160,7 +165,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[object] | None 
         from hermit.model import LiteralConcept
         if not isinstance(filler, LiteralConcept):
             filler = AtomicConcept.THING
-        at_least_plus1 = AtLeastConcept.create(n + 1, role, filler)  # type: ignore[arg-type]
+        at_least_plus1 = AtLeastConcept.create(n + 1, role, filler)
         max_iri = f"internal:atmost#{hash(at_least_plus1) & 0xFFFFFFFF}"
         synthetic = AtomicConcept.create(max_iri)
         neg = AtomicNegationConcept.create(synthetic)
@@ -276,10 +281,10 @@ class NormalizedAxioms:
     """Normalized disjunctive SWRL rules."""
 
     # -- Normalization interface (used by OWLNormalization) --
-    positive_facts: list = field(default_factory=list)
+    positive_facts: list[object] = field(default_factory=list)
     """Temporary storage for positive axioms during normalization."""
 
-    negative_facts: list = field(default_factory=list)
+    negative_facts: list[object] = field(default_factory=list)
     """Temporary storage for negative axioms during normalization."""
 
     # -- Conversion tracking (populated by _owl_expr_to_internal) --
@@ -307,16 +312,16 @@ class NormalizedAxioms:
                 pass
         return True  # optimistic default
 
-    def signature(self) -> set:
+    def signature(self) -> set[object]:
         """Return all entities in the axiom set."""
-        sig: set = set()
+        sig: set[object] = set()
         sig.update(self.atomic_concepts)
         sig.update(self.object_roles)
         sig.update(self.data_roles)
         sig.update(self.named_individuals)
         return sig
 
-    def add_concept_inclusion(self, simplified) -> None:
+    def add_concept_inclusion(self, simplified: object) -> None:
         """Add a concept inclusion (disjunction of concepts).
 
         Converts OWL model expressions to internal model concepts so that

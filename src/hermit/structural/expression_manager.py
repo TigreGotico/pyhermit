@@ -111,22 +111,22 @@ class ExpressionManager:
             filler = self._get_class_nnf(expr.get_filler())
             return OWLObjectExactCardinality(expr.get_cardinality(), expr.get_property(), filler)
         elif isinstance(expr, OWLDataSomeValuesFrom):
-            filler = self._get_data_range_nnf(expr.get_filler())
-            return OWLDataSomeValuesFrom(expr.get_property(), filler)
+            dr_filler = self._get_data_range_nnf(expr.get_filler())
+            return OWLDataSomeValuesFrom(expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataAllValuesFrom):
-            filler = self._get_data_range_nnf(expr.get_filler())
-            return OWLDataAllValuesFrom(expr.get_property(), filler)
+            dr_filler = self._get_data_range_nnf(expr.get_filler())
+            return OWLDataAllValuesFrom(expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataHasValue):
             return expr
         elif isinstance(expr, OWLDataMinCardinality):
-            filler = self._get_data_range_nnf(expr.get_filler())
-            return OWLDataMinCardinality(expr.get_cardinality(), expr.get_property(), filler)
+            dr_filler = self._get_data_range_nnf(expr.get_filler())
+            return OWLDataMinCardinality(expr.get_cardinality(), expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataMaxCardinality):
-            filler = self._get_data_range_nnf(expr.get_filler())
-            return OWLDataMaxCardinality(expr.get_cardinality(), expr.get_property(), filler)
+            dr_filler = self._get_data_range_nnf(expr.get_filler())
+            return OWLDataMaxCardinality(expr.get_cardinality(), expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataExactCardinality):
-            filler = self._get_data_range_nnf(expr.get_filler())
-            return OWLDataExactCardinality(expr.get_cardinality(), expr.get_property(), filler)
+            dr_filler = self._get_data_range_nnf(expr.get_filler())
+            return OWLDataExactCardinality(expr.get_cardinality(), expr.get_property(), dr_filler)
         else:
             # Default: return as-is
             return expr
@@ -186,31 +186,31 @@ class ExpressionManager:
                 ))
         elif isinstance(expr, OWLDataSomeValuesFrom):
             # ¬(∃R.D) = ∀R.¬D
-            filler = self._get_data_range_complement_nnf(expr.get_filler())
-            return OWLDataAllValuesFrom(expr.get_property(), filler)
+            dr_filler = self._get_data_range_complement_nnf(expr.get_filler())
+            return OWLDataAllValuesFrom(expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataAllValuesFrom):
             # ¬(∀R.D) = ∃R.¬D
-            filler = self._get_data_range_complement_nnf(expr.get_filler())
-            return OWLDataSomeValuesFrom(expr.get_property(), filler)
+            dr_filler = self._get_data_range_complement_nnf(expr.get_filler())
+            return OWLDataSomeValuesFrom(expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataHasValue):
             return OWLObjectComplementOf(expr)
         elif isinstance(expr, OWLDataMinCardinality):
             if expr.get_cardinality() == 0:
                 return OWLNothing
             else:
-                filler = self._get_data_range_nnf(expr.get_filler())
-                return OWLDataMaxCardinality(expr.get_cardinality() - 1, expr.get_property(), filler)
+                dr_filler = self._get_data_range_nnf(expr.get_filler())
+                return OWLDataMaxCardinality(expr.get_cardinality() - 1, expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataMaxCardinality):
-            filler = self._get_data_range_nnf(expr.get_filler())
-            return OWLDataMinCardinality(expr.get_cardinality() + 1, expr.get_property(), filler)
+            dr_filler = self._get_data_range_nnf(expr.get_filler())
+            return OWLDataMinCardinality(expr.get_cardinality() + 1, expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataExactCardinality):
-            filler = self._get_data_range_nnf(expr.get_filler())
+            dr_filler = self._get_data_range_nnf(expr.get_filler())
             if expr.get_cardinality() == 0:
-                return OWLDataMinCardinality(1, expr.get_property(), filler)
+                return OWLDataMinCardinality(1, expr.get_property(), dr_filler)
             else:
                 return OWLObjectUnionOf((
-                    OWLDataMaxCardinality(expr.get_cardinality() - 1, expr.get_property(), filler),
-                    OWLDataMinCardinality(expr.get_cardinality() + 1, expr.get_property(), filler),
+                    OWLDataMaxCardinality(expr.get_cardinality() - 1, expr.get_property(), dr_filler),
+                    OWLDataMinCardinality(expr.get_cardinality() + 1, expr.get_property(), dr_filler),
                 ))
         else:
             return OWLObjectComplementOf(expr)
@@ -264,7 +264,7 @@ class ExpressionManager:
             return expr
         elif isinstance(expr, OWLObjectIntersectionOf):
             # Simplify operands, remove TOP, fail if BOTTOM
-            operands = []
+            operands: list[OWLClassExpression] = []
             for op in expr.operands():
                 simplified = self._simplify_class_expression(op)
                 if simplified.is_owl_thing():
@@ -364,46 +364,46 @@ class ExpressionManager:
                 max_card = OWLObjectMaxCardinality(expr.get_cardinality(), expr.get_property(), filler)
                 return OWLObjectIntersectionOf((min_card, max_card))
         elif isinstance(expr, OWLDataSomeValuesFrom):
-            filler = self._simplify_data_range(expr.get_filler())
-            if self._is_bottom_data_range(filler):
+            dr_filler = self._simplify_data_range(expr.get_filler())
+            if self._is_bottom_data_range(dr_filler):
                 return OWLNothing
-            return OWLDataSomeValuesFrom(expr.get_property(), filler)
+            return OWLDataSomeValuesFrom(expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataAllValuesFrom):
-            filler = self._simplify_data_range(expr.get_filler())
-            if filler == TopOWLDatatype:
+            dr_filler = self._simplify_data_range(expr.get_filler())
+            if dr_filler == TopOWLDatatype:
                 return OWLThing
-            return OWLDataAllValuesFrom(expr.get_property(), filler)
+            return OWLDataAllValuesFrom(expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataHasValue):
-            nominal = OWLDataOneOf(expr.get_filler())
-            return OWLDataSomeValuesFrom(expr.get_property(), nominal)
+            data_nominal = OWLDataOneOf(expr.get_filler())
+            return OWLDataSomeValuesFrom(expr.get_property(), data_nominal)
         elif isinstance(expr, OWLDataMinCardinality):
-            filler = self._simplify_data_range(expr.get_filler())
+            dr_filler = self._simplify_data_range(expr.get_filler())
             if expr.get_cardinality() <= 0:
                 return OWLThing
-            elif self._is_bottom_data_range(filler):
+            elif self._is_bottom_data_range(dr_filler):
                 return OWLNothing
             elif expr.get_cardinality() == 1:
-                return OWLDataSomeValuesFrom(expr.get_property(), filler)
-            return OWLDataMinCardinality(expr.get_cardinality(), expr.get_property(), filler)
+                return OWLDataSomeValuesFrom(expr.get_property(), dr_filler)
+            return OWLDataMinCardinality(expr.get_cardinality(), expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataMaxCardinality):
-            filler = self._simplify_data_range(expr.get_filler())
-            if self._is_bottom_data_range(filler):
+            dr_filler = self._simplify_data_range(expr.get_filler())
+            if self._is_bottom_data_range(dr_filler):
                 return OWLThing
             elif expr.get_cardinality() <= 0:
-                return OWLDataAllValuesFrom(expr.get_property(), OWLDataComplementOf(filler))
-            return OWLDataMaxCardinality(expr.get_cardinality(), expr.get_property(), filler)
+                return OWLDataAllValuesFrom(expr.get_property(), OWLDataComplementOf(dr_filler))
+            return OWLDataMaxCardinality(expr.get_cardinality(), expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataExactCardinality):
-            filler = self._simplify_data_range(expr.get_filler())
+            dr_filler2 = self._simplify_data_range(expr.get_filler())
             if expr.get_cardinality() < 0:
                 return OWLNothing
             elif expr.get_cardinality() == 0:
-                return OWLDataAllValuesFrom(expr.get_property(), OWLDataComplementOf(filler))
-            elif self._is_bottom_data_range(filler):
+                return OWLDataAllValuesFrom(expr.get_property(), OWLDataComplementOf(dr_filler2))
+            elif self._is_bottom_data_range(dr_filler2):
                 return OWLNothing
             else:
-                min_card = OWLDataMinCardinality(expr.get_cardinality(), expr.get_property(), filler)
-                max_card = OWLDataMaxCardinality(expr.get_cardinality(), expr.get_property(), filler)
-                return OWLObjectIntersectionOf((min_card, max_card))
+                data_min_card = OWLDataMinCardinality(expr.get_cardinality(), expr.get_property(), dr_filler2)
+                data_max_card = OWLDataMaxCardinality(expr.get_cardinality(), expr.get_property(), dr_filler2)
+                return OWLObjectIntersectionOf((data_min_card, data_max_card))
         else:
             return expr
 
