@@ -1,14 +1,13 @@
 """Object property inclusion manager for role chain handling.
 
 Manages axiomatization of complex (non-simple) object properties and role chains.
-A property is complex if it appears in a role inclusion chain with cardinality > 1.
+A property is non-simple if it is transitive, appears as the superrole of a role
+chain, or is a superrole (via SubObjectPropertyOf) of any such property.
 
-NOTE: This module has extensive mypy errors due to API mismatches with NormalizedAxioms
-structure (negative_facts should be negative_concept_facts, etc.). The implementation
-is incomplete and not currently used in the reasoning pipeline.
+Called by OWLClausification.clausify() before producing DL clauses to enforce
+OWL 2 spec Section 11.2: non-simple properties may not appear in cardinality
+restrictions, hasSelf, asymmetric, irreflexive, or disjoint axioms.
 """
-
-# mypy: ignore-errors
 
 from __future__ import annotations
 
@@ -56,24 +55,88 @@ class ObjectPropertyInclusionManager:
             OWLNegativeObjectPropertyAssertionAxiom,
         )
 
+        from hermit.model import AtomicConcept, Atom, DLClause, Individual, Variable
+
         replacement_index = first_replacement_index
         facts_to_remove = []
+        new_clauses: list[DLClause] = []
+        new_positive_concept_facts: list[tuple] = []
+
+        X = Variable.create("X")
+        Y = Variable.create("Y")
+
+        from hermit.model import AtomicRole, InverseRole, Inequality
+
+        def _iri_str(owl_obj: object) -> str | None:
+            """Extract IRI string from an OWL model object."""
+            iri = getattr(owl_obj, "iri", None)
+            if iri is None:
+                return None
+            if isinstance(iri, str):
+                return iri
+            # IRI object — use as_str() if available, else str()
+            as_str = getattr(iri, "as_str", None)
+            return as_str() if callable(as_str) else str(iri)
+
+        # Build IRI → internal Role lookup for complex properties
+        complex_prop_iris: dict[str, object] = {}
+        for cp in self.complex_properties:
+            if isinstance(cp, AtomicRole):
+                complex_prop_iris[cp.iri] = cp
+            elif isinstance(cp, InverseRole):
+                complex_prop_iris[cp.get_inverse().iri] = cp
 
         for fact in normalized_axioms.negative_facts:
-            if isinstance(fact, OWLNegativeObjectPropertyAssertionAxiom):
-                prop = fact.property()
-                if prop in self.complex_properties:
-                    # Convert ¬op(a, b) to concept assertions
-                    # (This would create fresh concepts and add inclusions)
-                    # For now, we just mark the fact as needing conversion
-                    facts_to_remove.append(fact)
-                    # Actual conversion would go here
-                    # This is a simplified version
+            if not isinstance(fact, OWLNegativeObjectPropertyAssertionAxiom):
+                continue
+            owl_prop = fact.get_property()
+            prop_iri = _iri_str(owl_prop)
+            if prop_iri is None or prop_iri not in complex_prop_iris:
+                continue
 
-        # Apply the changes
+            # ¬op(a, b) where op is complex:
+            # Introduce fresh concept F_i, add F_i(a) and clause
+            # F_i(X) ∧ op(X, Y) → Y ≠ b
+            owl_subj = fact.get_subject()
+            owl_obj = fact.get_object()
+            subj_iri = _iri_str(owl_subj)
+            obj_iri = _iri_str(owl_obj)
+            if subj_iri is None or obj_iri is None:
+                continue
+
+            subject_ind = Individual.create(subj_iri)
+            obj_ind = Individual.create(obj_iri)
+            role_pred = complex_prop_iris[prop_iri]
+
+            fresh_iri = f"internal:negated-property-replacement#{replacement_index}"
+            fresh_concept = AtomicConcept.create(fresh_iri)
+            replacement_index += 1
+
+            # Positive concept fact: F_i(a)
+            new_positive_concept_facts.append((subject_ind, fresh_concept))
+
+            # DL clause: F_i(X) ∧ op(X, Y) → Y ≠ obj
+            head_atom = Atom.create(Inequality.INSTANCE, Y, obj_ind)
+            body_atoms = (
+                Atom.create(fresh_concept, X),
+                Atom.create(role_pred, X, Y),
+            )
+            new_clauses.append(DLClause.create((head_atom,), body_atoms))
+            facts_to_remove.append(fact)
+
+        # Apply removals and additions
         for fact in facts_to_remove:
             if fact in normalized_axioms.negative_facts:
                 normalized_axioms.negative_facts.remove(fact)
+
+        normalized_axioms.positive_concept_facts.extend(new_positive_concept_facts)
+
+        if hasattr(normalized_axioms, "dl_clauses"):
+            normalized_axioms.dl_clauses.extend(new_clauses)  # type: ignore[attr-defined]
+        elif hasattr(normalized_axioms, "rules"):
+            # Store in positive_facts for later clausification
+            for clause in new_clauses:
+                normalized_axioms.positive_facts.append(clause)
 
         return replacement_index
 
@@ -100,80 +163,168 @@ class ObjectPropertyInclusionManager:
     def _detect_complex_properties(
         self, normalized_axioms: NormalizedAxioms
     ) -> None:
-        """Detect which properties are complex (non-simple).
+        """Detect the full set of non-simple (complex) object properties.
 
-        A property is complex if it appears in a role chain with length > 1,
-        or if it has certain characteristics (transitivity, etc.).
+        Mirrors Java's ObjectPropertyInclusionManager.createAutomata():
 
-        Args:
-            normalized_axioms: Axioms to analyze
+        1. Directly complex: properties appearing in complex_object_property_inclusions
+           (transitivity R∘R⊑R, or chains R1∘...∘Rn⊑S).
+        2. Indirectly complex: superroles of complex properties via simple inclusions
+           (if R complex and R⊑P, then P complex).
+        3. Inverses of complex properties are also complex.
         """
-        # In a full implementation, this would analyze:
-        # - simple_object_property_inclusions for chain patterns
-        # - complex_object_property_inclusions for explicit chains
-        # - transitive properties (which are always complex)
-        # - inverse properties of complex properties
+        from hermit.model import AtomicRole, InverseRole
 
-        # For now, simplified: mark properties in complex inclusions as complex
-        if hasattr(normalized_axioms, "complex_object_property_inclusions"):
-            for inclusion in normalized_axioms.complex_object_property_inclusions:
-                # Mark properties in role chains as complex
-                if hasattr(inclusion, "sub_property_chain"):
-                    for prop in inclusion.sub_property_chain:
-                        self.complex_properties.add(prop)
-                if hasattr(inclusion, "super_property"):
-                    self.complex_properties.add(inclusion.super_property)
+        # Step 1: seed with directly complex properties
+        directly_complex: set[object] = set()
+        for inclusion in normalized_axioms.complex_object_property_inclusions:
+            # The super-property of any chain is complex
+            directly_complex.add(inclusion.super_object_property)
+            # Chain members that are the same as super (transitivity) are also complex
+            for prop in inclusion.sub_object_properties:
+                if prop == inclusion.super_object_property:
+                    directly_complex.add(prop)
 
-    @staticmethod
+        def _get_inverse(prop: object) -> object:
+            if isinstance(prop, AtomicRole):
+                return InverseRole.create(prop)
+            elif isinstance(prop, InverseRole):
+                return prop.get_inverse()
+            return prop
+
+        # Step 2+3: fixpoint — propagate through simple inclusions and
+        # always add inverses of complex properties until stable
+        complex_set = set(directly_complex)
+        # seed inverses of initial complex properties
+        for prop in list(complex_set):
+            complex_set.add(_get_inverse(prop))
+        changed = True
+        while changed:
+            changed = False
+            for (sub, sup) in normalized_axioms.simple_object_property_inclusions:
+                if sub in complex_set and sup not in complex_set:
+                    complex_set.add(sup)
+                    complex_set.add(_get_inverse(sup))
+                    changed = True
+
+        self.complex_properties.update(complex_set)
+
     def _validate_complex_property_constraints(
-        normalized_axioms: NormalizedAxioms,
+        self, normalized_axioms: NormalizedAxioms
     ) -> None:
-        """Validate that complex properties don't violate OWL 2 constraints.
+        """Validate that non-simple properties don't violate OWL 2 constraints.
 
-        OWL 2 spec: complex properties cannot appear in:
+        OWL 2 spec: non-simple properties cannot appear in:
         - asymmetric axioms
         - irreflexive axioms
         - disjoint property axioms
-
-        Args:
-            normalized_axioms: Axioms to validate
+        - cardinality restrictions (min, max, exact)
+        - hasSelf restrictions
 
         Raises:
             ValueError: If constraints are violated
         """
-        # Build set of complex properties
-        complex_props = set()
-        if hasattr(normalized_axioms, "complex_object_property_inclusions"):
-            for inclusion in normalized_axioms.complex_object_property_inclusions:
-                if hasattr(inclusion, "sub_property_chain"):
-                    complex_props.update(inclusion.sub_property_chain)
-                if hasattr(inclusion, "super_property"):
-                    complex_props.add(inclusion.super_property)
+        complex_props = self.complex_properties
+
+        def _is_complex(role: object) -> bool:
+            return role in complex_props
 
         # Check asymmetric properties
-        if hasattr(normalized_axioms, "asymmetric_object_properties"):
-            for prop in normalized_axioms.asymmetric_object_properties:
-                if prop in complex_props:
-                    raise ValueError(
-                        f"Complex property {prop} cannot be asymmetric (OWL 2 violation)"
-                    )
+        for prop in normalized_axioms.asymmetric_object_properties:
+            if _is_complex(prop):
+                raise ValueError(
+                    f"Non-simple property '{prop}' cannot be asymmetric (OWL 2 violation)"
+                )
 
         # Check irreflexive properties
-        if hasattr(normalized_axioms, "irreflexive_object_properties"):
-            for prop in normalized_axioms.irreflexive_object_properties:
-                if prop in complex_props:
-                    raise ValueError(
-                        f"Complex property {prop} cannot be irreflexive (OWL 2 violation)"
-                    )
+        for prop in normalized_axioms.irreflexive_object_properties:
+            if _is_complex(prop):
+                raise ValueError(
+                    f"Non-simple property '{prop}' cannot be irreflexive (OWL 2 violation)"
+                )
 
         # Check disjoint properties
-        if hasattr(normalized_axioms, "disjoint_object_properties"):
-            for disj_props in normalized_axioms.disjoint_object_properties:
-                for prop in disj_props:
-                    if prop in complex_props:
-                        raise ValueError(
-                            f"Complex property {prop} cannot be in disjoint axiom (OWL 2 violation)"
-                        )
+        for disj_props in normalized_axioms.disjoint_object_properties:
+            for prop in disj_props:
+                if _is_complex(prop):
+                    raise ValueError(
+                        f"Non-simple property '{prop}' cannot be in disjoint properties axiom (OWL 2 violation)"
+                    )
+
+        # Check cardinality restrictions and hasSelf in concept inclusions
+        self._check_concept_inclusions_for_non_simple(normalized_axioms, complex_props)
+
+    @staticmethod
+    def _check_concept_inclusions_for_non_simple(
+        normalized_axioms: NormalizedAxioms, complex_props: set
+    ) -> None:
+        """Scan concept inclusions for non-simple properties in cardinality/self restrictions."""
+        from hermit.owl_model.class_expression.restriction import (
+            OWLObjectCardinalityRestriction,
+            OWLObjectHasSelf,
+        )
+
+        def _role_iri(owl_prop: object) -> str | None:
+            """Get IRI string from an OWL property expression."""
+            iri = getattr(owl_prop, "iri", None)
+            if iri is None:
+                return None
+            return iri.as_str() if hasattr(iri, "as_str") else str(iri)
+
+        def _is_non_simple_owl_prop(owl_prop: object) -> bool:
+            """Check if an OWL property expression corresponds to a non-simple internal role."""
+            from hermit.model import AtomicRole, InverseRole
+            from hermit.owl_model.owl_property import OWLObjectInverseOf
+
+            iri = _role_iri(owl_prop)
+            if iri is None:
+                return False
+            if isinstance(owl_prop, OWLObjectInverseOf):
+                base_iri = _role_iri(owl_prop.get_inverse())
+                if base_iri is None:
+                    return False
+                inv_role = InverseRole.create(AtomicRole.create(base_iri))
+                atomic_role = AtomicRole.create(base_iri)
+                return inv_role in complex_props or atomic_role in complex_props
+            else:
+                atomic = AtomicRole.create(iri)
+                inv = InverseRole.create(atomic)
+                return atomic in complex_props or inv in complex_props
+
+        def _check_expr(expr: object) -> None:
+            """Recursively check a class expression for non-simple violations."""
+            if isinstance(expr, OWLObjectCardinalityRestriction):
+                prop = expr.get_property()
+                if _is_non_simple_owl_prop(prop):
+                    raise ValueError(
+                        f"Non-simple property '{prop}' or its inverse appears in "
+                        f"the cardinality restriction '{expr}' (OWL 2 violation)"
+                    )
+            elif isinstance(expr, OWLObjectHasSelf):
+                prop = expr.get_property()
+                if _is_non_simple_owl_prop(prop):
+                    raise ValueError(
+                        f"Non-simple property '{prop}' appears in a Self restriction "
+                        f"(OWL 2 violation)"
+                    )
+            # Recurse into unions/intersections
+            operands = getattr(expr, "_operands", None) or []
+            if callable(getattr(expr, "operands", None)):
+                operands = list(expr.operands())
+            for op in operands:
+                _check_expr(op)
+
+        # concept_inclusions stores tuple-of-expressions
+        for inclusion in normalized_axioms.concept_inclusions:
+            for expr in inclusion:
+                _check_expr(expr)
+
+        # positive_facts stores OWLObjectUnionOf / other OWL axioms/expressions
+        from hermit.owl_model.class_expression import OWLObjectUnionOf as _OWLObjectUnionOf
+        for fact in normalized_axioms.positive_facts:
+            if isinstance(fact, _OWLObjectUnionOf):
+                for op in fact.operands():
+                    _check_expr(op)
 
 
 class _Automaton:
