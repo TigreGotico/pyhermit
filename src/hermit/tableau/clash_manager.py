@@ -168,7 +168,7 @@ class ClashManager:
             if isinstance(dl_predicate_object, AtomicRole):
                 search_predicate = NegatedAtomicRole.create(dl_predicate_object)
             else:
-                search_predicate = dl_predicate_object.get_negated_atomic_role()
+                search_predicate = dl_predicate_object.negated_atomic_role
 
             self.m_ternary_auxiliary_tuple[0] = search_predicate
             self.m_ternary_auxiliary_tuple[1] = node0

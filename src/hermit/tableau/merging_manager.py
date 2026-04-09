@@ -112,13 +112,13 @@ class MergingManager:
             node1_cluster_anchor = node1.cluster_anchor
 
             can_merge_0_into_1 = (
-                node0._parent is node1._parent
+                node0.m_parent is node1.m_parent
                 or self._is_descendant_of_at_most_three_levels(
                     node0, node1_cluster_anchor
                 )
             )
             can_merge_1_into_0 = (
-                node0._parent is node1._parent
+                node0.m_parent is node1.m_parent
                 or self._is_descendant_of_at_most_three_levels(
                     node1, node0_cluster_anchor
                 )

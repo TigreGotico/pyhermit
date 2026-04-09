@@ -700,7 +700,7 @@ class ExtensionManager:
         # Description graph tables (created from permanent ontology)
 
         for description_graph in tableau.m_permanent_dl_ontology.get_all_description_graphs():
-            arity_int = description_graph.get_number_of_vertices() + 1
+            arity_int = description_graph.number_of_vertices() + 1
             if arity_int not in self.m_extension_tables_by_arity:
                 self.m_extension_tables_by_arity[arity_int] = (
                     ExtensionTableWithFullIndex(
