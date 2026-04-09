@@ -2,12 +2,7 @@
 
 Provides Negation Normal Form (NNF) transformation and simplification
 for class expressions and data ranges.
-
-NOTE: This module has 185+ mypy errors due to API mismatches from the port.
-Type checking is disabled for this module pending API cleanup.
 """
-
-# mypy: ignore-errors
 
 from __future__ import annotations
 
