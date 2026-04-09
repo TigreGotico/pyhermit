@@ -1381,7 +1381,8 @@ class TestBuiltInPropertyManager:
         mgr = BuiltInPropertyManager()
         axioms = NormalizedAxioms()
         mgr._axiomatize_bottom_object_property(axioms)
-        assert len(axioms.positive_concept_facts) == 1
+        # Axioms stored in positive_facts (untyped catch-all) for later normalization
+        assert len(axioms.positive_facts) == 1
 
     def test_axiomatize_top_object_property(self):
         from hermit.structural.builtin_property_manager import BuiltInPropertyManager
@@ -1389,7 +1390,7 @@ class TestBuiltInPropertyManager:
         mgr = BuiltInPropertyManager()
         axioms = NormalizedAxioms()
         mgr._axiomatize_top_object_property(axioms)
-        assert len(axioms.positive_concept_facts) == 1
+        assert len(axioms.positive_facts) == 1
 
     def test_axiomatize_top_data_property(self):
         from hermit.structural.builtin_property_manager import BuiltInPropertyManager
@@ -1397,7 +1398,7 @@ class TestBuiltInPropertyManager:
         mgr = BuiltInPropertyManager()
         axioms = NormalizedAxioms()
         mgr._axiomatize_top_data_property(axioms)
-        assert len(axioms.positive_concept_facts) == 1
+        assert len(axioms.positive_facts) == 1
 
     def test_axiomatize_bottom_data_property(self):
         from hermit.structural.builtin_property_manager import BuiltInPropertyManager
@@ -1405,7 +1406,7 @@ class TestBuiltInPropertyManager:
         mgr = BuiltInPropertyManager()
         axioms = NormalizedAxioms()
         mgr._axiomatize_bottom_data_property(axioms)
-        assert len(axioms.positive_concept_facts) == 1
+        assert len(axioms.positive_facts) == 1
 
     def test_checker_with_object_property_in_expression(self):
         from hermit.structural.builtin_property_manager import (

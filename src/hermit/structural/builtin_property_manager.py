@@ -3,12 +3,9 @@
 Injects axioms for built-in roles (owl:topObjectProperty, owl:bottomObjectProperty,
 owl:topDataProperty, owl:bottomDataProperty) when they're used in the ontology.
 
-NOTE: This module has extensive mypy errors due to API mismatches. The implementation
-is incomplete and not currently used in the reasoning pipeline. It should be revisited
-when the structural transformation pipeline is fully integrated.
+This module is not yet wired into the reasoning pipeline. It is available for
+future integration via OWLClausification.clausify().
 """
-
-# mypy: ignore-errors
 
 from __future__ import annotations
 
@@ -91,7 +88,7 @@ class BuiltInPropertyManager:
         # For now, add the axiom directly
         # NOTE: This implementation is incomplete - axioms should be converted to DL facts
         inclusion_axiom = OWLSubClassOfAxiom(OWLThing, some_values)
-        normalized_axioms.positive_concept_facts.append(inclusion_axiom)  # type: ignore[arg-type]
+        normalized_axioms.positive_facts.append(inclusion_axiom)
 
     @staticmethod
     def _axiomatize_bottom_object_property(
@@ -118,7 +115,7 @@ class BuiltInPropertyManager:
         # Add axiom: ⊤ ⊑ ∀owl:bottomObjectProperty.⊥
         all_values = OWLObjectAllValuesFrom(bottom_prop, OWLNothing)
         axiom = OWLSubClassOfAxiom(OWLThing, all_values)
-        normalized_axioms.positive_concept_facts.append(axiom)  # type: ignore[arg-type]
+        normalized_axioms.positive_facts.append(axiom)
 
     @staticmethod
     def _axiomatize_top_data_property(
@@ -135,23 +132,21 @@ class BuiltInPropertyManager:
             OWLDataSomeValuesFrom,
             OWLThing,
         )
-        from hermit.owl_model.owl_datatype import OWLDatatype
         from hermit.owl_model.class_expression import OWLDataOneOf
-        from hermit.owl_model.owl_literal import OWLLiteral
+        from hermit.owl_model.owl_literal import _OWLLiteralImplString as OWLLiteralString
         from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
 
         top_data_prop = OWLDataProperty(
             IRI.create(BuiltInPropertyManager.TOP_DATA_PROPERTY_IRI)
         )
 
-        # Create an anonymous datatype and constant for the built-in axiom
-        anonymous_datatype = OWLDatatype(IRI("internal:", "anonymous-constants"))
-        literal = OWLLiteral("internal:constant", anonymous_datatype)
+        # Create a string literal constant for the built-in axiom
+        literal = OWLLiteralString("internal:constant")  # type: ignore[no-untyped-call]
         one_of = OWLDataOneOf(literal)
         some_values = OWLDataSomeValuesFrom(top_data_prop, one_of)
 
         axiom = OWLSubClassOfAxiom(OWLThing, some_values)
-        normalized_axioms.positive_concept_facts.append(axiom)  # type: ignore[arg-type]
+        normalized_axioms.positive_facts.append(axiom)
 
     @staticmethod
     def _axiomatize_bottom_data_property(
@@ -182,7 +177,7 @@ class BuiltInPropertyManager:
 
         all_values = OWLDataAllValuesFrom(bottom_data_prop, complement)
         axiom = OWLSubClassOfAxiom(OWLThing, all_values)
-        normalized_axioms.positive_concept_facts.append(axiom)  # type: ignore[arg-type]
+        normalized_axioms.positive_facts.append(axiom)
 
 
 class _BuiltInPropertyChecker:
@@ -207,18 +202,18 @@ class _BuiltInPropertyChecker:
             else:
                 self._check_class_expression(inclusion)
 
-        # Check property inclusions
-        for inclusion in normalized_axioms.simple_object_property_inclusions:
-            for obj_prop in inclusion:
-                self._check_object_property(obj_prop)
+        # Check property inclusions (each item is a (sub, super) Role tuple)
+        for sub_prop, sup_prop in normalized_axioms.simple_object_property_inclusions:
+            self._check_object_property(sub_prop)
+            self._check_object_property(sup_prop)
 
         # Check data property inclusions
-        for inclusion in normalized_axioms.data_property_inclusions:
-            for data_prop in inclusion:
+        for data_inclusion in normalized_axioms.data_property_inclusions:
+            for data_prop in data_inclusion:
                 self._check_data_property(data_prop)
 
-        # Check facts
-        for fact in normalized_axioms.positive_concept_facts:  # type: ignore[attr-defined]
+        # Check unclassified positive facts for OWL property axioms
+        for fact in normalized_axioms.positive_facts:
             self._check_axiom(fact)
 
     def _check_axiom(self, axiom: object) -> None:
@@ -233,21 +228,21 @@ class _BuiltInPropertyChecker:
         )
 
         if isinstance(axiom, OWLObjectPropertyAssertionAxiom):
-            self._check_object_property(axiom.get_property())  # type: ignore[attr-defined]
+            self._check_object_property(axiom.get_property())
         elif isinstance(axiom, OWLDataPropertyAssertionAxiom):
-            self._check_data_property(axiom.get_property())  # type: ignore[attr-defined]
+            self._check_data_property(axiom.get_property())
         elif isinstance(axiom, OWLSubObjectPropertyOfAxiom):
-            self._check_object_property(axiom.get_sub_property())  # type: ignore[attr-defined]
-            self._check_object_property(axiom.get_super_property())  # type: ignore[attr-defined]
+            self._check_object_property(axiom.get_sub_property())
+            self._check_object_property(axiom.get_super_property())
         elif isinstance(axiom, OWLObjectPropertyDomainAxiom):
-            self._check_object_property(axiom.get_property())  # type: ignore[attr-defined]
-            self._check_class_expression(axiom.get_domain())  # type: ignore[attr-defined]
+            self._check_object_property(axiom.get_property())
+            self._check_class_expression(axiom.get_domain())
         elif isinstance(axiom, OWLObjectPropertyRangeAxiom):
-            self._check_object_property(axiom.get_property())  # type: ignore[attr-defined]
-            self._check_class_expression(axiom.get_range())  # type: ignore[attr-defined]
+            self._check_object_property(axiom.get_property())
+            self._check_class_expression(axiom.get_range())
         elif isinstance(axiom, OWLSubDataPropertyOfAxiom):
-            self._check_data_property(axiom.get_sub_property())  # type: ignore[attr-defined]
-            self._check_data_property(axiom.get_super_property())  # type: ignore[attr-defined]
+            self._check_data_property(axiom.get_sub_property())
+            self._check_data_property(axiom.get_super_property())
 
     def _check_class_expression(self, expr: object) -> None:
         """Recursively check a class expression for built-in properties."""
