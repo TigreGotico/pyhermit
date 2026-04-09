@@ -299,7 +299,7 @@ class ObjectPropertyInclusionManager:
 
         def _check_expr(expr: object) -> None:
             """Recursively check a class expression for non-simple violations."""
-            from hermit.model import AtLeastConcept as _AtLeastConcept
+            from hermit.model import AtLeastConcept as _AtLeastConcept, AtMostConcept as _AtMostConcept
 
             if isinstance(expr, OWLObjectCardinalityRestriction):
                 prop = expr.get_property()
@@ -315,7 +315,7 @@ class ObjectPropertyInclusionManager:
                         f"Non-simple property '{prop}' appears in a Self restriction "
                         f"(OWL 2 violation)"
                     )
-            elif isinstance(expr, _AtLeastConcept):
+            elif isinstance(expr, (_AtLeastConcept, _AtMostConcept)):
                 # Already-converted internal model cardinality restriction
                 role = getattr(expr, "_on_role", None)
                 if _is_non_simple_internal_role(role):

@@ -7,7 +7,7 @@
 - [x] **Step 3** — Fix `_owl_expr_to_internal()` in `normalized_axioms.py`: `OWLObjectMaxCardinality` → `AtMostConcept`; `OWLObjectExactCardinality` → `[AtLeastConcept, AtMostConcept]`; remove synthetic approximations
 - [x] **Step 4** — Emit two-variable DL clauses for `∀R.C` in `OWLNormalization._process_sub_class_of()`; add `direct_dl_clauses: list[DLClause]` to `NormalizedAxioms`; consume in `OWLClausification.clausify()`
 - [x] **Step 5** — Fix `¬(complex)` via NNF push-in: `OWLObjectComplementOf(complex)` → correct NNF expansion instead of synthetic hash concept
-- [ ] **Step 6** — Add `AtMostConcept` non-simplicity check to `ObjectPropertyInclusionManager._check_concept_inclusions_for_non_simple()`
+- [x] **Step 6** — Add `AtMostConcept` non-simplicity check to `ObjectPropertyInclusionManager._check_concept_inclusions_for_non_simple()`
 - [ ] **Step 7** — Add OWL 2 conformance tests in `tests/test_conformance.py` using `koala.owl` (≥6 tests, guarded by `pytest.importorskip("owlready2")`)
 - [ ] **Step 8** — Add `TestAllValuesFrom` (≥4 tests) and `TestMaxCardinality` (≥4 tests) to `tests/test_correctness.py`; remove `TestUniversalRestrictionLimitation`
 - [ ] **Step 9** — Fix mypy errors in `src/hermit/structural/` files; remove their entries from `[[tool.mypy.overrides]]` in `pyproject.toml`
