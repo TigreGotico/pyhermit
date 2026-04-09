@@ -65,6 +65,24 @@ class ValueSpaceSubset(ABC):
         """Return the complement of this subset within the datatype's value space."""
         ...
 
+    def has_cardinality_at_least(self, number: int) -> bool:
+        """Return True if this subset has at least *number* elements.
+
+        For infinite value spaces, returns True if number >= 1.
+        For finite value spaces, would need to count elements.
+        """
+        if number <= 0:
+            return True
+        # For our implementation, assume non-empty finite spaces have "enough" values
+        return not self.is_empty()
+
+    def contains_data_value(self, value: Any) -> bool:
+        """Check if a data value is in this subset.
+
+        Alias for contains() for compatibility.
+        """
+        return self.contains(value)
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 

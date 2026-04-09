@@ -1916,9 +1916,12 @@ class TestDatatypeManagerInit:
         mock_node = MagicMock()
         v.m_node = mock_node
 
-        # Use a mock restriction that has get_datatype_uri()
+        # Use a mock restriction that has get_datatype_uri() and facet properties
         mock_dr = MagicMock()
         mock_dr.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr.datatype_iri = XSD + "integer"
+        mock_dr._facet_uris = ()
+        mock_dr._facet_values = ()
         v.m_positive_datatype_restrictions = [mock_dr]
         v.m_most_specific_restriction = mock_dr
 

@@ -450,9 +450,12 @@ class DatatypeManager:
         """Normalize when positive datatype restrictions are present."""
         from hermit.datatypes.registry import DatatypeRegistry
 
-        most_specific_datatype_uri = variable.m_most_specific_restriction.get_datatype_uri()
+        restriction = variable.m_most_specific_restriction
+        most_specific_datatype_uri = restriction.get_datatype_uri()
         variable.m_value_space_subset = DatatypeRegistry.create_value_space_subset(
-            variable.m_most_specific_restriction
+            restriction.datatype_iri,
+            restriction._facet_uris,
+            restriction._facet_values
         )
         for restriction in reversed(variable.m_positive_datatype_restrictions):
             if restriction != variable.m_most_specific_restriction:
