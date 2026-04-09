@@ -1124,11 +1124,6 @@ class TestExpressionManager:
 # OWL Normalization tests
 # ===========================================================================
 
-_norm_xfail = pytest.mark.xfail(
-    reason="owl_normalization uses positive_facts/negative_facts/add_concept_inclusion which don't exist on NormalizedAxioms"
-)
-
-
 class TestOWLNormalization:
     """Test the OWL axiom normalization."""
 
@@ -1141,7 +1136,6 @@ class TestOWLNormalization:
         assert "0" in str(c1.iri)
         assert "1" in str(c2.iri)
 
-    @_norm_xfail
     def test_process_ontology_empty(self):
         from hermit.structural.owl_normalization import OWLNormalization
         from hermit.structural.normalized_axioms import NormalizedAxioms
@@ -1150,7 +1144,6 @@ class TestOWLNormalization:
         assert isinstance(result, NormalizedAxioms)
         assert len(result.positive_facts) == 0
 
-    @_norm_xfail
     def test_process_class_assertion(self):
         from hermit.structural.owl_normalization import OWLNormalization
         from hermit.owl_model.owl_axiom import OWLClassAssertionAxiom
@@ -1164,7 +1157,7 @@ class TestOWLNormalization:
         result = norm.process_ontology([axiom])
         assert len(result.positive_facts) == 1
 
-    @_norm_xfail
+
     def test_process_sub_object_property(self):
         from hermit.structural.owl_normalization import OWLNormalization
         from hermit.owl_model.owl_axiom import OWLSubObjectPropertyOfAxiom
@@ -1177,7 +1170,7 @@ class TestOWLNormalization:
         result = norm.process_ontology([axiom])
         assert len(result.positive_facts) == 1
 
-    @_norm_xfail
+
     def test_process_equivalent_object_properties(self):
         from hermit.structural.owl_normalization import OWLNormalization
         from hermit.owl_model.owl_axiom import OWLEquivalentObjectPropertiesAxiom
@@ -1191,7 +1184,7 @@ class TestOWLNormalization:
         # Should have 2 positive facts (R subprop S and S subprop R)
         assert len(result.positive_facts) == 2
 
-    @_norm_xfail
+
     def test_process_various_property_axioms(self):
         from hermit.structural.owl_normalization import OWLNormalization
         from hermit.owl_model.owl_axiom import (
@@ -1219,7 +1212,7 @@ class TestOWLNormalization:
         result = norm.process_ontology(axioms)
         assert len(result.positive_facts) == 7
 
-    @_norm_xfail
+
     def test_process_individual_axioms(self):
         from hermit.structural.owl_normalization import OWLNormalization
         from hermit.owl_model.owl_axiom import (
@@ -1252,7 +1245,7 @@ class TestOWLNormalization:
         result = norm.process_ontology(axioms)
         assert len(result.positive_facts) == 4
 
-    @_norm_xfail
+
     def test_process_negative_assertions(self):
         from hermit.structural.owl_normalization import OWLNormalization
         from hermit.owl_model.owl_axiom import (
@@ -1279,7 +1272,7 @@ class TestOWLNormalization:
         result = norm.process_ontology(axioms)
         assert len(result.negative_facts) == 2
 
-    @_norm_xfail
+
     def test_process_data_property_axioms(self):
         from hermit.structural.owl_normalization import OWLNormalization
         from hermit.owl_model.owl_axiom import (
@@ -1307,7 +1300,7 @@ class TestOWLNormalization:
         result = norm.process_ontology(axioms)
         assert len(result.positive_facts) == 5
 
-    @_norm_xfail
+
     def test_process_object_property_domain_range(self):
         from hermit.structural.owl_normalization import OWLNormalization
         from hermit.owl_model.owl_axiom import (
@@ -1331,7 +1324,7 @@ class TestOWLNormalization:
         result = norm.process_ontology(axioms)
         assert len(result.positive_facts) == 3
 
-    @_norm_xfail
+
     def test_process_disjoint_object_properties(self):
         from hermit.structural.owl_normalization import OWLNormalization
         from hermit.owl_model.owl_axiom import OWLDisjointObjectPropertiesAxiom
@@ -1533,7 +1526,6 @@ class TestObjectPropertyInclusionManager:
         mgr = ObjectPropertyInclusionManager()
         assert len(mgr.complex_properties) == 0
 
-    @pytest.mark.xfail(reason="object_property_inclusion_manager uses negative_facts which doesn't exist on NormalizedAxioms")
     def test_rewrite_negative_assertions(self):
         from hermit.structural.object_property_inclusion_manager import (
             ObjectPropertyInclusionManager,

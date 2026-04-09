@@ -134,6 +134,13 @@ class NormalizedAxioms:
     rules: list[DisjunctiveRule] = field(default_factory=list)
     """Normalized disjunctive SWRL rules."""
 
+    # -- Normalization interface (used by OWLNormalization) --
+    positive_facts: list = field(default_factory=list)
+    """Temporary storage for positive axioms during normalization."""
+
+    negative_facts: list = field(default_factory=list)
+    """Temporary storage for negative axioms during normalization."""
+
     @property
     def is_horn(self) -> bool:
         """All concept inclusions have at most one positive (non-negated) literal."""
@@ -162,6 +169,17 @@ class NormalizedAxioms:
         sig.update(self.data_roles)
         sig.update(self.named_individuals)
         return sig
+
+    def add_concept_inclusion(self, simplified) -> None:
+        """Add a concept inclusion (disjunction of concepts).
+
+        Args:
+            simplified: A simplified class expression (typically from NNF conversion)
+                       that represents a concept inclusion.
+        """
+        # For now, store in positive_facts to support OWLNormalization
+        # In a full implementation, this would convert to internal model
+        self.positive_facts.append(simplified)
 
 
 # ===========================================================================
