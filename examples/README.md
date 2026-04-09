@@ -4,11 +4,11 @@ Welcome to the comprehensive PyHermit examples collection. This folder contains 
 
 ## Overview
 
-**Total Examples: 20**
+**Total Examples: 25**
 - **Beginner Track (01-05):** Learn core concepts (consistency, subsumption, properties, instances, cardinality)
 - **Intermediate Track (06-10):** Real-world patterns (disjointness, complex reasoning, OWL loading, configuration)
 - **Advanced Track (11-14, 17):** Integration and special topics (e-commerce, design patterns, testing, inverse roles, contradictions)
-- **Advanced+ Track (15-16, 18-20):** Advanced reasoning patterns (multiple inheritance, queries, nominalsI, performance, multi-domain)
+- **Advanced+ Track (15-16, 18-25):** Advanced patterns (inheritance, queries, nominals, performance, multi-domain, validation, graphs, search, explanation, dynamic)
 
 All examples are **self-contained and runnable**:
 ```bash
@@ -26,7 +26,7 @@ python examples/01_hello_world.py
 
 ### Run all examples
 ```bash
-for i in {01..14} 15 16 17 18 19 20; do
+for i in {01..14} 15 16 17 18 19 20 21 22 23 24 25; do
     python examples/${i}_*.py
 done
 ```
@@ -237,31 +237,85 @@ python examples/03_object_properties.py > output.txt 2>&1
 - **Learning Time:** 25 minutes
 - **Difficulty:** Advanced
 
+#### 21_ontology_validation.py
+**Purpose:** Quality assurance and constraint checking
+- Automated validation patterns
+- Constraint compliance checking
+- Data quality verification
+- Business rule enforcement
+- Debugging ontologies
+- **Key Concepts:** Validation, constraints, error detection, quality assurance
+- **Learning Time:** 20 minutes
+- **Difficulty:** Advanced
+
+#### 22_knowledge_graph_construction.py
+**Purpose:** Building semantic knowledge graphs
+- Entity linking and resolution
+- Property extraction and enrichment
+- Graph structure design
+- Semantic annotation
+- Real-world movie database example
+- **Key Concepts:** Knowledge graphs, RDF, entity linking, graph topology
+- **Learning Time:** 25 minutes
+- **Difficulty:** Advanced
+
+#### 23_semantic_search.py
+**Purpose:** Intelligent search beyond keywords
+- Semantic search implementation
+- Concept expansion
+- Result ranking and discovery
+- Cross-category recommendations
+- E-commerce search example
+- **Key Concepts:** Semantic search, information retrieval, ranking, discovery
+- **Learning Time:** 20 minutes
+- **Difficulty:** Advanced
+
+#### 24_explanation_tracing.py
+**Purpose:** Explaining and debugging reasoning
+- Justification tracking
+- Derivation chain tracing
+- Rule application explanation
+- Debugging inferences
+- Medical diagnosis example
+- **Key Concepts:** Explanation, justification, tracing, debugging
+- **Learning Time:** 20 minutes
+- **Difficulty:** Advanced
+
+#### 25_incremental_reasoning.py
+**Purpose:** Reasoning with dynamic and evolving data
+- Incremental fact addition
+- Change propagation
+- Impact analysis
+- Dynamic ontology updates
+- Project management example
+- **Key Concepts:** Incremental reasoning, dynamic updates, change tracking
+- **Learning Time:** 20 minutes
+- **Difficulty:** Advanced
+
 ## Feature Matrix: Which Examples Cover What?
 
-| Feature | 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 | 09 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
-|---------|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| **Basic Ontology** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **Subsumption** | ✓ | ✓ | ✓ |   | ✓ |   | ✓ | ✓ | ✓ | ✓ | ✓ |   | ✓ |   | ✓ | ✓ |   |   |   |   |
-| **Object Properties** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   | ✓ |   |   |   | ✓ |
-| **Existential Restrictions** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   |   |   |   |   |   |   |   |   |
-| **Cardinality** |   |   |   |   | ✓ |   |   |   |   | ✓ | ✓ |   |   |   |   |   |   |   |   |   |
-| **Disjointness** |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |
-| **Instance ABox** |   |   | ✓ | ✓ | ✓ | ✓ | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   | ✓ |   | ✓ |   | ✓ |
-| **Type Checking** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ | ✓ | ✓ |   | ✓ |   | ✓ |
-| **Role Relationships** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   | ✓ |   |   |   | ✓ |
-| **Consistency Checking** | ✓ |   |   | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **Class Hierarchy** |   | ✓ |   | ✓ |   |   | ✓ | ✓ | ✓ | ✓ | ✓ |   | ✓ |   | ✓ | ✓ |   |   |   |   |
-| **File Loading** |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   |   |   |   |   |
-| **Inverse Roles** |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |
-| **Multiple Inheritance** |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |
-| **Query Patterns** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |
-| **Design Patterns** |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   |
-| **Nominal Classes** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |
-| **Performance Analysis** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |
-| **Multi-Domain Integration** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |
-| **Testing** |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |
-| **Inconsistency Detection** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |
+| Feature | 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 | 09 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 |
+|---------|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+| **Basic Ontology** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Subsumption** | ✓ | ✓ | ✓ |   | ✓ |   | ✓ | ✓ | ✓ | ✓ | ✓ |   | ✓ |   | ✓ | ✓ |   |   |   |   |   | ✓ | ✓ |   |   |
+| **Object Properties** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   | ✓ |   |   |   | ✓ | ✓ | ✓ | ✓ |   | ✓ |
+| **Instance ABox** |   |   | ✓ | ✓ | ✓ | ✓ | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |   | ✓ |   | ✓ |   | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Type Checking** |   |   | ✓ | ✓ |   |   | ✓ |   | ✓ | ✓ | ✓ |   | ✓ | ✓ | ✓ | ✓ |   | ✓ |   | ✓ | ✓ | ✓ | ✓ |   | ✓ |
+| **Consistency Checking** | ✓ |   |   | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Design Patterns** |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   |   |   |   |   |   |
+| **Query Patterns** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   | ✓ |   |   |
+| **Knowledge Graphs** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |
+| **Semantic Search** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |
+| **Validation** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |
+| **Explanation** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |
+| **Incremental Reasoning** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |
+| **Testing** |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   |   |   |   |   |
+| **Inverse Roles** |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   |   |   |   |
+| **Multiple Inheritance** |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   |   |   |
+| **Nominals** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |
+| **Performance Analysis** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |
+| **Multi-Domain** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |
+| **Inconsistency** |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | ✓ |   |   |   |   |   |   |   |   |
 
 ## Learning Paths
 
@@ -417,7 +471,7 @@ Fido hasOwner Alice: True
 
 ## Testing
 
-All 20 examples pass successfully:
+All 25 examples pass successfully:
 ```
 ✓ Example 01 - hello_world
 ✓ Example 02 - class_hierarchy  
@@ -439,16 +493,22 @@ All 20 examples pass successfully:
 ✓ Example 18 - nominal_classes
 ✓ Example 19 - performance_analysis
 ✓ Example 20 - multi_domain_reasoning
+✓ Example 21 - ontology_validation
+✓ Example 22 - knowledge_graph_construction
+✓ Example 23 - semantic_search
+✓ Example 24 - explanation_tracing
+✓ Example 25 - incremental_reasoning
 ```
 
 ## Performance Notes
 
-- Examples 01-07: < 100ms each
+- Examples 01-07: < 100ms each (basic concepts)
 - Examples 08-10: < 500ms each (more complex ontologies)
 - Examples 11-14, 17: < 1s each (real-world complexity)
-- Examples 15-16, 18-20: < 2s each (advanced reasoning patterns, benchmarking)
+- Examples 15-16, 18-20: < 2s each (advanced patterns)
+- Examples 21-25: < 3s each (specialized topics, validation, graphs)
 
-**Total runtime for all 20 examples: < 30 seconds**
+**Total runtime for all 25 examples: < 60 seconds**
 
 ## Documentation Files
 
