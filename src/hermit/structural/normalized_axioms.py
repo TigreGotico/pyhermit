@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 # ===========================================================================
 
 
-def _owl_expr_to_internal(expr: object, _max_role_registry: list[object] | None = None) -> object:
+def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = None) -> object:
     """Convert an OWL model class expression to an internal model concept.
 
     This is the bridge between OWLNormalization (which produces OWL model NNF
@@ -288,7 +288,7 @@ class NormalizedAxioms:
     """Temporary storage for negative axioms during normalization."""
 
     # -- Conversion tracking (populated by _owl_expr_to_internal) --
-    max_cardinality_roles: list[object] = field(default_factory=list)
+    max_cardinality_roles: list[Role] = field(default_factory=list)
     """Roles appearing in OWLObjectMaxCardinality restrictions; used for
     non-simplicity validation after OWL→internal conversion."""
 
