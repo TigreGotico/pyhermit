@@ -73,6 +73,9 @@ class PairWiseDirectBlockingChecker(DirectBlockingChecker):
 
         blocker_obj = blocker.get_blocking_object()
         blocked_obj = blocked.get_blocking_object()
+        # If blocker or blocked has no parent, they can't be blocked by pairwise blocking
+        if blocker.parent is None or blocked.parent is None:
+            return False
         blocker_parent_obj = blocker.parent.get_blocking_object()
         blocked_parent_obj = blocked.parent.get_blocking_object()
         assert isinstance(blocker_obj, PairWiseBlockingObject)

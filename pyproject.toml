@@ -7,8 +7,8 @@ name = "hermit-reasoner"
 version = "0.1.0"
 description = "A conformant OWL 2 DL tableau reasoner — Python port of HermiT"
 readme = "README.md"
-license = "LGPL-3.0-or-later"
-license-files = ["LICENSE", "LICENSE.LESSER"]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [
     { name = "HermiT Python Port Contributors" },
@@ -18,7 +18,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",

@@ -201,3 +201,99 @@ class DatatypeRegistry:
     def supported_iris(cls) -> tuple[str, ...]:
         """Return all datatype IRIs currently supported."""
         return tuple(cls._handlers_by_iri.keys())
+
+    @classmethod
+    def is_disjoint_with(cls, datatype_iri1: str, datatype_iri2: str) -> bool:
+        """Check if two datatype value spaces are disjoint.
+
+        For now, different datatype IRIs are not considered disjoint
+        (conservative: assume overlap unless proven otherwise).
+        """
+        # Different built-in XSD datatypes are generally disjoint
+        # but for this port we use a conservative approach
+        return False
+
+    @classmethod
+    def is_subset_of(cls, datatype_iri1: str, datatype_iri2: str) -> bool:
+        """Check if datatype_iri1 is a subset of datatype_iri2.
+
+        Returns True if the value space of datatype_iri1 is a subset of
+        the value space of datatype_iri2.
+        """
+        # Same datatype is a subset of itself
+        if datatype_iri1 == datatype_iri2:
+            return True
+
+        # Specific subtype relationships:
+        # Integer types are subsets of Decimal and Float types
+        int_iri = "http://www.w3.org/2001/XMLSchema#integer"
+        decimal_iri = "http://www.w3.org/2001/XMLSchema#decimal"
+        float_iri = "http://www.w3.org/2001/XMLSchema#float"
+        double_iri = "http://www.w3.org/2001/XMLSchema#double"
+
+        if datatype_iri1 == int_iri and datatype_iri2 in [decimal_iri, float_iri, double_iri]:
+            return True
+
+        # For other cases, assume not a subset
+        return False
+
+    @classmethod
+    def conjoin_with_dr(
+        cls, value_space: ValueSpaceSubset, datatype_restriction: Any
+    ) -> ValueSpaceSubset:
+        """Conjoin a value space with a datatype restriction.
+
+        Returns the intersection of the value space with the restriction.
+        """
+        # Extract facets from the datatype restriction
+        if hasattr(datatype_restriction, 'datatype_iri'):
+            dr_iri = datatype_restriction.datatype_iri
+        else:
+            dr_iri = datatype_restriction.get_datatype_uri()
+
+        if hasattr(datatype_restriction, '_facet_uris'):
+            facet_uris = datatype_restriction._facet_uris
+            facet_values = datatype_restriction._facet_values
+        else:
+            facet_uris = ()
+            facet_values = ()
+
+        # Create a value space subset for this restriction
+        restriction_space = cls.create_value_space_subset(
+            dr_iri, facet_uris, facet_values
+        )
+
+        # Intersect with the current value space
+        return value_space.intersect(restriction_space)
+
+    @classmethod
+    def conjoin_with_dr_negation(
+        cls, value_space: ValueSpaceSubset, datatype_restriction: Any
+    ) -> ValueSpaceSubset:
+        """Conjoin a value space with the negation of a datatype restriction.
+
+        Returns the intersection of the value space with the complement of the restriction.
+        """
+        # Extract facets from the datatype restriction
+        if hasattr(datatype_restriction, 'datatype_iri'):
+            dr_iri = datatype_restriction.datatype_iri
+        else:
+            dr_iri = datatype_restriction.get_datatype_uri()
+
+        if hasattr(datatype_restriction, '_facet_uris'):
+            facet_uris = datatype_restriction._facet_uris
+            facet_values = datatype_restriction._facet_values
+        else:
+            facet_uris = ()
+            facet_values = ()
+
+        # Create a value space subset for this restriction
+        restriction_space = cls.create_value_space_subset(
+            dr_iri, facet_uris, facet_values
+        )
+
+        # Take the complement of the restriction space
+        complement = restriction_space.complement()
+
+        # Intersect with the current value space
+        return value_space.intersect(complement)

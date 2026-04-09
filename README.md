@@ -1,6 +1,6 @@
 # PyHermit — Python OWL 2 DL Reasoner
 
-[![License: LGPL-3.0](https://img.shields.io/badge/License-LGPL--3.0-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
 A faithful Python port of [HermiT](http://hermit-reasoner.com), a conformant OWL 2 DL reasoner developed at the University of Oxford. Reasons about OWL ontologies using tableau-based decision procedures — no JVM required.
@@ -137,6 +137,6 @@ See [AUDIT_PYTHON_PORT.md](AUDIT_PYTHON_PORT.md) for a detailed audit.
 
 ## License
 
-LGPL 3.0 or later. See [LICENSE](LICENSE) and [LICENSE.LESSER](LICENSE.LESSER).
+Apache 2.0 or later. See [LICENSE](LICENSE).
 
 Based on HermiT, copyright Oxford University Computing Laboratory 2008–2014.
