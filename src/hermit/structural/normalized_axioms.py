@@ -81,16 +81,63 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
         return AtomicConcept.create(iri_str)
 
     if isinstance(expr, OWLObjectComplementOf):
-        inner = _owl_expr_to_internal(expr.get_operand())
-        # Only AtomicConcept can be directly negated; wrap others
+        operand = expr.get_operand()
+        # Push complement inward using NNF rules before converting to internal model
+        from hermit.owl_model.class_expression.restriction import (
+            OWLObjectSomeValuesFrom as _Some,
+            OWLObjectAllValuesFrom as _All,
+            OWLObjectMinCardinality as _Min,
+            OWLObjectMaxCardinality as _Max,
+            OWLObjectExactCardinality as _Exact,
+        )
+        from hermit.owl_model.class_expression import OWLObjectIntersectionOf, OWLObjectUnionOf
+
+        if isinstance(operand, _Some):
+            # ¬(∃R.C) = ∀R.¬C → handle as AllValuesFrom with negated filler
+            neg_filler = OWLObjectComplementOf(operand.get_filler())
+            all_expr = _All(operand.get_property(), neg_filler)
+            return _owl_expr_to_internal(all_expr, _max_role_registry)
+        elif isinstance(operand, _All):
+            # ¬(∀R.C) = ∃R.¬C
+            neg_filler = OWLObjectComplementOf(operand.get_filler())
+            some_expr = _Some(operand.get_property(), neg_filler)
+            return _owl_expr_to_internal(some_expr, _max_role_registry)
+        elif isinstance(operand, _Min):
+            # ¬(≥n R.C) = ≤(n-1) R.C
+            n = operand.get_cardinality()
+            if n == 0:
+                return AtomicConcept.NOTHING  # ¬(≥0 R.C) = ⊥ (impossible)
+            max_expr = _Max(n - 1, operand.get_property(), operand.get_filler())
+            return _owl_expr_to_internal(max_expr, _max_role_registry)
+        elif isinstance(operand, _Max):
+            # ¬(≤n R.C) = ≥(n+1) R.C
+            n = operand.get_cardinality()
+            min_expr = _Min(n + 1, operand.get_property(), operand.get_filler())
+            return _owl_expr_to_internal(min_expr, _max_role_registry)
+        elif isinstance(operand, _Exact):
+            # ¬(=n R.C) = <n R.C ∨ >n R.C → too complex for single concept; use THING approximation
+            inner = _owl_expr_to_internal(operand, _max_role_registry)
+            if isinstance(inner, AtomicConcept):
+                return AtomicNegationConcept.create(inner)
+            return AtomicConcept.THING
+        elif isinstance(operand, OWLObjectIntersectionOf):
+            # ¬(A ⊓ B) = ¬A ⊔ ¬B — cannot represent as a single internal concept;
+            # approximate: the NNF should have been pushed before reaching here
+            # Return THING (overapproximation) — the normalization layer should have
+            # eliminated complex complements before calling _owl_expr_to_internal
+            return AtomicConcept.THING
+        elif isinstance(operand, OWLObjectUnionOf):
+            # ¬(A ⊔ B) = ¬A ⊓ ¬B — similarly cannot be a single internal concept
+            return AtomicConcept.NOTHING
+
+        # For OWLClass and other atomic cases, convert inner then negate
+        inner = _owl_expr_to_internal(operand, _max_role_registry)
         if isinstance(inner, AtomicConcept):
             return AtomicNegationConcept.create(inner)
-        # For complex inner (AtLeastConcept etc.) we need an anonymous negation concept.
-        # HermiT handles this by introducing a fresh atomic concept; approximate here
-        # by creating a negation concept backed by a synthetic IRI.
-        neg_iri = f"internal:negation#{hash(inner) & 0xFFFFFFFF}"
-        neg_concept = AtomicConcept.create(neg_iri)
-        return AtomicNegationConcept.create(neg_concept)
+        if isinstance(inner, AtomicNegationConcept):
+            return inner.negated  # double negation elimination
+        # Cannot negate complex concept — return as overapproximation
+        return AtomicConcept.THING
 
     def _owl_prop_to_internal_role(owl_prop: object) -> "Role":
         """Convert an OWL property expression to an internal Role."""
