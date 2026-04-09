@@ -773,8 +773,6 @@ class InstanceManager:
             self.m_interrupt_flag.start_task()
             try:
                 self._initialize_individuals_for_nodes()
-                # DEBUG: Check if individuals_for_nodes was populated
-                # print(f"DEBUG: After _initialize_individuals_for_nodes(), m_individuals_for_nodes has {len(self.m_individuals_for_nodes)} entries")
                 if not self.m_classes_initialised:
                     self._initialize_same_as()
                 completed_steps = self._read_off_property_instances_by_individual(
@@ -899,7 +897,6 @@ class InstanceManager:
         )
         self.m_ternary_retrieval_1_bound.open()
         tuple_buffer = self.m_ternary_retrieval_1_bound.get_tuple_buffer()
-        assertion_count = 0
         while not self.m_ternary_retrieval_1_bound.after_last():
             role_object = tuple_buffer[0]
             successor_node = tuple_buffer[2]
@@ -1865,8 +1862,7 @@ class InstanceManager:
     def _is_role_instance(
         self, role: Role, individual1: Individual, individual2: Individual
     ) -> bool:
-        from hermit.model import Atom as AtomCls, AtomicRole
-        from hermit.tableau.node import Node
+        from hermit.model import Atom as AtomCls
 
         ind1 = individual1
         ind2 = individual2

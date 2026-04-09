@@ -16,7 +16,7 @@ Pipeline::
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hermit.owl_model.owl_axiom import OWLAxiom
@@ -99,7 +99,7 @@ class _OwlreadyMapper:
             OWLObjectMinCardinality, OWLObjectMaxCardinality, OWLObjectExactCardinality,
             OWLObjectOneOf, OWLThing, OWLNothing,
         )
-        from hermit.owl_model.owl_property import OWLObjectProperty, OWLObjectInverseOf
+        from hermit.owl_model.owl_property import OWLObjectProperty
 
         # owl:Thing / owl:Nothing
         if expr is or2.Thing:
@@ -173,33 +173,33 @@ class _OwlreadyMapper:
             cardinality = getattr(expr, "cardinality", None)
 
             # owlready2 restriction type constants
-            SOME = getattr(or2, "SOME", 24)
-            ONLY = getattr(or2, "ONLY", 25)
-            MIN = getattr(or2, "MIN", 26)
-            MAX = getattr(or2, "MAX", 27)
-            EXACTLY = getattr(or2, "EXACTLY", 28)
-            HAS_SELF = getattr(or2, "HAS_SELF", 11)
-            VALUE = getattr(or2, "VALUE", 29)
+            some = getattr(or2, "SOME", 24)
+            only = getattr(or2, "ONLY", 25)
+            min_ = getattr(or2, "MIN", 26)
+            max_ = getattr(or2, "MAX", 27)
+            exactly = getattr(or2, "EXACTLY", 28)
+            has_self = getattr(or2, "HAS_SELF", 11)
+            value_type = getattr(or2, "VALUE", 29)
 
             filler = self._map_class_expression(value) if value is not None else OWLThing
 
-            if rtype == SOME:
+            if rtype == some:
                 if filler is None:
                     return None
                 return OWLObjectSomeValuesFrom(owl_prop, filler)
-            elif rtype == ONLY:
+            elif rtype == only:
                 if filler is None:
                     return None
                 return OWLObjectAllValuesFrom(owl_prop, filler)
-            elif rtype == MIN and cardinality is not None:
+            elif rtype == min_ and cardinality is not None:
                 return OWLObjectMinCardinality(cardinality, owl_prop, filler or OWLThing)
-            elif rtype == MAX and cardinality is not None:
+            elif rtype == max_ and cardinality is not None:
                 return OWLObjectMaxCardinality(cardinality, owl_prop, filler or OWLThing)
-            elif rtype == EXACTLY and cardinality is not None:
+            elif rtype == exactly and cardinality is not None:
                 return OWLObjectExactCardinality(cardinality, owl_prop, filler or OWLThing)
-            elif rtype == HAS_SELF:
+            elif rtype == has_self:
                 return OWLObjectHasSelf(owl_prop)
-            elif rtype == VALUE and value is not None:
+            elif rtype == value_type and value is not None:
                 ind_iri = getattr(value, "iri", None)
                 if ind_iri:
                     from hermit.owl_model.owl_individual import OWLNamedIndividual
@@ -213,7 +213,6 @@ class _OwlreadyMapper:
 
     def _extract_class_axioms(self, onto: object, axioms: list) -> None:
         """Extract SubClassOf, EquivalentClasses, DisjointClasses."""
-        or2 = self._or2
         from hermit.owl_model.owl_axiom import (
             OWLSubClassOfAxiom,
             OWLEquivalentClassesAxiom,

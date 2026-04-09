@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 # ===========================================================================
 
 
-def _owl_expr_to_internal(expr: object, _max_role_registry: list | None = None) -> object:
+def _owl_expr_to_internal(expr: object, _max_role_registry: list[object] | None = None) -> object:
     """Convert an OWL model class expression to an internal model concept.
 
     This is the bridge between OWLNormalization (which produces OWL model NNF
@@ -65,7 +65,6 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list | None = None) 
         OWLObjectAllValuesFrom,
         OWLObjectMinCardinality,
     )
-    from hermit.owl_model.owl_property import OWLObjectInverseOf  # type: ignore[attr-defined]
 
     # Already an internal model concept — pass through
     if hasattr(expr, "accept"):
@@ -91,7 +90,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list | None = None) 
         neg_concept = AtomicConcept.create(neg_iri)
         return AtomicNegationConcept.create(neg_concept)
 
-    def _owl_prop_to_internal_role(owl_prop: object) -> object:
+    def _owl_prop_to_internal_role(owl_prop: object) -> Role:  # type: ignore[return]
         """Convert an OWL property expression to an internal Role."""
         inv_of_cls: type | None = None
         try:
@@ -100,7 +99,9 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list | None = None) 
         except ImportError:
             pass
         if inv_of_cls is not None and isinstance(owl_prop, inv_of_cls):
-            base_iri = owl_prop.get_inverse().iri.as_str()  # type: ignore[union-attr]
+            base_prop = getattr(owl_prop, "get_inverse", lambda: None)()
+            base_iri_obj = getattr(base_prop, "iri", None)
+            base_iri = base_iri_obj.as_str() if hasattr(base_iri_obj, "as_str") else str(base_iri_obj)
             return InverseRole.create(AtomicRole.create(base_iri))
         iri_str = getattr(owl_prop, "iri", None)
         if iri_str is None:
@@ -123,7 +124,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list | None = None) 
         if isinstance(inner_filler, AtomicConcept):
             neg_filler: LiteralConcept = AtomicNegationConcept.create(inner_filler)
         elif isinstance(inner_filler, AtomicNegationConcept):
-            neg_filler = inner_filler.get_negated_concept()  # type: ignore[assignment]
+            neg_filler = inner_filler.negated
         else:
             neg_filler = AtomicNegationConcept.create(AtomicConcept.THING)
         at_least = AtLeastConcept.create(1, role, neg_filler)  # type: ignore[arg-type]
@@ -273,7 +274,7 @@ class NormalizedAxioms:
     """Temporary storage for negative axioms during normalization."""
 
     # -- Conversion tracking (populated by _owl_expr_to_internal) --
-    max_cardinality_roles: list = field(default_factory=list)
+    max_cardinality_roles: list[object] = field(default_factory=list)
     """Roles appearing in OWLObjectMaxCardinality restrictions; used for
     non-simplicity validation after OWL→internal conversion."""
 

@@ -337,7 +337,7 @@ class OWLNormalization:
         self, axiom: OWLClassAssertionAxiom, result: NormalizedAxioms
     ) -> None:
         """Route ClassAssertion(C, a) to typed positive_concept_facts."""
-        from hermit.model import AtomicConcept, Individual
+        from hermit.model import AtomicConcept
         from hermit.owl_model.class_expression import OWLClass
         ind = _owl_ind_to_internal(axiom.get_individual())
         ce = axiom.get_class_expression()
@@ -369,7 +369,7 @@ class OWLNormalization:
         self, axiom: OWLDataPropertyAssertionAxiom, result: NormalizedAxioms
     ) -> None:
         """Route DataPropertyAssertion(P, a, v) to typed positive_data_facts."""
-        from hermit.model import AtomicRole, Constant, Individual
+        from hermit.model import AtomicRole, Constant
         from hermit.owl_model.owl_property import OWLDataProperty
         ind = _owl_ind_to_internal(axiom.get_subject())
         owl_prop = axiom.get_property()
@@ -411,6 +411,6 @@ class OWLNormalization:
 
     def _fresh_concept(self, base_name: str = "internal:def") -> OWLClass:
         """Generate a fresh named atomic concept."""
-        iri_str = f"{base_name}#{self._replacement_counter}"
+        idx = self._replacement_counter
         self._replacement_counter += 1
-        return OWLClass(IRI(f"{base_name}#", str(self._replacement_counter - 1)))
+        return OWLClass(IRI(f"{base_name}#", str(idx)))

@@ -255,7 +255,13 @@ class Retrieval(ABC):
 
 
 class _SimpleRetrieval(Retrieval):
-    """Basic retrieval that scans all tuples matching a bound mask."""
+    """Basic retrieval that scans all tuples matching a bound mask.
+
+    Semantics (mirrors Java HermiT):
+    - ``open()`` resets to start and pre-loads the first matching tuple.
+    - ``after_last()`` returns True when no current valid tuple is loaded.
+    - ``next()`` advances to and loads the next matching tuple.
+    """
 
     def __init__(
         self,
@@ -274,9 +280,11 @@ class _SimpleRetrieval(Retrieval):
         self._start_index = 0
         self._end_index = 0
         self._arity = len(bound_mask)
+        self._after_last = True
 
     def clear(self) -> None:
         self._current_index = -1
+        self._after_last = True
         # Reset in-place to preserve shared references (evaluator CopyValues workers
         # hold a reference to the same list object).
         for i in range(len(self._tuple_buffer)):
@@ -285,7 +293,6 @@ class _SimpleRetrieval(Retrieval):
             self._bindings_buffer[i] = None
 
     def open(self) -> None:
-        table = self._extension_table.m_tuple_table
         arity = self._extension_table.m_tuple_arity
         slot_size = arity + 1
         if self._view == "EXTENSION_THIS":
@@ -302,8 +309,12 @@ class _SimpleRetrieval(Retrieval):
             self._end_index = self._extension_table._after_delta_new_tuple_index * slot_size
 
         self._current_index = self._start_index
+        self._after_last = True
+        # Pre-load first match (Java semantics: open() positions at first result)
+        self._find_next()
 
-    def next(self) -> None:
+    def _find_next(self) -> None:
+        """Search forward from current position and load first match into buffer."""
         table = self._extension_table.m_tuple_table
         arity = self._extension_table.m_tuple_arity
         slot_size = arity + 1
@@ -320,12 +331,18 @@ class _SimpleRetrieval(Retrieval):
             if match:
                 table.retrieve_tuple(self._tuple_buffer, self._current_index)
                 self._current_index += slot_size
+                self._after_last = False
                 return
             self._current_index += slot_size
-        self._current_index = self._end_index  # past end
+        self._current_index = self._end_index
+        self._after_last = True
+
+    def next(self) -> None:
+        self._after_last = True
+        self._find_next()
 
     def after_last(self) -> bool:
-        return self._current_index >= self._end_index
+        return self._after_last
 
     def get_tuple_buffer(self) -> list[Any]:
         return self._tuple_buffer
@@ -348,6 +365,11 @@ class _FullRetrieval(Retrieval):
     Mirrors the Java ``ExtensionTable.createRetrieval(int[], Object[], Object[], boolean, View)``.
     ``binding_positions[i] == -1`` means slot i is unbound (free variable);
     otherwise it is the index in ``bindings_buffer`` containing the bound value.
+
+    Semantics (mirrors Java HermiT):
+    - ``open()`` resets to start and pre-loads the first matching tuple.
+    - ``after_last()`` returns True when no current valid tuple is loaded.
+    - ``next()`` advances to and loads the next matching tuple.
     """
 
     def __init__(
@@ -367,14 +389,20 @@ class _FullRetrieval(Retrieval):
         self._view = view
         self._current_index = -1
         self._arity = extension_table.m_tuple_arity
+        self._after_last = True
 
     def clear(self) -> None:
         self._current_index = -1
+        self._after_last = True
 
     def open(self) -> None:
         self._current_index = 0
+        self._after_last = True
+        # Pre-load first match (Java semantics: open() positions at first result)
+        self._find_next()
 
-    def next(self) -> None:
+    def _find_next(self) -> None:
+        """Search forward from current position and load first match into buffer."""
         table = self._extension_table.m_tuple_table
         arity = self._arity
         slot_size = arity + 1
@@ -393,12 +421,18 @@ class _FullRetrieval(Retrieval):
             if match:
                 table.retrieve_tuple(self._tuple_buffer, self._current_index)
                 self._current_index += slot_size
+                self._after_last = False
                 return
             self._current_index += slot_size
         self._current_index = table.size
+        self._after_last = True
+
+    def next(self) -> None:
+        self._after_last = True
+        self._find_next()
 
     def after_last(self) -> bool:
-        return self._current_index >= self._extension_table.m_tuple_table.size
+        return self._after_last
 
     def get_tuple_buffer(self) -> list[Any]:
         return self._tuple_buffer
@@ -1162,19 +1196,6 @@ class ExtensionManager:
                 f"add_assertion requires 3-5 additional arguments, got {n}"
             )
 
-    def add_assertion_binary(
-        self,
-        dl_predicate: DLPredicate,
-        node0: Node,
-        node1: Node,
-        dependency_set: DependencySet,
-        is_core: bool,
-    ) -> bool:
-        """Add a binary assertion (DLPredicate on two nodes)."""
-        return self.add_role_assertion(
-            dl_predicate, node0, node1, dependency_set, is_core
-        )
-
     def add_assertion_unary(
         self,
         dl_predicate: DLPredicate,
@@ -1217,8 +1238,12 @@ class ExtensionManager:
                 node0, node1, dependency_set
             )
         # Canonicalize nodes in case they were merged
-        node0 = node0.get_canonical_node()
-        node1 = node1.get_canonical_node()
+        if node0 is not None:
+            node0 = node0.get_canonical_node()
+        if node1 is not None:
+            node1 = node1.get_canonical_node()
+        if node0 is None or node1 is None:
+            return False
         if self._add_active:
             raise RuntimeError("ExtensionManager is not reentrant.")
         self._add_active = True

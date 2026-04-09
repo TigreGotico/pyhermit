@@ -62,8 +62,8 @@ class ObjectPropertyInclusionManager:
         new_clauses: list[DLClause] = []
         new_positive_concept_facts: list[tuple] = []
 
-        X = Variable.create("X")
-        Y = Variable.create("Y")
+        var_x = Variable.create("X")
+        var_y = Variable.create("Y")
 
         from hermit.model import AtomicRole, InverseRole, Inequality
 
@@ -116,10 +116,10 @@ class ObjectPropertyInclusionManager:
             new_positive_concept_facts.append((subject_ind, fresh_concept))
 
             # DL clause: F_i(X) ∧ op(X, Y) → Y ≠ obj
-            head_atom = Atom.create(Inequality.INSTANCE, Y, obj_ind)
+            head_atom = Atom.create(Inequality.INSTANCE, var_y, obj_ind)
             body_atoms = (
-                Atom.create(fresh_concept, X),
-                Atom.create(role_pred, X, Y),
+                Atom.create(fresh_concept, var_x),
+                Atom.create(role_pred, var_x, var_y),
             )
             new_clauses.append(DLClause.create((head_atom,), body_atoms))
             facts_to_remove.append(fact)

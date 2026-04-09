@@ -319,26 +319,34 @@ class DatatypeRegistry:
         if datatype_iri1 == datatype_iri2:
             return True
 
-        XSD = "http://www.w3.org/2001/XMLSchema#"
+        xsd = "http://www.w3.org/2001/XMLSchema#"
 
         # Define type hierarchy for XSD types
         # Maps each type to its parent type(s)
         type_hierarchy = {
-            XSD + "long": [XSD + "integer", XSD + "decimal"],
-            XSD + "int": [XSD + "long", XSD + "integer", XSD + "decimal"],
-            XSD + "short": [XSD + "int", XSD + "long", XSD + "integer", XSD + "decimal"],
-            XSD + "byte": [XSD + "short", XSD + "int", XSD + "long", XSD + "integer", XSD + "decimal"],
-            XSD + "nonNegativeInteger": [XSD + "integer", XSD + "decimal"],
-            XSD + "positiveInteger": [XSD + "nonNegativeInteger", XSD + "integer", XSD + "decimal"],
-            XSD + "unsignedLong": [XSD + "nonNegativeInteger", XSD + "integer", XSD + "decimal"],
-            XSD + "unsignedInt": [XSD + "unsignedLong", XSD + "nonNegativeInteger", XSD + "integer", XSD + "decimal"],
-            XSD + "unsignedShort": [XSD + "unsignedInt", XSD + "unsignedLong", XSD + "nonNegativeInteger", XSD + "integer", XSD + "decimal"],
-            XSD + "unsignedByte": [XSD + "unsignedShort", XSD + "unsignedInt", XSD + "unsignedLong", XSD + "nonNegativeInteger", XSD + "integer", XSD + "decimal"],
-            XSD + "nonPositiveInteger": [XSD + "integer", XSD + "decimal"],
-            XSD + "negativeInteger": [XSD + "nonPositiveInteger", XSD + "integer", XSD + "decimal"],
-            XSD + "integer": [XSD + "decimal"],
-            XSD + "decimal": [XSD + "float", XSD + "double"],
-            XSD + "float": [XSD + "double"],
+            xsd + "long": [xsd + "integer", xsd + "decimal"],
+            xsd + "int": [xsd + "long", xsd + "integer", xsd + "decimal"],
+            xsd + "short": [xsd + "int", xsd + "long", xsd + "integer", xsd + "decimal"],
+            xsd + "byte": [xsd + "short", xsd + "int", xsd + "long", xsd + "integer", xsd + "decimal"],
+            xsd + "nonNegativeInteger": [xsd + "integer", xsd + "decimal"],
+            xsd + "positiveInteger": [xsd + "nonNegativeInteger", xsd + "integer", xsd + "decimal"],
+            xsd + "unsignedLong": [xsd + "nonNegativeInteger", xsd + "integer", xsd + "decimal"],
+            xsd + "unsignedInt": [
+                xsd + "unsignedLong", xsd + "nonNegativeInteger", xsd + "integer", xsd + "decimal"
+            ],
+            xsd + "unsignedShort": [
+                xsd + "unsignedInt", xsd + "unsignedLong",
+                xsd + "nonNegativeInteger", xsd + "integer", xsd + "decimal",
+            ],
+            xsd + "unsignedByte": [
+                xsd + "unsignedShort", xsd + "unsignedInt", xsd + "unsignedLong",
+                xsd + "nonNegativeInteger", xsd + "integer", xsd + "decimal",
+            ],
+            xsd + "nonPositiveInteger": [xsd + "integer", xsd + "decimal"],
+            xsd + "negativeInteger": [xsd + "nonPositiveInteger", xsd + "integer", xsd + "decimal"],
+            xsd + "integer": [xsd + "decimal"],
+            xsd + "decimal": [xsd + "float", xsd + "double"],
+            xsd + "float": [xsd + "double"],
         }
 
         # Check if datatype_iri1 is in the parent list of datatype_iri2
