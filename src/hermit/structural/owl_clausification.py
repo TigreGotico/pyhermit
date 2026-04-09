@@ -538,8 +538,8 @@ class NormalizedAxiomClausifier:
             # ≤0 R.C: A(X) ∧ R(X,Y) ∧ C(Y) → ⊥
             y_var = Variable.create("Y")
             body = tuple(saved_body) + (
-                Atom.create(role, X, y_var),
-                Atom.create(filler, y_var),
+                Atom.create(role, X, y_var),  # type: ignore[arg-type]
+                Atom.create(filler, y_var),  # type: ignore[arg-type]
             )
             self._extra_clauses: list[DLClause]
             if not hasattr(self, "_extra_clauses"):
@@ -553,12 +553,12 @@ class NormalizedAxiomClausifier:
             for i in range(n + 1):
                 for j in range(i + 1, n + 1):
                     body = tuple(saved_body) + (
-                        Atom.create(role, X, y_vars[i]),
-                        Atom.create(filler, y_vars[i]),
-                        Atom.create(role, X, y_vars[j]),
-                        Atom.create(filler, y_vars[j]),
+                        Atom.create(role, X, y_vars[i]),  # type: ignore[arg-type]
+                        Atom.create(filler, y_vars[i]),  # type: ignore[arg-type]
+                        Atom.create(role, X, y_vars[j]),  # type: ignore[arg-type]
+                        Atom.create(filler, y_vars[j]),  # type: ignore[arg-type]
                     )
-                    head = (Atom.create(Inequality.INSTANCE, y_vars[i], y_vars[j]),)
+                    head = (Atom.create(Inequality.INSTANCE, y_vars[i], y_vars[j]),)  # type: ignore[arg-type]
                     self._extra_clauses.append(DLClause.create(head, body))
 
         # No head atoms from this visit — the clauses are in _extra_clauses

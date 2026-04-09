@@ -321,7 +321,7 @@ class OWLNormalization:
 
         # Body: A(X) ∧ R(X, Y)
         # Head: C(Y)
-        body_atoms: list[Atom] = [Atom.create(role, x_var, y_var)]
+        body_atoms: list[Atom] = [Atom.create(role, x_var, y_var)]  # type: ignore[arg-type]
         if hasattr(sub_concept, "arity") or hasattr(sub_concept, "accept"):
             # sub_concept is a valid DLPredicate — add as guard
             from hermit.model import AtomicNegationConcept
@@ -330,9 +330,9 @@ class OWLNormalization:
                 # we add the positive version as body guard
                 body_atoms.insert(0, Atom.create(sub_concept.negated, x_var))
             else:
-                body_atoms.insert(0, Atom.create(sub_concept, x_var))
+                body_atoms.insert(0, Atom.create(sub_concept, x_var))  # type: ignore[arg-type]
 
-        head_atom = Atom.create(filler_concept, y_var)
+        head_atom = Atom.create(filler_concept, y_var)  # type: ignore[arg-type]
         clause = DLClause.create((head_atom,), tuple(body_atoms))
         result.direct_dl_clauses.append(clause)
 

@@ -171,29 +171,12 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
         return AtLeastConcept.create(1, role, filler)
 
     if isinstance(expr, OWLObjectAllValuesFrom):
-        # TODO: ∀R.C is approximated — needs AtMostConcept or OWLNormalization-level handling.
-        # The correct NNF encoding of A ⊑ ∀R.C is the DL clause A(X) ∧ R(X,Y) → C(Y), which
-        # requires two-variable encoding at the clausifier level.  The current architecture has
-        # no AtMostConcept and NormalizedAxiomClausifier only handles single-concept atoms.
-        # A full fix requires either:
-        #   (a) adding AtMostConcept to the model and a clausifier visitor, OR
-        #   (b) handling SubClassOf(A, ∀R.B) in OWLNormalization before add_concept_inclusion
-        #       and emitting a raw DL clause directly.
-        # Until then, this synthetic-concept approximation keeps the pipeline from crashing but
-        # DOES NOT produce sound reasoning for ∀R.C subsumption through the OWL pipeline.
-        role = _owl_prop_to_internal_role(expr.get_property())
-        inner_filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
-        from hermit.model import LiteralConcept
-        if isinstance(inner_filler, AtomicConcept):
-            neg_filler: LiteralConcept = AtomicNegationConcept.create(inner_filler)
-        elif isinstance(inner_filler, AtomicNegationConcept):
-            neg_filler = inner_filler.negated
-        else:
-            neg_filler = AtomicNegationConcept.create(AtomicConcept.THING)
-        at_least = AtLeastConcept.create(1, role, neg_filler)
-        # Return negation of ∃R.¬C → synthetic atomic negation concept
-        neg_iri = f"internal:allvalues#{hash(at_least) & 0xFFFFFFFF}"
-        return AtomicNegationConcept.create(AtomicConcept.create(neg_iri))
+        # ∀R.C is handled upstream in OWLNormalization._process_sub_class_of()
+        # by emitting a two-variable DL clause A(X) ∧ R(X,Y) → C(Y) directly.
+        # If we reach here, it means ∀R.C appears inside a complex expression
+        # (e.g. disjunction disjunct) rather than as the direct super-class.
+        # Fall through to the approximation: treat as owl:Thing (overapproximation).
+        return AtomicConcept.THING
 
     if isinstance(expr, OWLObjectMinCardinality):
         n = expr.get_cardinality()
@@ -233,7 +216,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
         if _max_role_registry is not None:
             _max_role_registry.append(role)
         # Return both constraints as a list; caller must split into two inclusions
-        return [AtLeastConcept.create(n, role, filler), AtMostConcept.create(n, role, filler)]  # type: ignore[return-value]
+        return [AtLeastConcept.create(n, role, filler), AtMostConcept.create(n, role, filler)]
 
     # Fallback: unknown expression — return as-is and let the clausifier handle it
     return expr
@@ -438,7 +421,7 @@ class NormalizedAxioms:
             if isinstance(converted, list):
                 # ExactCardinality: each constraint becomes its own concept inclusion
                 for part in converted:
-                    self.concept_inclusions.append((part,))  # type: ignore[arg-type]
+                    self.concept_inclusions.append((part,))
             else:
                 self.concept_inclusions.append((converted,))  # type: ignore[arg-type]
 
