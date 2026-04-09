@@ -47,8 +47,10 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
       OWLClass(iri)                       → AtomicConcept.create(iri)
       OWLObjectComplementOf(OWLClass(i))  → AtomicNegationConcept.create(AtomicConcept.create(i))
       OWLObjectSomeValuesFrom(R, C)       → AtLeastConcept.create(1, role, concept)
-      OWLObjectAllValuesFrom(R, C)        → AtomicNegationConcept wrapping AtLeastConcept(¬C)
+      OWLObjectAllValuesFrom(R, C)        → handled upstream in OWLNormalization (DL clause)
       OWLObjectMinCardinality(n, R, C)    → AtLeastConcept.create(n, role, concept)
+      OWLObjectMaxCardinality(n, R, C)    → AtMostConcept.create(n, role, concept)
+      OWLObjectExactCardinality(n, R, C)  → [AtLeastConcept(n,..), AtMostConcept(n,..)] (list)
       Internal model objects              → returned as-is
     """
     from hermit.model import (
@@ -155,23 +157,36 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
             filler = AtomicConcept.THING
         return AtLeastConcept.create(n, role, filler)
 
-    from hermit.owl_model.class_expression.restriction import OWLObjectMaxCardinality
+    from hermit.owl_model.class_expression.restriction import (
+        OWLObjectMaxCardinality,
+        OWLObjectExactCardinality,
+    )
+    from hermit.model import AtMostConcept
+
     if isinstance(expr, OWLObjectMaxCardinality):
-        # ≤n R.C ≡ ¬∃(n+1)R.C — represent as AtomicNegationConcept wrapping a
-        # synthetic concept; the role is registered for non-simplicity checking.
         n = expr.get_cardinality()
         role = _owl_prop_to_internal_role(expr.get_property())
         filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
         from hermit.model import LiteralConcept
         if not isinstance(filler, LiteralConcept):
             filler = AtomicConcept.THING
-        at_least_plus1 = AtLeastConcept.create(n + 1, role, filler)
-        max_iri = f"internal:atmost#{hash(at_least_plus1) & 0xFFFFFFFF}"
-        synthetic = AtomicConcept.create(max_iri)
-        neg = AtomicNegationConcept.create(synthetic)
         if _max_role_registry is not None:
             _max_role_registry.append(role)
-        return neg
+        return AtMostConcept.create(n, role, filler)
+
+    if isinstance(expr, OWLObjectExactCardinality):
+        # =n R.C decomposes to ≥n R.C ∧ ≤n R.C
+        # Return a sentinel tuple; add_concept_inclusion handles splitting.
+        n = expr.get_cardinality()
+        role = _owl_prop_to_internal_role(expr.get_property())
+        filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
+        from hermit.model import LiteralConcept
+        if not isinstance(filler, LiteralConcept):
+            filler = AtomicConcept.THING
+        if _max_role_registry is not None:
+            _max_role_registry.append(role)
+        # Return both constraints as a list; caller must split into two inclusions
+        return [AtLeastConcept.create(n, role, filler), AtMostConcept.create(n, role, filler)]  # type: ignore[return-value]
 
     # Fallback: unknown expression — return as-is and let the clausifier handle it
     return expr
@@ -335,10 +350,23 @@ class NormalizedAxioms:
         from hermit.owl_model.class_expression import OWLObjectUnionOf
         reg = self.max_cardinality_roles
         if isinstance(simplified, OWLObjectUnionOf):
-            disjuncts = [_owl_expr_to_internal(op, reg) for op in simplified.operands()]
+            disjuncts_raw = [_owl_expr_to_internal(op, reg) for op in simplified.operands()]
+            # Expand any list entries (from ExactCardinality decomposition)
+            disjuncts: list[object] = []
+            for d in disjuncts_raw:
+                if isinstance(d, list):
+                    disjuncts.extend(d)
+                else:
+                    disjuncts.append(d)
             self.concept_inclusions.append(tuple(disjuncts))  # type: ignore[arg-type]
         else:
-            self.concept_inclusions.append((_owl_expr_to_internal(simplified, reg),))  # type: ignore[arg-type]
+            converted = _owl_expr_to_internal(simplified, reg)
+            if isinstance(converted, list):
+                # ExactCardinality: each constraint becomes its own concept inclusion
+                for part in converted:
+                    self.concept_inclusions.append((part,))  # type: ignore[arg-type]
+            else:
+                self.concept_inclusions.append((converted,))  # type: ignore[arg-type]
 
 
 # ===========================================================================
