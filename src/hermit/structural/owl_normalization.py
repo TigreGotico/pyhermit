@@ -234,9 +234,20 @@ class OWLNormalization:
     def _process_sub_class_of(
         self, axiom: OWLSubClassOfAxiom, result: NormalizedAxioms
     ) -> None:
-        """Process SubClassOf axiom: A ⊑ B → ¬A ⊔ B."""
+        """Process SubClassOf axiom: A ⊑ B → ¬A ⊔ B.
+
+        Special case: A ⊑ ∀R.C is handled by emitting a two-variable DL clause
+        A(X) ∧ R(X,Y) → C(Y) directly, bypassing the concept-inclusion path.
+        """
+        from hermit.owl_model.class_expression.restriction import OWLObjectAllValuesFrom
+
         sub_expr = self._expression_manager.get_nnf(axiom.sub_class)
         super_expr = self._expression_manager.get_nnf(axiom.super_class)
+
+        # Intercept ∀R.C: emit two-variable DL clause directly
+        if isinstance(super_expr, OWLObjectAllValuesFrom):
+            self._emit_all_values_from_clause(sub_expr, super_expr, result)
+            return
 
         # ¬sub ⊔ super
         complement = self._expression_manager.get_complement_nnf(sub_expr)
@@ -250,6 +261,60 @@ class OWLNormalization:
         # Simplify and normalize
         simplified = self._expression_manager.get_simplified(inclusion)
         result.add_concept_inclusion(simplified)
+
+    def _emit_all_values_from_clause(
+        self,
+        sub_expr: object,
+        all_values: object,
+        result: NormalizedAxioms,
+    ) -> None:
+        """Emit A(X) ∧ R(X,Y) → C(Y) for SubClassOf(A, ∀R.C).
+
+        The two-variable DL clause is added directly to result.direct_dl_clauses
+        so that OWLClausification can pass it straight to DLOntology.
+        """
+        from hermit.structural.normalized_axioms import _owl_expr_to_internal
+        from hermit.model import (
+            Atom,
+            AtomicConcept,
+            DLClause,
+            Variable,
+        )
+
+        x_var = Variable.create("X")
+        y_var = Variable.create("Y")
+
+        # Convert subclass to internal body concept (guard atom)
+        sub_concept = _owl_expr_to_internal(sub_expr, result.max_cardinality_roles)
+
+        # Extract role and filler from ∀R.C
+        owl_prop = getattr(all_values, "get_property", lambda: None)()
+        owl_filler = getattr(all_values, "get_filler", lambda: None)()
+
+        from hermit.structural.normalized_axioms import _owl_prop_to_internal_role_standalone
+        role = _owl_prop_to_internal_role_standalone(owl_prop)
+        filler_concept = _owl_expr_to_internal(owl_filler, result.max_cardinality_roles)
+
+        from hermit.model import LiteralConcept
+        if not isinstance(filler_concept, LiteralConcept):
+            filler_concept = AtomicConcept.THING
+
+        # Body: A(X) ∧ R(X, Y)
+        # Head: C(Y)
+        body_atoms: list[Atom] = [Atom.create(role, x_var, y_var)]
+        if hasattr(sub_concept, "arity") or hasattr(sub_concept, "accept"):
+            # sub_concept is a valid DLPredicate — add as guard
+            from hermit.model import AtomicNegationConcept
+            if isinstance(sub_concept, AtomicNegationConcept):
+                # A negated concept in body position means the guard is ¬A(X);
+                # we add the positive version as body guard
+                body_atoms.insert(0, Atom.create(sub_concept.negated, x_var))
+            else:
+                body_atoms.insert(0, Atom.create(sub_concept, x_var))
+
+        head_atom = Atom.create(filler_concept, y_var)
+        clause = DLClause.create((head_atom,), tuple(body_atoms))
+        result.direct_dl_clauses.append(clause)
 
     def _process_equivalent_classes(
         self, axiom: OWLEquivalentClassesAxiom, result: NormalizedAxioms

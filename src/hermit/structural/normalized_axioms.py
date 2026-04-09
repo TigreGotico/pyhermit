@@ -192,6 +192,29 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
     return expr
 
 
+def _owl_prop_to_internal_role_standalone(owl_prop: object) -> "Role":
+    """Convert an OWL property expression to an internal Role (standalone helper)."""
+    from hermit.model import AtomicRole, InverseRole
+    try:
+        from hermit.owl_model.owl_property import OWLObjectInverseOf as _InvOf
+        if isinstance(owl_prop, _InvOf):
+            base_prop = getattr(owl_prop, "get_inverse", lambda: None)()
+            base_iri_obj = getattr(base_prop, "iri", None)
+            if base_iri_obj is None:
+                base_iri = str(base_prop)
+            elif hasattr(base_iri_obj, "as_str"):
+                base_iri = str(base_iri_obj.as_str())
+            else:
+                base_iri = str(base_iri_obj)
+            return InverseRole.create(AtomicRole.create(base_iri))
+    except ImportError:
+        pass
+    iri_str = getattr(owl_prop, "iri", None)
+    if iri_str is None:
+        return AtomicRole.create(str(owl_prop))
+    return AtomicRole.create(iri_str.as_str() if hasattr(iri_str, "as_str") else str(iri_str))
+
+
 # ===========================================================================
 # NormalizedAxioms
 # ===========================================================================
@@ -301,6 +324,10 @@ class NormalizedAxioms:
 
     negative_facts: list[object] = field(default_factory=list)
     """Temporary storage for negative axioms during normalization."""
+
+    # -- Direct DL clauses (from ∀R.C expansion) --
+    direct_dl_clauses: list[object] = field(default_factory=list)
+    """DL clauses emitted directly by normalization (e.g. for ∀R.C)."""
 
     # -- Conversion tracking (populated by _owl_expr_to_internal) --
     max_cardinality_roles: list[Role] = field(default_factory=list)

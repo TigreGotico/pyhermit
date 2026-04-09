@@ -174,6 +174,12 @@ class OWLClausification:
                 dl_clause.get_safe_version(InternalDatatype.RDFS_LITERAL)  # type: ignore[arg-type]
             )
 
+        # -- Direct DL clauses (e.g. from ∀R.C normalization) --
+        from hermit.model import DLClause as _DLClause
+        for direct_clause in getattr(axioms, "direct_dl_clauses", []):
+            if isinstance(direct_clause, _DLClause):
+                dl_clauses.add(direct_clause.get_safe_version(AtomicConcept.THING))
+
         # -- Key clauses --
         for obj_key in axioms.object_property_keys:
             dl_clauses.add(self._clausify_object_key(obj_key))
