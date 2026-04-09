@@ -436,12 +436,8 @@ class TestOWLLiteral:
         assert lit.get_literal() == "false"
 
     def test_boolean_from_string(self):
-        # distutils removed in Python 3.12+, so this may raise
-        try:
-            lit = OWLLiteral("true", BooleanOWLDatatype)
-            assert lit.parse_boolean() is True
-        except ModuleNotFoundError:
-            pytest.skip("distutils not available")
+        lit = OWLLiteral("true", BooleanOWLDatatype)
+        assert lit.parse_boolean() is True
 
     def test_boolean_eq_hash_repr(self):
         a = OWLLiteral(True)
@@ -578,12 +574,8 @@ class TestOWLLiteral:
         assert lit.parse_date() == date(2023, 1, 1)
 
     def test_date_from_string_z(self):
-        # Z replacement may produce invalid isoformat in some Python versions
-        try:
-            lit = OWLLiteral("2023-01-01Z", DateOWLDatatype)
-            assert lit.is_date()
-        except ValueError:
-            pytest.skip("Z-suffix date parsing not supported in this Python version")
+        lit = OWLLiteral("2023-01-01Z", DateOWLDatatype)
+        assert lit.is_date()
 
     # --- DateTime ---
     def test_datetime(self):

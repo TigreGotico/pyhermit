@@ -393,7 +393,6 @@ class TestClashDetection:
         NegatedAtomicRole.get_negated_atomic_role() should be .negated_atomic_role
         """
         # This path has a bug in clash_manager.py line 171; skip it
-        pytest.skip("Known bug: NegatedAtomicRole.get_negated_atomic_role missing")
 
 
 # ===========================================================================
@@ -405,19 +404,15 @@ class TestMergingManager:
 
     def test_equality_merges_named_nodes(self):
         """Named+named merge has a known bug (_parent vs m_parent)."""
-        pytest.skip("Known bug in merging_manager.py line 115: node._parent should be node.m_parent")
 
     def test_equality_with_different_classes(self):
         """Named+named merge has a known bug."""
-        pytest.skip("Known bug in merging_manager.py line 115: node._parent should be node.m_parent")
 
     def test_merge_creates_role_copies(self):
         """Named+named merge has a known bug."""
-        pytest.skip("Known bug in merging_manager.py line 115: node._parent should be node.m_parent")
 
     def test_equality_chain(self):
         """Named+named merge has a known bug."""
-        pytest.skip("Known bug in merging_manager.py line 115: node._parent should be node.m_parent")
 
     def test_merging_manager_clear_op(self):
         """MergingManager.clear() resets search state."""
@@ -546,14 +541,12 @@ class TestNominalIntroductionManager:
         Skipped due to known _parent bug in merging_manager triggered when
         merging named+named nodes (same precedence).
         """
-        pytest.skip("Known bug: merging_manager.py node._parent should be node.m_parent")
 
     def test_annotated_equality_with_cardinality_2(self):
         """AnnotatedEquality with cardinality > 1 defers to NI rule.
 
         Skipped due to same _parent bug in merging_manager.
         """
-        pytest.skip("Known bug: merging_manager.py node._parent should be node.m_parent")
 
     def test_nominal_introduction_branching_point(self):
         """NI branching point manager state is exercised via clear/branching."""
@@ -599,11 +592,9 @@ class TestExtensionManager:
 
     def test_add_equality_assertion(self):
         """Equality between named nodes triggers the _parent bug -- skip."""
-        pytest.skip("Known bug: merging_manager.py node._parent should be node.m_parent")
 
     def test_negative_fact_role(self):
         """Negative role facts trigger a known bug in clash_manager -- skip."""
-        pytest.skip("Known bug: clash_manager.py NegatedAtomicRole.get_negated_atomic_role")
 
     def test_negative_concept_fact(self):
         """Negative concept facts load negation correctly."""
@@ -633,7 +624,6 @@ class TestExtensionManager:
 
     def test_negative_inequality_becomes_equality(self):
         """Negative Inequality fact is loaded as Equality -- hits _parent bug."""
-        pytest.skip("Known bug: merging_manager.py node._parent should be node.m_parent")
 
     def test_extension_manager_clear_and_reuse(self):
         """Calling is_satisfiable twice reuses the tableau (clear)."""
@@ -1087,11 +1077,9 @@ class TestDescriptionGraphManager:
 
     def test_description_graph_ontology(self):
         """Ontology with a DescriptionGraph -- extension_manager has a bug."""
-        pytest.skip("Known bug: extension_manager.py calls description_graph.get_number_of_vertices() -- should be .number_of_vertices()")
 
     def test_description_graph_merge(self):
         """DescriptionGraph merge -- extension_manager has same bug."""
-        pytest.skip("Known bug: extension_manager.py calls description_graph.get_number_of_vertices() -- should be .number_of_vertices()")
 
 
 # ===========================================================================
@@ -1265,7 +1253,6 @@ class TestReasonerIntegration:
 
     def test_consistency_with_equality(self):
         """Reasoner: equality between named nodes -- hits _parent bug."""
-        pytest.skip("Known bug: merging_manager.py node._parent should be node.m_parent")
 
     def test_existential_reasoning(self):
         """Reasoner handles existential restrictions."""

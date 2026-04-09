@@ -606,8 +606,18 @@ class _OWLLiteralImplBoolean(OWLLiteral):
     def __init__(self, value, type_=BooleanOWLDatatype):
         assert type_ is None or type_ == BooleanOWLDatatype
         if not isinstance(value, bool):
-            from distutils.util import strtobool
-            value = bool(strtobool(value))
+            # distutils.util.strtobool was removed in Python 3.12
+            # Implement the same logic locally
+            if isinstance(value, str):
+                val_lower = value.lower().strip()
+                if val_lower in ('1', 'yes', 'true', 'on'):
+                    value = True
+                elif val_lower in ('0', 'no', 'false', 'off'):
+                    value = False
+                else:
+                    raise ValueError(f"Cannot parse '{value}' as boolean")
+            else:
+                value = bool(value)
         self._v = value
         self._type = type_
 
