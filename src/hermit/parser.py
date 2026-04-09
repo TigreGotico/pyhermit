@@ -1,6 +1,16 @@
 """OWL file parser using owlready2.
 
 Loads OWL/RDF ontologies from files and converts them to hermit.owl_model types.
+
+The parser bridges owlready2's object-oriented API (where axioms are embedded
+in class/property/individual objects) to hermit.owl_model's first-class axiom
+objects (mirroring the OWL API used by Java HermiT).
+
+Pipeline::
+
+    OWL file → owlready2 → _OwlreadyMapper → Iterable[OWLAxiom]
+                                               → OWLNormalization → NormalizedAxioms
+                                               → OWLClausification → DLOntology
 """
 
 from __future__ import annotations
@@ -12,14 +22,14 @@ if TYPE_CHECKING:
     from hermit.owl_model.owl_axiom import OWLAxiom
 
 
-def load_ontology(path: str | Path) -> Iterable[OWLAxiom]:
+def load_ontology(path: str | Path) -> list[OWLAxiom]:
     """Load an OWL ontology from a file.
 
     Args:
-        path: Path to OWL/RDF file (.owl, .ttl, .rdf, etc.)
+        path: Path to OWL/RDF file (.owl, .nt, etc.)
 
     Returns:
-        Iterator of OWLAxiom objects
+        List of OWLAxiom objects covering the full set of logical axioms.
 
     Raises:
         ImportError: If owlready2 is not installed
@@ -38,121 +48,399 @@ def load_ontology(path: str | Path) -> Iterable[OWLAxiom]:
     if not path.exists():
         raise FileNotFoundError(f"OWL file not found: {path}")
 
-    # Load ontology with owlready2
     try:
         onto = owlready2.get_ontology(str(path.as_uri())).load()
     except Exception as e:
         raise ValueError(f"Failed to parse OWL file: {path}") from e
 
-    # Convert to hermit.owl_model axioms
-    mapper = _OwlreadyMapper()
-    axioms = []
-
-    # Iterate over logical axioms (not import declarations, annotations, etc.)
-    for axiom in onto.logical_axioms:
-        try:
-            hermit_axiom = mapper.map_axiom(axiom)
-            if hermit_axiom is not None:
-                axioms.append(hermit_axiom)
-        except Exception:
-            # Skip axioms that can't be mapped
-            pass
-
-    return axioms
+    return _OwlreadyMapper(owlready2).extract_axioms(onto)
 
 
 class _OwlreadyMapper:
-    """Converts owlready2 objects to hermit.owl_model types."""
+    """Converts an owlready2 ontology into hermit.owl_model OWL axiom objects.
 
-    def __init__(self) -> None:
-        """Initialize the mapper."""
-        self._iri_cache: dict[str, object] = {}
-        self._class_cache: dict[str, object] = {}
+    owlready2 does not expose first-class axiom objects (unlike the Java OWL API).
+    Instead, axioms are embedded in class/property/individual objects and must be
+    extracted by iterating the ontology signature and reading properties.
 
-    def map_axiom(self, axiom: object) -> object | None:
-        """Map an owlready2 axiom to hermit.owl_model type.
+    This mapper performs that extraction for all axiom types that OWLNormalization
+    understands.
+    """
 
-        Args:
-            axiom: owlready2 axiom object
+    def __init__(self, owlready2_module: object) -> None:
+        self._or2 = owlready2_module
 
-        Returns:
-            hermit.owl_model.OWLAxiom or None if unmappable
+    def extract_axioms(self, onto: object) -> list[OWLAxiom]:
+        """Extract all logical axioms from an owlready2 ontology."""
+        axioms: list[OWLAxiom] = []
+        self._extract_class_axioms(onto, axioms)
+        self._extract_individual_axioms(onto, axioms)
+        self._extract_object_property_axioms(onto, axioms)
+        self._extract_data_property_axioms(onto, axioms)
+        return axioms
+
+    # ------------------------------------------------------------------
+    # Class expression mapping
+    # ------------------------------------------------------------------
+
+    def _map_class_expression(self, expr: object) -> object | None:
+        """Convert an owlready2 class expression to an OWL model class expression.
+
+        Handles: named classes, restrictions (some/all/min/max/exactly/hasSelf/hasValue),
+        intersections, unions, complements, and one-of nominals.
+        Returns None if the expression cannot be mapped.
         """
-        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
+        or2 = self._or2
+        from hermit.owl_model.class_expression import (
+            OWLClass, OWLObjectComplementOf,
+            OWLObjectIntersectionOf, OWLObjectUnionOf,
+            OWLObjectSomeValuesFrom, OWLObjectAllValuesFrom,
+            OWLObjectHasSelf, OWLObjectHasValue,
+            OWLObjectMinCardinality, OWLObjectMaxCardinality, OWLObjectExactCardinality,
+            OWLObjectOneOf, OWLThing, OWLNothing,
+        )
+        from hermit.owl_model.owl_property import OWLObjectProperty, OWLObjectInverseOf
 
-        # Simple dispatch on axiom type
-        axiom_class_name = type(axiom).__name__
+        # owl:Thing / owl:Nothing
+        if expr is or2.Thing:
+            return OWLThing
+        if expr is or2.Nothing:
+            return OWLNothing
 
-        # Handle SubClassOf axioms
-        if axiom_class_name == "SubClassOf" or "SubClassOf" in str(axiom):
-            # Try to extract sub and super class expressions
-            # This is a simplified version - real implementation would be more complete
-            return self._map_subclass_axiom(axiom)
+        # Named class
+        if isinstance(expr, or2.ThingClass):
+            iri = getattr(expr, "iri", None)
+            if iri:
+                return OWLClass(iri)
+            return None
 
-        # Handle EquivalentClasses
-        if axiom_class_name == "EquivalentClasses" or "EquivalentClasses" in str(axiom):
-            return self._map_equivalent_classes_axiom(axiom)
+        # Complement (Not)
+        if isinstance(expr, or2.Not):
+            operand = self._map_class_expression(getattr(expr, "Class", None))
+            if operand is not None:
+                return OWLObjectComplementOf(operand)
+            return None
 
-        # Handle DisjointClasses
-        if axiom_class_name == "DisjointClasses" or "DisjointClasses" in str(axiom):
-            return self._map_disjoint_classes_axiom(axiom)
+        # And (Intersection)
+        if isinstance(expr, or2.And):
+            operands = [self._map_class_expression(c) for c in getattr(expr, "Classes", [])]
+            operands = [o for o in operands if o is not None]
+            if len(operands) >= 2:
+                return OWLObjectIntersectionOf(operands)
+            if len(operands) == 1:
+                return operands[0]
+            return None
 
-        # Handle ClassAssertion
-        if axiom_class_name == "ClassAssertion" or "ClassAssertion" in str(axiom):
-            return self._map_class_assertion_axiom(axiom)
+        # Or (Union)
+        if isinstance(expr, or2.Or):
+            operands = [self._map_class_expression(c) for c in getattr(expr, "Classes", [])]
+            operands = [o for o in operands if o is not None]
+            if len(operands) >= 2:
+                return OWLObjectUnionOf(operands)
+            if len(operands) == 1:
+                return operands[0]
+            return None
 
-        # Handle ObjectPropertyAssertion
-        if axiom_class_name == "ObjectPropertyAssertion" or "ObjectPropertyAssertion" in str(axiom):
-            return self._map_object_property_assertion_axiom(axiom)
+        # OneOf (nominals)
+        if isinstance(expr, or2.OneOf):
+            from hermit.owl_model.owl_individual import OWLNamedIndividual
+            inds = []
+            for ind in getattr(expr, "instances", []):
+                ind_iri = getattr(ind, "iri", None)
+                if ind_iri:
+                    inds.append(OWLNamedIndividual(ind_iri))
+            if inds:
+                return OWLObjectOneOf(inds)
+            return None
 
-        # Handle DataPropertyAssertion
-        if axiom_class_name == "DataPropertyAssertion" or "DataPropertyAssertion" in str(axiom):
-            return self._map_data_property_assertion_axiom(axiom)
+        # Restriction
+        if isinstance(expr, or2.Restriction):
+            prop_obj = getattr(expr, "property", None)
+            if prop_obj is None:
+                return None
+            prop_iri = getattr(prop_obj, "iri", None)
+            if prop_iri is None:
+                return None
 
-        # For other axiom types, return None (unmapped)
+            # Determine if object or data property
+            is_object_prop = isinstance(prop_obj, or2.ObjectPropertyClass)
+            if not is_object_prop:
+                return None  # data property restrictions handled separately
+
+            owl_prop = OWLObjectProperty(prop_iri)
+            rtype = getattr(expr, "type", None)
+            value = getattr(expr, "value", None)
+            cardinality = getattr(expr, "cardinality", None)
+
+            # owlready2 restriction type constants
+            SOME = getattr(or2, "SOME", 24)
+            ONLY = getattr(or2, "ONLY", 25)
+            MIN = getattr(or2, "MIN", 26)
+            MAX = getattr(or2, "MAX", 27)
+            EXACTLY = getattr(or2, "EXACTLY", 28)
+            HAS_SELF = getattr(or2, "HAS_SELF", 11)
+            VALUE = getattr(or2, "VALUE", 29)
+
+            filler = self._map_class_expression(value) if value is not None else OWLThing
+
+            if rtype == SOME:
+                if filler is None:
+                    return None
+                return OWLObjectSomeValuesFrom(owl_prop, filler)
+            elif rtype == ONLY:
+                if filler is None:
+                    return None
+                return OWLObjectAllValuesFrom(owl_prop, filler)
+            elif rtype == MIN and cardinality is not None:
+                return OWLObjectMinCardinality(cardinality, owl_prop, filler or OWLThing)
+            elif rtype == MAX and cardinality is not None:
+                return OWLObjectMaxCardinality(cardinality, owl_prop, filler or OWLThing)
+            elif rtype == EXACTLY and cardinality is not None:
+                return OWLObjectExactCardinality(cardinality, owl_prop, filler or OWLThing)
+            elif rtype == HAS_SELF:
+                return OWLObjectHasSelf(owl_prop)
+            elif rtype == VALUE and value is not None:
+                ind_iri = getattr(value, "iri", None)
+                if ind_iri:
+                    from hermit.owl_model.owl_individual import OWLNamedIndividual
+                    return OWLObjectHasValue(owl_prop, OWLNamedIndividual(ind_iri))
+
         return None
 
-    def _map_subclass_axiom(self, axiom: object) -> object | None:
-        """Map a SubClassOf axiom."""
-        # This would extract sub and super class expressions
-        # from the owlready2 axiom and create OWLSubClassOfAxiom
-        # Simplified version just returns None
-        return None
+    # ------------------------------------------------------------------
+    # Class-level axioms
+    # ------------------------------------------------------------------
 
-    def _map_equivalent_classes_axiom(self, axiom: object) -> object | None:
-        """Map an EquivalentClasses axiom."""
-        return None
+    def _extract_class_axioms(self, onto: object, axioms: list) -> None:
+        """Extract SubClassOf, EquivalentClasses, DisjointClasses."""
+        or2 = self._or2
+        from hermit.owl_model.owl_axiom import (
+            OWLSubClassOfAxiom,
+            OWLEquivalentClassesAxiom,
+            OWLDisjointClassesAxiom,
+        )
+        from hermit.owl_model.class_expression import OWLClass
 
-    def _map_disjoint_classes_axiom(self, axiom: object) -> object | None:
-        """Map a DisjointClasses axiom."""
-        return None
+        for cls in onto.classes():
+            sub_iri = getattr(cls, "iri", None)
+            if sub_iri is None:
+                continue
+            owl_sub = OWLClass(sub_iri)
 
-    def _map_class_assertion_axiom(self, axiom: object) -> object | None:
-        """Map a ClassAssertion axiom."""
-        return None
+            # SubClassOf — includes both named parents and restrictions
+            for parent in getattr(cls, "is_a", []):
+                super_expr = self._map_class_expression(parent)
+                if super_expr is not None:
+                    try:
+                        axioms.append(OWLSubClassOfAxiom(owl_sub, super_expr))
+                    except Exception:
+                        pass
 
-    def _map_object_property_assertion_axiom(self, axiom: object) -> object | None:
-        """Map an ObjectPropertyAssertion axiom."""
-        return None
+            # EquivalentClasses — includes complex expressions
+            for eq in getattr(cls, "equivalent_to", []):
+                eq_expr = self._map_class_expression(eq)
+                if eq_expr is not None:
+                    try:
+                        axioms.append(OWLEquivalentClassesAxiom([owl_sub, eq_expr]))
+                    except Exception:
+                        pass
 
-    def _map_data_property_assertion_axiom(self, axiom: object) -> object | None:
-        """Map a DataPropertyAssertion axiom."""
-        return None
+        # DisjointClasses — owlready2 stores these as AllDisjoint objects
+        for disj in getattr(onto, "disjoint_classes", lambda: [])():
+            entities = getattr(disj, "entities", [])
+            owl_classes = []
+            for e in entities:
+                e_iri = getattr(e, "iri", None)
+                if e_iri:
+                    owl_classes.append(OWLClass(e_iri))
+            if len(owl_classes) >= 2:
+                try:
+                    axioms.append(OWLDisjointClassesAxiom(owl_classes))
+                except Exception:
+                    pass
 
-    def _get_or_create_iri(self, iri_str: str) -> object:
-        """Get or create an IRI object."""
-        if iri_str not in self._iri_cache:
-            from hermit.owl_model.iri import IRI
-            self._iri_cache[iri_str] = IRI(iri_str)
-        return self._iri_cache[iri_str]
+    # ------------------------------------------------------------------
+    # Individual-level axioms
+    # ------------------------------------------------------------------
 
-    def _get_or_create_class(self, class_iri: str) -> object:
-        """Get or create an OWLClass object."""
-        if class_iri not in self._class_cache:
-            from hermit.owl_model.class_expression import OWLClass
-            iri = self._get_or_create_iri(class_iri)
-            self._class_cache[class_iri] = OWLClass(iri)  # type: ignore[arg-type]
-        return self._class_cache[class_iri]
+    def _extract_individual_axioms(self, onto: object, axioms: list) -> None:
+        """Extract ClassAssertion, ObjectPropertyAssertion, SameIndividual, DifferentIndividuals."""
+        or2 = self._or2
+        from hermit.owl_model.owl_axiom import (
+            OWLClassAssertionAxiom,
+            OWLObjectPropertyAssertionAxiom,
+            OWLSameIndividualAxiom,
+            OWLDifferentIndividualsAxiom,
+        )
+        from hermit.owl_model.class_expression import OWLClass
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        for ind in onto.individuals():
+            ind_iri = getattr(ind, "iri", None)
+            if ind_iri is None:
+                continue
+            owl_ind = OWLNamedIndividual(ind_iri)
+
+            # ClassAssertion: A(a)
+            for typ in getattr(ind, "is_a", []):
+                if isinstance(typ, or2.ThingClass):
+                    typ_iri = getattr(typ, "iri", None)
+                    if typ_iri:
+                        try:
+                            axioms.append(OWLClassAssertionAxiom(owl_ind, OWLClass(typ_iri)))
+                        except Exception:
+                            pass
+
+            # ObjectPropertyAssertion: R(a, b)
+            for prop in onto.object_properties():
+                prop_iri = getattr(prop, "iri", None)
+                if prop_iri is None:
+                    continue
+                prop_name = getattr(prop, "python_name", None) or getattr(prop, "name", None)
+                if prop_name is None:
+                    continue
+                targets = getattr(ind, prop_name, [])
+                if not hasattr(targets, "__iter__"):
+                    targets = [targets] if targets is not None else []
+                owl_prop = OWLObjectProperty(prop_iri)
+                for target in targets:
+                    tgt_iri = getattr(target, "iri", None)
+                    if tgt_iri:
+                        try:
+                            axioms.append(
+                                OWLObjectPropertyAssertionAxiom(
+                                    owl_ind, owl_prop, OWLNamedIndividual(tgt_iri)
+                                )
+                            )
+                        except Exception:
+                            pass
+
+            # SameIndividual
+            for same in getattr(ind, "equivalent_to", []):
+                same_iri = getattr(same, "iri", None)
+                if same_iri and same_iri != ind_iri:
+                    try:
+                        axioms.append(OWLSameIndividualAxiom([owl_ind, OWLNamedIndividual(same_iri)]))
+                    except Exception:
+                        pass
+
+            # DifferentIndividuals
+            for diff in getattr(ind, "different_from", []):
+                diff_iri = getattr(diff, "iri", None)
+                if diff_iri:
+                    try:
+                        axioms.append(OWLDifferentIndividualsAxiom([owl_ind, OWLNamedIndividual(diff_iri)]))
+                    except Exception:
+                        pass
+
+    # ------------------------------------------------------------------
+    # Object property axioms
+    # ------------------------------------------------------------------
+
+    def _extract_object_property_axioms(self, onto: object, axioms: list) -> None:
+        """Extract property characteristics and sub-property axioms."""
+        or2 = self._or2
+        from hermit.owl_model.owl_axiom import (
+            OWLSubObjectPropertyOfAxiom,
+            OWLTransitiveObjectPropertyAxiom,
+            OWLSymmetricObjectPropertyAxiom,
+            OWLAsymmetricObjectPropertyAxiom,
+            OWLReflexiveObjectPropertyAxiom,
+            OWLIrreflexiveObjectPropertyAxiom,
+            OWLFunctionalObjectPropertyAxiom,
+            OWLInverseFunctionalObjectPropertyAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        for prop in onto.object_properties():
+            prop_iri = getattr(prop, "iri", None)
+            if prop_iri is None:
+                continue
+            owl_prop = OWLObjectProperty(prop_iri)
+
+            # Characteristics encoded as mixin classes in owlready2
+            for parent in getattr(prop, "is_a", []):
+                if parent is or2.TransitiveProperty:
+                    try:
+                        axioms.append(OWLTransitiveObjectPropertyAxiom(owl_prop))
+                    except Exception:
+                        pass
+                elif parent is or2.SymmetricProperty:
+                    try:
+                        axioms.append(OWLSymmetricObjectPropertyAxiom(owl_prop))
+                    except Exception:
+                        pass
+                elif parent is or2.AsymmetricProperty:
+                    try:
+                        axioms.append(OWLAsymmetricObjectPropertyAxiom(owl_prop))
+                    except Exception:
+                        pass
+                elif parent is or2.ReflexiveProperty:
+                    try:
+                        axioms.append(OWLReflexiveObjectPropertyAxiom(owl_prop))
+                    except Exception:
+                        pass
+                elif parent is or2.IrreflexiveProperty:
+                    try:
+                        axioms.append(OWLIrreflexiveObjectPropertyAxiom(owl_prop))
+                    except Exception:
+                        pass
+                elif parent is or2.FunctionalProperty:
+                    try:
+                        axioms.append(OWLFunctionalObjectPropertyAxiom(owl_prop))
+                    except Exception:
+                        pass
+                elif parent is or2.InverseFunctionalProperty:
+                    try:
+                        axioms.append(OWLInverseFunctionalObjectPropertyAxiom(owl_prop))
+                    except Exception:
+                        pass
+                elif isinstance(parent, or2.ObjectPropertyClass):
+                    # SubObjectPropertyOf
+                    parent_iri = getattr(parent, "iri", None)
+                    if parent_iri and parent_iri != prop_iri:
+                        try:
+                            axioms.append(
+                                OWLSubObjectPropertyOfAxiom(owl_prop, OWLObjectProperty(parent_iri))
+                            )
+                        except Exception:
+                            pass
+
+    # ------------------------------------------------------------------
+    # Data property axioms
+    # ------------------------------------------------------------------
+
+    def _extract_data_property_axioms(self, onto: object, axioms: list) -> None:
+        """Extract data property sub-property and characteristic axioms."""
+        or2 = self._or2
+        from hermit.owl_model.owl_axiom import (
+            OWLSubDataPropertyOfAxiom,
+            OWLFunctionalDataPropertyAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLDataProperty
+
+        for prop in onto.data_properties():
+            prop_iri = getattr(prop, "iri", None)
+            if prop_iri is None:
+                continue
+            owl_prop = OWLDataProperty(prop_iri)
+
+            for parent in getattr(prop, "is_a", []):
+                if parent is or2.FunctionalProperty:
+                    try:
+                        axioms.append(OWLFunctionalDataPropertyAxiom(owl_prop))
+                    except Exception:
+                        pass
+                elif isinstance(parent, or2.DataPropertyClass):
+                    parent_iri = getattr(parent, "iri", None)
+                    if parent_iri and parent_iri != prop_iri:
+                        try:
+                            axioms.append(
+                                OWLSubDataPropertyOfAxiom(owl_prop, OWLDataProperty(parent_iri))
+                            )
+                        except Exception:
+                            pass
 
 
 __all__ = ["load_ontology"]
