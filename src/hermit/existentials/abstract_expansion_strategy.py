@@ -255,7 +255,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
         else:
             retrieval = self.m_ternary_extension_table_search02_bound  # type: ignore[assignment]
             assert isinstance(on_role, InverseRole)
-            retrieval.get_bindings_buffer()[0] = on_role.get_inverse_of()
+            retrieval.get_bindings_buffer()[0] = on_role.inverse_of
             retrieval.get_bindings_buffer()[2] = for_node
             to_node_index = 1
 
