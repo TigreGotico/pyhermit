@@ -628,3 +628,245 @@ class TestDLClauseDirect:
             assert r.is_sub_class_of(A, C) is True
         finally:
             r.dispose()
+
+
+# ---------------------------------------------------------------------------
+# OWL pipeline universal restriction limitation test
+# ---------------------------------------------------------------------------
+
+class TestUniversalRestrictionLimitation:
+    """Document the known approximation for OWLObjectAllValuesFrom.
+
+    The OWL pipeline currently approximates ∀R.C using a synthetic atomic
+    concept rather than a proper AtMostConcept or DL-clause encoding.
+    This means subsumption reasoning that REQUIRES ∀R.C through the OWL
+    normalization pipeline produces incorrect results.  These tests document
+    the current limitation — they do NOT assert the correct answer.
+    """
+
+    def test_all_values_from_owl_pipeline_does_not_crash(self):
+        """SubClassOf(A, ∀R.B) through OWL pipeline should not crash.
+
+        The approximation stores a synthetic concept and returns a reasoner.
+        We only assert the pipeline completes without error.
+        Expected: pipeline succeeds (no exception)."""
+        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
+        from hermit.owl_model.class_expression import OWLClass
+        from hermit.owl_model.class_expression.restriction import OWLObjectAllValuesFrom
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        A = OWLClass(NS + "A")
+        B = OWLClass(NS + "B")
+        R = OWLObjectProperty(NS + "R")
+        all_r_b = OWLObjectAllValuesFrom(R, B)
+        axioms = [OWLSubClassOfAxiom(A, all_r_b)]
+        # Should not raise
+        r = _reasoner_from_axioms(axioms)
+        r.dispose()
+
+    def test_all_values_from_limitation_documented(self):
+        """∀R.B subsumption via OWL pipeline is approximated and may return False
+        even when the correct answer is True.
+
+        This test documents the limitation: the pipeline returns a consistent
+        ontology (no crash) but the synthetic concept does not carry the
+        semantics of the universal restriction.
+        Expected: is_consistent() = True (the approximation is conservative)."""
+        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
+        from hermit.owl_model.class_expression import OWLClass
+        from hermit.owl_model.class_expression.restriction import OWLObjectAllValuesFrom
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        A = OWLClass(NS + "A")
+        B = OWLClass(NS + "B")
+        R = OWLObjectProperty(NS + "R")
+        all_r_b = OWLObjectAllValuesFrom(R, B)
+        axioms = [OWLSubClassOfAxiom(A, all_r_b)]
+        r = _reasoner_from_axioms(axioms)
+        try:
+            # The approximation will not detect a contradiction here — consistent
+            assert r.is_consistent() is True
+        finally:
+            r.dispose()
+
+    def test_all_values_from_correct_via_dl_clause(self):
+        """∀R.B can be correctly encoded as a DL clause: A(X) ∧ R(X,Y) → B(Y).
+
+        This is the correct workaround — bypass the OWL pipeline and use the
+        DL clause directly.
+        Expected: is_consistent() = False (because B(b) contradicts DisjointClasses(B,C) with C(b))."""
+        A = _concept("A")
+        B = _concept("B")
+        C = _concept("C")
+        R = _role("R")
+        a = _ind("a")
+        b = _ind("b")
+        # ∀R.B: A(X) ∧ R(X, Y) → B(Y)
+        all_r_b_clause = DLClause.create(
+            (Atom.create(B, Y),),
+            (Atom.create(A, X), Atom.create(R, X, Y)),
+        )
+        # DisjointClasses(B, C): B(X) ∧ C(X) → ⊥
+        disj = DLClause.create((), (Atom.create(B, X), Atom.create(C, X)))
+        r = _reasoner_from_dl(
+            [all_r_b_clause, disj],
+            positive_facts=[
+                Atom.create(A, a),
+                Atom.create(R, a, b),
+                Atom.create(C, b),
+            ],
+        )
+        try:
+            assert r.is_consistent() is False
+        finally:
+            r.dispose()
+
+
+# ---------------------------------------------------------------------------
+# End-to-end parser → reasoner tests
+# ---------------------------------------------------------------------------
+
+owlready2 = pytest.importorskip("owlready2")
+
+
+class TestParserEndToEnd:
+    """End-to-end tests: owlready2 ontology → load_ontology() → Reasoner.
+
+    These tests catch parser regressions by exercising the full pipeline from
+    owlready2 in-memory ontologies through to the reasoner.
+    """
+
+    def _load_and_reason(self, tmp_path, onto):
+        """Helper: save ontology to tmp file and run the full pipeline."""
+        import tempfile
+        from hermit.parser import load_ontology
+
+        owl_file = tmp_path / "test.owl"
+        onto.save(file=str(owl_file), format="rdfxml")
+        axioms = load_ontology(owl_file)
+        r = _reasoner_from_axioms(axioms)
+        return r
+
+    def test_simple_subclass_via_parser(self, tmp_path):
+        """Parser end-to-end: A ⊑ B and B ⊑ C → A ⊑ C.
+        Expected: is_sub_class_of(A, C) = True."""
+        import owlready2
+
+        onto = owlready2.get_ontology("http://e2e.test/simple#")
+        with onto:
+            class A(owlready2.Thing): pass  # type: ignore[valid-type]
+            class B(owlready2.Thing): pass  # type: ignore[valid-type]
+            class C(owlready2.Thing): pass  # type: ignore[valid-type]
+            A.is_a.append(B)
+            B.is_a.append(C)
+
+        r = self._load_and_reason(tmp_path, onto)
+        try:
+            A_int = AtomicConcept.create("http://e2e.test/simple#A")
+            C_int = AtomicConcept.create("http://e2e.test/simple#C")
+            assert r.is_sub_class_of(A_int, C_int) is True
+        finally:
+            r.dispose()
+
+    def test_existential_restriction_consistent_via_parser(self, tmp_path):
+        """Parser end-to-end: A ⊑ ∃R.B — ontology is consistent.
+        Expected: is_consistent() = True."""
+        import owlready2
+
+        onto = owlready2.get_ontology("http://e2e.test/exists#")
+        with onto:
+            class A(owlready2.Thing): pass  # type: ignore[valid-type]
+            class B(owlready2.Thing): pass  # type: ignore[valid-type]
+            class R(owlready2.ObjectProperty): pass  # type: ignore[valid-type]
+            A.is_a.append(R.some(B))
+
+        r = self._load_and_reason(tmp_path, onto)
+        try:
+            assert r.is_consistent() is True
+        finally:
+            r.dispose()
+
+    def test_disjoint_subclasses_parsed_consistently(self, tmp_path):
+        """Parser end-to-end: A ⊑ B, DisjointClasses(B, C), no individuals.
+
+        Without any individual asserted in A, the ontology is consistent
+        (A is an empty class, not necessarily contradictory unless A has a member).
+        We assert is_consistent() = True, and check the parser completes without error.
+        Expected: is_consistent() = True."""
+        import owlready2
+
+        onto = owlready2.get_ontology("http://e2e.test/disj#")
+        with onto:
+            class A(owlready2.Thing): pass  # type: ignore[valid-type]
+            class B(owlready2.Thing): pass  # type: ignore[valid-type]
+            class C(owlready2.Thing): pass  # type: ignore[valid-type]
+            A.is_a.append(B)
+            owlready2.AllDisjoint([B, C])
+
+        r = self._load_and_reason(tmp_path, onto)
+        try:
+            assert r.is_consistent() is True
+        finally:
+            r.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Datatype reasoning tests
+# ---------------------------------------------------------------------------
+
+class TestDatatypeReasoning:
+    """Datatype constraint reasoning tests.
+
+    Uses the normalization pipeline for OWL-layer tests and the DL clause API
+    for direct encoding, since DLOntology does not expose a data-assertion
+    constructor.  The goal is to confirm that the datatype pipeline does not
+    crash and returns the expected consistency result.
+    """
+
+    def test_data_property_range_consistent_pipeline(self):
+        """DataPropertyRange(P, xsd:integer) alone — consistent.
+        Expected: is_consistent() = True."""
+        from hermit.owl_model.owl_axiom import OWLDataPropertyRangeAxiom
+        from hermit.owl_model.owl_property import OWLDataProperty
+        from hermit.owl_model.owl_datatype import OWLDatatype
+
+        P = OWLDataProperty(NS + "age")
+        xsd_int = OWLDatatype("http://www.w3.org/2001/XMLSchema#integer")
+        axioms = [OWLDataPropertyRangeAxiom(P, xsd_int)]
+        r = _reasoner_from_axioms(axioms)
+        try:
+            assert r.is_consistent() is True
+        finally:
+            r.dispose()
+
+    def test_data_property_domain_consistent_pipeline(self):
+        """DataPropertyDomain(P, A) alone — consistent.
+        Expected: is_consistent() = True."""
+        from hermit.owl_model.owl_axiom import OWLDataPropertyDomainAxiom
+        from hermit.owl_model.owl_property import OWLDataProperty
+        from hermit.owl_model.class_expression import OWLClass
+
+        P = OWLDataProperty(NS + "score")
+        A = OWLClass(NS + "Person")
+        axioms = [OWLDataPropertyDomainAxiom(P, A)]
+        r = _reasoner_from_axioms(axioms)
+        try:
+            assert r.is_consistent() is True
+        finally:
+            r.dispose()
+
+    def test_datatype_normalization_pipeline_no_crash(self):
+        """A datatype range axiom through the normalization pipeline should not crash.
+        Expected: pipeline runs without exception and is_consistent() = True."""
+        from hermit.owl_model.owl_axiom import OWLDataPropertyRangeAxiom
+        from hermit.owl_model.owl_property import OWLDataProperty
+        from hermit.owl_model.owl_datatype import OWLDatatype
+
+        P = OWLDataProperty(NS + "weight")
+        xsd_float = OWLDatatype("http://www.w3.org/2001/XMLSchema#float")
+        axioms = [OWLDataPropertyRangeAxiom(P, xsd_float)]
+        r = _reasoner_from_axioms(axioms)
+        try:
+            assert r.is_consistent() is True
+        finally:
+            r.dispose()

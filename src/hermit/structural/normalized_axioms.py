@@ -117,7 +117,16 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[object] | None 
         return AtLeastConcept.create(1, role, filler)  # type: ignore[arg-type]
 
     if isinstance(expr, OWLObjectAllValuesFrom):
-        # ∀R.C ≡ ¬∃R.¬C — represent as complement of AtLeastConcept on ¬C
+        # TODO: ∀R.C is approximated — needs AtMostConcept or OWLNormalization-level handling.
+        # The correct NNF encoding of A ⊑ ∀R.C is the DL clause A(X) ∧ R(X,Y) → C(Y), which
+        # requires two-variable encoding at the clausifier level.  The current architecture has
+        # no AtMostConcept and NormalizedAxiomClausifier only handles single-concept atoms.
+        # A full fix requires either:
+        #   (a) adding AtMostConcept to the model and a clausifier visitor, OR
+        #   (b) handling SubClassOf(A, ∀R.B) in OWLNormalization before add_concept_inclusion
+        #       and emitting a raw DL clause directly.
+        # Until then, this synthetic-concept approximation keeps the pipeline from crashing but
+        # DOES NOT produce sound reasoning for ∀R.C subsumption through the OWL pipeline.
         role = _owl_prop_to_internal_role(expr.get_property())
         inner_filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
         from hermit.model import LiteralConcept
