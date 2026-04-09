@@ -17,6 +17,7 @@ Class hierarchy (model)::
     ├── LiteralConcept
     │   ├── AtomicConcept          (also DLPredicate)
     │   └── AtomicNegationConcept
+    ├── AtMostConcept
     └── ExistentialConcept
         └── AtLeast                (also DLPredicate)
             ├── AtLeastConcept
@@ -66,6 +67,7 @@ __all__ = [
     "AtLeast",
     "AtLeastConcept",
     "AtLeastDataRange",
+    "AtMostConcept",
     "ExistsDescriptionGraph",
     # Roles
     "Role",
@@ -784,6 +786,9 @@ class InverseRole(Role):
         if isinstance(other, InverseRole):
             return self._inverse_of == other._inverse_of
         return False
+
+    def equals(self, other: object) -> bool:
+        return self.__eq__(other)
 
     @classmethod
     def create(cls, inverse_of: AtomicRole) -> InverseRole:
@@ -1557,6 +1562,58 @@ class AtLeastDataRange(AtLeast):
     @classmethod
     def create(cls, number: int, on_role: Role, to_data_range: DataRange) -> AtLeastDataRange:
         return _interner.intern(cls(number, on_role, to_data_range))
+
+
+class AtMostConcept(Concept):
+    """≤ n R.C  (at-most cardinality restriction)."""
+    __slots__ = ("_number", "_on_role", "_to_concept")
+
+    def __init__(self, number: int, on_role: Role, to_concept: LiteralConcept) -> None:
+        self._number = number
+        self._on_role = on_role
+        self._to_concept = to_concept
+
+    @property
+    def number(self) -> int:
+        return self._number
+
+    @property
+    def on_role(self) -> Role:
+        return self._on_role
+
+    @property
+    def to_concept(self) -> LiteralConcept:
+        return self._to_concept
+
+    def is_always_false(self) -> bool:
+        return False
+
+    def is_always_true(self) -> bool:
+        return False
+
+    def accept(self, visitor: object) -> object:
+        visit = getattr(visitor, "visit_at_most_concept", None)
+        if visit is None:
+            raise AttributeError(
+                f"{type(visitor).__name__} has no visit_at_most_concept()"
+            )
+        return visit(self)
+
+    def __str__(self) -> str:
+        return f"atMost({self._number} {self._on_role} {self._to_concept})"
+
+    def __hash__(self) -> int:
+        return (self._number * 13 + hash(self._on_role)) * 13 + hash(self._to_concept)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, AtMostConcept):
+            return (self._number == other._number and self._on_role == other._on_role
+                    and self._to_concept == other._to_concept)
+        return False
+
+    @classmethod
+    def create(cls, number: int, on_role: Role, to_concept: LiteralConcept) -> AtMostConcept:
+        return _interner.intern(cls(number, on_role, to_concept))
 
 
 # --- ExistsDescriptionGraph ---

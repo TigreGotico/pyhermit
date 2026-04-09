@@ -1,19 +1,17 @@
-# Status: pyhermit Production Readiness
+# Status: pyhermit Full Semantic Correctness (Sprint 2)
 
 ## Checklist
 
-- [x] **Step 1a** — Add `positive_concept_facts`, `positive_role_facts`, `positive_data_facts` to `NormalizedAxioms` (`src/hermit/structural/normalized_axioms.py`) — already existed
-- [x] **Step 1b** — Update `OWLNormalization._process_axiom()` to route axioms to typed fact lists (`src/hermit/structural/owl_normalization.py`)
-- [x] **Step 1c** — Update `OWLClausification.clausify()` to consume typed fact lists where appropriate — already reading typed lists; fixed by 1b
-- [x] **Step 2** — Remove `# mypy: ignore-errors` from `owl_normalization.py`; confirm `mypy` clean
-- [x] **Step 3** — Remove `# mypy: ignore-errors` from `expression_manager.py`
-- [x] **Step 4** — Fix or integrate `builtin_property_manager.py` — cleaned up, removed all stale type: ignore comments, mypy clean
-- [x] **Step 5** — Remove `# mypy: ignore-errors` from `object_property_inclusion_manager.py`; mypy --strict clean
-- [x] **Step 6** — Enhance owlready2 parser: add `_map_class_expression()` recursion; extract restrictions, cardinalities, unions, intersections, complements, nominals from owlready2 objects
-- [x] **Step 7** — Investigated `datatype_manager.py:360`: both `pass` statements are correct behaviour (skip internal datatypes like rdfs:Literal). No actual stub to fix.
-- [x] **Step 8** — Add `tests/test_correctness.py` with ≥20 reasoning-answer tests covering subsumption via restrictions, cardinality constraints, transitivity, nominals, datatypes; both SAT and UNSAT cases
-- [x] **Step 9** — Bump version to `0.2.0`, update `pyproject.toml` classifier to `4 - Beta`, pin owlready2 in optional extras
-- [x] **Step 10** — `ruff check` clean (0 errors), `pytest` 0 failures (2274 passed); mypy has 1217 pre-existing errors in 76 files (unchanged from baseline — not regressed by our work)
+- [x] **Step 1** — Add `AtMostConcept` to `src/hermit/model/__init__.py` with `accept()`, `create()`, exported from `hermit.model`
+- [ ] **Step 2** — Add `visit_at_most_concept()` to `NormalizedAxiomClausifier` in `src/hermit/structural/owl_clausification.py`; emit pairwise inequality DL clauses
+- [ ] **Step 3** — Fix `_owl_expr_to_internal()` in `normalized_axioms.py`: `OWLObjectMaxCardinality` → `AtMostConcept`; `OWLObjectExactCardinality` → `[AtLeastConcept, AtMostConcept]`; remove synthetic approximations
+- [ ] **Step 4** — Emit two-variable DL clauses for `∀R.C` in `OWLNormalization._process_sub_class_of()`; add `direct_dl_clauses: list[DLClause]` to `NormalizedAxioms`; consume in `OWLClausification.clausify()`
+- [ ] **Step 5** — Fix `¬(complex)` via NNF push-in: `OWLObjectComplementOf(complex)` → correct NNF expansion instead of synthetic hash concept
+- [ ] **Step 6** — Add `AtMostConcept` non-simplicity check to `ObjectPropertyInclusionManager._check_concept_inclusions_for_non_simple()`
+- [ ] **Step 7** — Add OWL 2 conformance tests in `tests/test_conformance.py` using `koala.owl` (≥6 tests, guarded by `pytest.importorskip("owlready2")`)
+- [ ] **Step 8** — Add `TestAllValuesFrom` (≥4 tests) and `TestMaxCardinality` (≥4 tests) to `tests/test_correctness.py`; remove `TestUniversalRestrictionLimitation`
+- [ ] **Step 9** — Fix mypy errors in `src/hermit/structural/` files; remove their entries from `[[tool.mypy.overrides]]` in `pyproject.toml`
+- [ ] **Step 10** — Full validation: `mypy --strict src/hermit/structural/` exits 0, `ruff check` exits 0, `pytest` 0 failures; bump version `0.2.0` → `0.3.0`
 
 ## Blockers
 
