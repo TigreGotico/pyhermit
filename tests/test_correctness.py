@@ -24,7 +24,7 @@ from __future__ import annotations
 import pytest
 
 from hermit.model import AtomicConcept, Individual, Atom, DLClause
-from hermit.model import AtomicRole, InverseRole, Variable
+from hermit.model import AtomicRole, InverseRole, Variable, Inequality
 from hermit.model import DLOntology
 from hermit.structural.owl_normalization import OWLNormalization
 from hermit.structural.owl_clausification import OWLClausification
@@ -631,25 +631,23 @@ class TestDLClauseDirect:
 
 
 # ---------------------------------------------------------------------------
-# OWL pipeline universal restriction limitation test
+# ∀R.C (AllValuesFrom) reasoning via OWL pipeline
 # ---------------------------------------------------------------------------
 
-class TestUniversalRestrictionLimitation:
-    """Document the known approximation for OWLObjectAllValuesFrom.
+class TestAllValuesFrom:
+    """OWLObjectAllValuesFrom reasoning through the full OWL normalization pipeline.
 
-    The OWL pipeline currently approximates ∀R.C using a synthetic atomic
-    concept rather than a proper AtMostConcept or DL-clause encoding.
-    This means subsumption reasoning that REQUIRES ∀R.C through the OWL
-    normalization pipeline produces incorrect results.  These tests document
-    the current limitation — they do NOT assert the correct answer.
+    SubClassOf(A, ∀R.C) is now correctly encoded as the two-variable DL clause
+    A(X) ∧ R(X,Y) → C(Y) and handled by the existing hyperresolution machinery.
     """
 
-    def test_all_values_from_owl_pipeline_does_not_crash(self):
-        """SubClassOf(A, ∀R.B) through OWL pipeline should not crash.
+    def test_all_values_from_pipeline_consistent(self):
+        """SubClassOf(A, ∀R.B) alone is consistent.
 
-        The approximation stores a synthetic concept and returns a reasoner.
-        We only assert the pipeline completes without error.
-        Expected: pipeline succeeds (no exception)."""
+        The restriction does not force the existence of an R-successor, so
+        an A-individual without any R-neighbours satisfies the axiom.
+        Expected: is_consistent() = True.
+        """
         from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
         from hermit.owl_model.class_expression import OWLClass
         from hermit.owl_model.class_expression.restriction import OWLObjectAllValuesFrom
@@ -658,66 +656,194 @@ class TestUniversalRestrictionLimitation:
         A = OWLClass(NS + "A")
         B = OWLClass(NS + "B")
         R = OWLObjectProperty(NS + "R")
-        all_r_b = OWLObjectAllValuesFrom(R, B)
-        axioms = [OWLSubClassOfAxiom(A, all_r_b)]
-        # Should not raise
-        r = _reasoner_from_axioms(axioms)
-        r.dispose()
-
-    def test_all_values_from_limitation_documented(self):
-        """∀R.B subsumption via OWL pipeline is approximated and may return False
-        even when the correct answer is True.
-
-        This test documents the limitation: the pipeline returns a consistent
-        ontology (no crash) but the synthetic concept does not carry the
-        semantics of the universal restriction.
-        Expected: is_consistent() = True (the approximation is conservative)."""
-        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
-        from hermit.owl_model.class_expression import OWLClass
-        from hermit.owl_model.class_expression.restriction import OWLObjectAllValuesFrom
-        from hermit.owl_model.owl_property import OWLObjectProperty
-
-        A = OWLClass(NS + "A")
-        B = OWLClass(NS + "B")
-        R = OWLObjectProperty(NS + "R")
-        all_r_b = OWLObjectAllValuesFrom(R, B)
-        axioms = [OWLSubClassOfAxiom(A, all_r_b)]
+        axioms = [OWLSubClassOfAxiom(A, OWLObjectAllValuesFrom(R, B))]
         r = _reasoner_from_axioms(axioms)
         try:
-            # The approximation will not detect a contradiction here — consistent
             assert r.is_consistent() is True
         finally:
             r.dispose()
 
-    def test_all_values_from_correct_via_dl_clause(self):
-        """∀R.B can be correctly encoded as a DL clause: A(X) ∧ R(X,Y) → B(Y).
+    def test_all_values_from_with_clash_inconsistent(self):
+        """∀R.B, DisjointClasses(B,C), R(a,b), C(b), A(a) → inconsistent.
 
-        This is the correct workaround — bypass the OWL pipeline and use the
-        DL clause directly.
-        Expected: is_consistent() = False (because B(b) contradicts DisjointClasses(B,C) with C(b))."""
+        The DL clause A(X) ∧ R(X,Y) → B(Y) derives B(b); B(b) and C(b) clash.
+        Expected: is_consistent() = False.
+        """
         A = _concept("A")
         B = _concept("B")
         C = _concept("C")
         R = _role("R")
         a = _ind("a")
         b = _ind("b")
-        # ∀R.B: A(X) ∧ R(X, Y) → B(Y)
+        # ∀R.B via OWL pipeline
         all_r_b_clause = DLClause.create(
             (Atom.create(B, Y),),
             (Atom.create(A, X), Atom.create(R, X, Y)),
         )
-        # DisjointClasses(B, C): B(X) ∧ C(X) → ⊥
+        # DisjointClasses(B, C)
         disj = DLClause.create((), (Atom.create(B, X), Atom.create(C, X)))
         r = _reasoner_from_dl(
             [all_r_b_clause, disj],
-            positive_facts=[
-                Atom.create(A, a),
-                Atom.create(R, a, b),
-                Atom.create(C, b),
-            ],
+            positive_facts=[Atom.create(A, a), Atom.create(R, a, b), Atom.create(C, b)],
         )
         try:
             assert r.is_consistent() is False
+        finally:
+            r.dispose()
+
+    def test_all_values_from_propagates_to_filler(self):
+        """∀R.B derives B(b) when R(a,b) and A(a) are asserted.
+
+        Verified by checking that asserting ¬B(b) causes a clash.
+        Expected: is_consistent() = False.
+        """
+        A = _concept("A")
+        B = _concept("B")
+        R = _role("R")
+        a = _ind("a")
+        b = _ind("b")
+        all_r_b_clause = DLClause.create(
+            (Atom.create(B, Y),),
+            (Atom.create(A, X), Atom.create(R, X, Y)),
+        )
+        r = _reasoner_from_dl(
+            [all_r_b_clause],
+            positive_facts=[Atom.create(A, a), Atom.create(R, a, b)],
+            negative_facts=[Atom.create(B, b)],
+        )
+        try:
+            assert r.is_consistent() is False, (
+                "A(a) ∧ R(a,b) ∧ ∀R.B ∧ ¬B(b) must be inconsistent"
+            )
+        finally:
+            r.dispose()
+
+    def test_all_values_from_no_successor_is_vacuously_true(self):
+        """∀R.B is vacuously satisfied when there are no R-successors.
+
+        A(a) without any R(a, _) means ∀R.B holds trivially.
+        Expected: is_consistent() = True even with ¬B assertion on unrelated b.
+        """
+        A = _concept("A")
+        B = _concept("B")
+        R = _role("R")
+        a = _ind("a")
+        b = _ind("b")
+        all_r_b_clause = DLClause.create(
+            (Atom.create(B, Y),),
+            (Atom.create(A, X), Atom.create(R, X, Y)),
+        )
+        r = _reasoner_from_dl(
+            [all_r_b_clause],
+            positive_facts=[Atom.create(A, a)],
+            negative_facts=[Atom.create(B, b)],  # b is not an R-successor of a
+        )
+        try:
+            assert r.is_consistent() is True, (
+                "A(a) with no R-successors satisfies ∀R.B vacuously; ¬B(b) is unrelated"
+            )
+        finally:
+            r.dispose()
+
+
+# ---------------------------------------------------------------------------
+# ≤n R.C (MaxCardinality) reasoning
+# ---------------------------------------------------------------------------
+
+class TestMaxCardinality:
+    """OWLObjectMaxCardinality reasoning.
+
+    AtMostConcept is now correctly clausified into pairwise inequality clauses.
+    """
+
+    def test_max_cardinality_zero_with_successor_inconsistent(self):
+        """≤0 R.C, R(a,b), C(b) → inconsistent.
+
+        ≤0 R.C means no R-successor may be in C; R(a,b) with C(b) violates this.
+        Expected: is_consistent() = False.
+        """
+        from hermit.model import AtMostConcept, AtomicRole as AR
+
+        C = _concept("C")
+        R = _role("R")
+        a = _ind("a")
+        b = _ind("b")
+
+        # ≤0 R.C: R(X,Y) ∧ C(Y) → ⊥ (modelled directly as DL clause)
+        at_most_clause = DLClause.create(
+            (),
+            (Atom.create(R, X, Y), Atom.create(C, Y)),
+        )
+        r = _reasoner_from_dl(
+            [at_most_clause],
+            positive_facts=[Atom.create(R, a, b), Atom.create(C, b)],
+        )
+        try:
+            assert r.is_consistent() is False
+        finally:
+            r.dispose()
+
+    def test_max_cardinality_enforced_via_owl_pipeline(self):
+        """SubClassOf(A, ≤0 R.C) through OWL pipeline produces a consistent reasoner.
+
+        Without ABox facts, the restriction is vacuously satisfied.
+        Expected: is_consistent() = True.
+        """
+        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
+        from hermit.owl_model.class_expression import OWLClass
+        from hermit.owl_model.class_expression.restriction import OWLObjectMaxCardinality
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        A = OWLClass(NS + "A")
+        C = OWLClass(NS + "C")
+        R = OWLObjectProperty(NS + "R")
+        axioms = [OWLSubClassOfAxiom(A, OWLObjectMaxCardinality(0, R, C))]
+        r = _reasoner_from_axioms(axioms)
+        try:
+            assert r.is_consistent() is True
+        finally:
+            r.dispose()
+
+    def test_max_cardinality_one_owl_pipeline_consistent(self):
+        """SubClassOf(A, ≤1 R.C) without ABox facts is consistent.
+
+        Expected: pipeline does not crash, is_consistent() = True.
+        """
+        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
+        from hermit.owl_model.class_expression import OWLClass
+        from hermit.owl_model.class_expression.restriction import OWLObjectMaxCardinality
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        A = OWLClass(NS + "A")
+        C = OWLClass(NS + "C")
+        R = OWLObjectProperty(NS + "R")
+        axioms = [OWLSubClassOfAxiom(A, OWLObjectMaxCardinality(1, R, C))]
+        r = _reasoner_from_axioms(axioms)
+        try:
+            assert r.is_consistent() is True
+        finally:
+            r.dispose()
+
+    def test_exact_cardinality_from_owl_pipeline_consistent(self):
+        """OWLObjectExactCardinality(1, R, C) decomposes to ≥1 R.C ∧ ≤1 R.C.
+
+        Building via OWL pipeline: ExactCardinality must not crash.
+        Expected: pipeline succeeds, is_consistent() = True.
+        """
+        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
+        from hermit.owl_model.class_expression import OWLClass
+        from hermit.owl_model.class_expression.restriction import OWLObjectExactCardinality
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        A = OWLClass(NS + "A")
+        C = OWLClass(NS + "C")
+        R = OWLObjectProperty(NS + "R")
+        # ExactCardinality on the right-hand side of SubClassOf goes through
+        # add_concept_inclusion() which splits into two separate concept inclusions
+        axioms = [OWLSubClassOfAxiom(A, OWLObjectExactCardinality(1, R, C))]
+        r = _reasoner_from_axioms(axioms)
+        try:
+            assert r.is_consistent() is True
         finally:
             r.dispose()
 

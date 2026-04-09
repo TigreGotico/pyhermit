@@ -239,7 +239,12 @@ class OWLNormalization:
         Special case: A ⊑ ∀R.C is handled by emitting a two-variable DL clause
         A(X) ∧ R(X,Y) → C(Y) directly, bypassing the concept-inclusion path.
         """
-        from hermit.owl_model.class_expression.restriction import OWLObjectAllValuesFrom
+        from hermit.owl_model.class_expression.restriction import (
+            OWLObjectAllValuesFrom,
+            OWLObjectExactCardinality,
+            OWLObjectMinCardinality,
+            OWLObjectMaxCardinality,
+        )
 
         sub_expr = self._expression_manager.get_nnf(axiom.sub_class)
         super_expr = self._expression_manager.get_nnf(axiom.super_class)
@@ -247,6 +252,21 @@ class OWLNormalization:
         # Intercept ∀R.C: emit two-variable DL clause directly
         if isinstance(super_expr, OWLObjectAllValuesFrom):
             self._emit_all_values_from_clause(sub_expr, super_expr, result)
+            return
+
+        # Intercept =n R.C: decompose to ≥n R.C and ≤n R.C (two separate axioms)
+        if isinstance(super_expr, OWLObjectExactCardinality):
+            n = super_expr.get_cardinality()
+            prop = super_expr.get_property()
+            filler = super_expr.get_filler()
+            self._process_sub_class_of(
+                OWLSubClassOfAxiom(axiom.sub_class, OWLObjectMinCardinality(n, prop, filler)),
+                result,
+            )
+            self._process_sub_class_of(
+                OWLSubClassOfAxiom(axiom.sub_class, OWLObjectMaxCardinality(n, prop, filler)),
+                result,
+            )
             return
 
         # ¬sub ⊔ super
