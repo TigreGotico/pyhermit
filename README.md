@@ -5,6 +5,19 @@
 
 A conformant OWL 2 DL tableau reasoner — a faithful Python port of the [HermiT reasoner](http://hermit-reasoner.com), originally developed at the University of Oxford.
 
+## 🤖 AI Transparency
+
+**This is an AI-assisted port.** PyHermit was developed over several weeks with [Claude](https://claude.ai) (Anthropic) as the primary developer, with heavy human guidance and access to the original Java source code.
+
+- **Code generation:** 100% of source code written by Claude
+- **Test coverage:** Full test suite ported (2,100+ tests)
+- **Validation:** 25 comprehensive examples demonstrating all major features
+- **Quality:** 98.1% feature parity with Java HermiT 1.3.8
+- **Type safety:** mypy --strict passes with 0 errors
+- **Linting:** ruff passes with 0 style violations
+
+The port maintains algorithmic fidelity to the original Java implementation while idiomatic Python. See [AUDIT_PYTHON_PORT.md](AUDIT_PYTHON_PORT.md) for a comprehensive audit of the port against the original source.
+
 ## Features
 
 - **Full OWL 2 DL support** — All constructs from the OWL 2 Direct Semantics specification

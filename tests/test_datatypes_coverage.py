@@ -1659,8 +1659,6 @@ class TestDatatypeManagerInit:
 
         items = [[dr, mock_node]]
         dm = DatatypeManager(t)
-        # Patch active_variables to be a list (source uses .append and indexing on it)
-        dm.m_conjunction.m_active_variables = []
         dm.m_assertions_delta_old_retrieval = _make_retrieval_iter(items)
         dm.m_assertions1_retrieval = _make_retrieval_iter([])
         dm.m_inequality_delta_old_retrieval = _make_retrieval_iter([])
@@ -1689,7 +1687,6 @@ class TestDatatypeManagerInit:
         try:
             items = [[Inequality.INSTANCE, mock_node1, mock_node2]]
             dm = DatatypeManager(t)
-            dm.m_conjunction.m_active_variables = []  # list for append/indexing
             dm.m_assertions_delta_old_retrieval = _make_retrieval_iter([])
             dm.m_inequality_delta_old_retrieval = _make_retrieval_iter(items)
             dm.m_assertions1_retrieval = _make_retrieval_iter([])
@@ -1820,7 +1817,6 @@ class TestDatatypeManagerInit:
 
         t = _make_mock_tableau()
         dm = DatatypeManager(t)
-        dm.m_conjunction.m_active_variables = []
 
         class FakeNode:
             def __init__(self, ident):
@@ -1861,7 +1857,6 @@ class TestDatatypeManagerInit:
 
         t = _make_mock_tableau()
         dm = DatatypeManager(t)
-        dm.m_conjunction.m_active_variables = []
 
         class FakeNode:
             def __init__(self, ident):
