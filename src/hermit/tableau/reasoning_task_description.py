@@ -205,12 +205,6 @@ class ReasoningTaskDescription:
 
 def _to_string_with_prefixes(obj: Any, prefixes: Any) -> str:
     """Convert *obj* to a string using *prefixes* if applicable."""
-    if isinstance(obj, DLPredicate):
-        return obj.to_string(prefixes)  # type: ignore[attr-defined]
-    if isinstance(obj, Role):
-        return obj.to_string(prefixes)  # type: ignore[attr-defined]
-    if isinstance(obj, Concept):
-        return obj.to_string(prefixes)  # type: ignore[attr-defined]
-    if isinstance(obj, Term):
-        return obj.to_string(prefixes)  # type: ignore[attr-defined]
+    if hasattr(obj, "to_string"):
+        return str(obj.to_string(prefixes))
     return str(obj)

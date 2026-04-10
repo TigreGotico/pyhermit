@@ -39,7 +39,7 @@ __all__ = [
 
 import sys
 import time
-from typing import Any, TextIO, TypeAlias
+from typing import Any, Sequence, TextIO, TypeAlias
 
 # Forward-reference types not yet ported -- all resolved to Any at runtime.
 _Tableau: TypeAlias = Any
@@ -82,15 +82,15 @@ class TableauMonitor:
     def node_pruned(self, node: _Node) -> None: ...
     def merge_fact_started(
         self, merge_from: _Node, merge_into: _Node,
-        source_tuple: tuple[Any, ...], target_tuple: tuple[Any, ...],
+        source_tuple: Sequence[Any], target_tuple: Sequence[Any],
     ) -> None: ...
     def merge_fact_finished(
         self, merge_from: _Node, merge_into: _Node,
-        source_tuple: tuple[Any, ...], target_tuple: tuple[Any, ...],
+        source_tuple: Sequence[Any], target_tuple: Sequence[Any],
     ) -> None: ...
     def merge_finished(self, merge_from: _Node, merge_into: _Node) -> None: ...
-    def clash_detection_started(self, tuples: tuple[tuple[Any, ...], ...]) -> None: ...
-    def clash_detection_finished(self, tuples: tuple[tuple[Any, ...], ...]) -> None: ...
+    def clash_detection_started(self, *tuples: Sequence[Any]) -> None: ...
+    def clash_detection_finished(self, *tuples: Sequence[Any]) -> None: ...
     def clash_detected(self) -> None: ...
     def backtrack_to_started(self, new_current_branching_point: _BranchingPoint) -> None: ...
     def tuple_removed(self, tuple_: tuple[Any, ...]) -> None: ...
@@ -209,19 +209,19 @@ class TableauMonitorAdapter(TableauMonitor):
     def node_pruned(self, node: _Node) -> None:
         pass
 
-    def merge_fact_started(self, merge_from: _Node, merge_into: _Node, source_tuple: tuple[Any, ...], target_tuple: tuple[Any, ...]) -> None:
+    def merge_fact_started(self, merge_from: _Node, merge_into: _Node, source_tuple: Sequence[Any], target_tuple: Sequence[Any]) -> None:
         pass
 
-    def merge_fact_finished(self, merge_from: _Node, merge_into: _Node, source_tuple: tuple[Any, ...], target_tuple: tuple[Any, ...]) -> None:
+    def merge_fact_finished(self, merge_from: _Node, merge_into: _Node, source_tuple: Sequence[Any], target_tuple: Sequence[Any]) -> None:
         pass
 
     def merge_finished(self, merge_from: _Node, merge_into: _Node) -> None:
         pass
 
-    def clash_detection_started(self, tuples: tuple[tuple[Any, ...], ...]) -> None:
+    def clash_detection_started(self, *tuples: Sequence[Any]) -> None:
         pass
 
-    def clash_detection_finished(self, tuples: tuple[tuple[Any, ...], ...]) -> None:
+    def clash_detection_finished(self, *tuples: Sequence[Any]) -> None:
         pass
 
     def clash_detected(self) -> None:
@@ -391,11 +391,11 @@ class TableauMonitorFork(TableauMonitor):
         self._first.node_pruned(node)
         self._second.node_pruned(node)
 
-    def merge_fact_started(self, merge_from: _Node, merge_into: _Node, source_tuple: tuple[Any, ...], target_tuple: tuple[Any, ...]) -> None:
+    def merge_fact_started(self, merge_from: _Node, merge_into: _Node, source_tuple: Sequence[Any], target_tuple: Sequence[Any]) -> None:
         self._first.merge_fact_started(merge_from, merge_into, source_tuple, target_tuple)
         self._second.merge_fact_started(merge_from, merge_into, source_tuple, target_tuple)
 
-    def merge_fact_finished(self, merge_from: _Node, merge_into: _Node, source_tuple: tuple[Any, ...], target_tuple: tuple[Any, ...]) -> None:
+    def merge_fact_finished(self, merge_from: _Node, merge_into: _Node, source_tuple: Sequence[Any], target_tuple: Sequence[Any]) -> None:
         self._first.merge_fact_finished(merge_from, merge_into, source_tuple, target_tuple)
         self._second.merge_fact_finished(merge_from, merge_into, source_tuple, target_tuple)
 
@@ -403,13 +403,13 @@ class TableauMonitorFork(TableauMonitor):
         self._first.merge_finished(merge_from, merge_into)
         self._second.merge_finished(merge_from, merge_into)
 
-    def clash_detection_started(self, tuples: tuple[tuple[Any, ...], ...]) -> None:
-        self._first.clash_detection_started(tuples)
-        self._second.clash_detection_started(tuples)
+    def clash_detection_started(self, *tuples: Sequence[Any]) -> None:
+        self._first.clash_detection_started(*tuples)
+        self._second.clash_detection_started(*tuples)
 
-    def clash_detection_finished(self, tuples: tuple[tuple[Any, ...], ...]) -> None:
-        self._first.clash_detection_finished(tuples)
-        self._second.clash_detection_finished(tuples)
+    def clash_detection_finished(self, *tuples: Sequence[Any]) -> None:
+        self._first.clash_detection_finished(*tuples)
+        self._second.clash_detection_finished(*tuples)
 
     def clash_detected(self) -> None:
         self._first.clash_detected()
@@ -635,11 +635,11 @@ class TableauMonitorForwarder(TableauMonitor):
         if self._forwarding_on:
             self._forwarding_target_monitor.node_pruned(node)
 
-    def merge_fact_started(self, merge_from: _Node, merge_into: _Node, source_tuple: tuple[Any, ...], target_tuple: tuple[Any, ...]) -> None:
+    def merge_fact_started(self, merge_from: _Node, merge_into: _Node, source_tuple: Sequence[Any], target_tuple: Sequence[Any]) -> None:
         if self._forwarding_on:
             self._forwarding_target_monitor.merge_fact_started(merge_from, merge_into, source_tuple, target_tuple)
 
-    def merge_fact_finished(self, merge_from: _Node, merge_into: _Node, source_tuple: tuple[Any, ...], target_tuple: tuple[Any, ...]) -> None:
+    def merge_fact_finished(self, merge_from: _Node, merge_into: _Node, source_tuple: Sequence[Any], target_tuple: Sequence[Any]) -> None:
         if self._forwarding_on:
             self._forwarding_target_monitor.merge_fact_finished(merge_from, merge_into, source_tuple, target_tuple)
 
@@ -647,13 +647,13 @@ class TableauMonitorForwarder(TableauMonitor):
         if self._forwarding_on:
             self._forwarding_target_monitor.merge_finished(merge_from, merge_into)
 
-    def clash_detection_started(self, tuples: tuple[tuple[Any, ...], ...]) -> None:
+    def clash_detection_started(self, *tuples: Sequence[Any]) -> None:
         if self._forwarding_on:
-            self._forwarding_target_monitor.clash_detection_started(tuples)
+            self._forwarding_target_monitor.clash_detection_started(*tuples)
 
-    def clash_detection_finished(self, tuples: tuple[tuple[Any, ...], ...]) -> None:
+    def clash_detection_finished(self, *tuples: Sequence[Any]) -> None:
         if self._forwarding_on:
-            self._forwarding_target_monitor.clash_detection_finished(tuples)
+            self._forwarding_target_monitor.clash_detection_finished(*tuples)
 
     def clash_detected(self) -> None:
         if self._forwarding_on:

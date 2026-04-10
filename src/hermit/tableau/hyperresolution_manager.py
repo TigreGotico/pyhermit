@@ -36,7 +36,7 @@ class CompiledDLClauseInfo:
     ) -> None:
         self.m_evaluator = evaluator
         self.m_next = next_info
-        self.m_index_in_list = (
+        self.m_index_in_list: int = (
             1 if next_info is None else next_info.m_index_in_list + 1
         )
 

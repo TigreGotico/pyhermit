@@ -292,11 +292,13 @@ class _TrieNodeManager:
         """Estimate memory usage."""
         size = len(self.m_index_pages) * 4 + len(self.m_object_pages) * 4
         for i in range(len(self.m_index_pages) - 1, -1, -1):
-            if self.m_index_pages[i] is not None:
-                size += len(self.m_index_pages[i]) * 4
+            ipage = self.m_index_pages[i]
+            if ipage is not None:
+                size += len(ipage) * 4
         for i in range(len(self.m_object_pages) - 1, -1, -1):
-            if self.m_object_pages[i] is not None:
-                size += len(self.m_object_pages[i]) * 4
+            opage = self.m_object_pages[i]
+            if opage is not None:
+                size += len(opage) * 4
         return size
 
     def clear(self) -> None:

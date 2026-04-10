@@ -77,8 +77,12 @@ class _YConstraint:
             if not extension_manager.contains_assertion(role, node_y, node_x):
                 return False
         node_y_mirror: Node
-        if node_y.is_blocked() and not node_y.get_blocking_object().block_violates_parent_constraints():
-            node_y_mirror = node_y.get_blocker()
+        _y_blocking_obj = node_y.get_blocking_object()
+        assert _y_blocking_obj is not None
+        if node_y.is_blocked() and not _y_blocking_obj.block_violates_parent_constraints():
+            _y_blocker = node_y.get_blocker()
+            assert _y_blocker is not None
+            node_y_mirror = _y_blocker
         else:
             node_y_mirror = node_y
         for concept in self.m_y_concepts:
@@ -123,7 +127,7 @@ class _SimpleConsequenceAtom(_ConsequenceAtom):
 
         if isinstance(self.m_dl_predicate, AnnotatedEquality):
             return self.m_assertion_buffer[1] is self.m_assertion_buffer[2]
-        return extension_manager.contains_tuple(tuple(self.m_assertion_buffer))
+        return extension_manager.contains_tuple(list(self.m_assertion_buffer))
 
 
 class _X2YOrY2XConsequenceAtom(_ConsequenceAtom):
@@ -136,10 +140,13 @@ class _X2YOrY2XConsequenceAtom(_ConsequenceAtom):
 
     def is_satisfied(self, extension_manager: ExtensionManager, dl_clause_info: DLClauseInfo, blocked_x: Node) -> bool:
         node_y = dl_clause_info.m_y_nodes[self.m_y_argument_index]
+        assert node_y is not None
         if node_y is blocked_x.parent:
-            node_x_real = blocked_x
+            node_x_real: Node = blocked_x
         else:
-            node_x_real = dl_clause_info.m_x_node
+            _xn = dl_clause_info.m_x_node
+            assert _xn is not None
+            node_x_real = _xn
         if self.m_is_x2y:
             return extension_manager.contains_assertion(self.m_atomic_role, node_x_real, node_y)
         return extension_manager.contains_assertion(self.m_atomic_role, node_y, node_x_real)
@@ -154,17 +161,20 @@ class _MirroredYConsequenceAtom(_ConsequenceAtom):
 
     def is_satisfied(self, extension_manager: ExtensionManager, dl_clause_info: DLClauseInfo, blocked_x: Node) -> bool:
         node_y = dl_clause_info.m_y_nodes[self.m_y_argument_index]
+        assert node_y is not None
         node_y_mirror: Node
         if node_y.is_blocked():
-            node_y_mirror = node_y.get_blocker()
+            _blocker = node_y.get_blocker()
+            assert _blocker is not None
+            node_y_mirror = _blocker
         else:
             node_y_mirror = node_y
         return extension_manager.contains_assertion(self.m_atomic_concept, node_y_mirror)
 
     def is_satisfied_non_mirrored(self, extension_manager: ExtensionManager, dl_clause_info: DLClauseInfo) -> bool:
-        return extension_manager.contains_assertion(
-            self.m_atomic_concept, dl_clause_info.m_y_nodes[self.m_y_argument_index]
-        )
+        _yn = dl_clause_info.m_y_nodes[self.m_y_argument_index]
+        assert _yn is not None
+        return extension_manager.contains_assertion(self.m_atomic_concept, _yn)
 
 
 class DLClauseInfo:
@@ -207,6 +217,7 @@ class DLClauseInfo:
             atom = dl_clause.body_atom(i)
             predicate = atom.predicate
             var1 = atom.argument_variable(0)
+            assert var1 is not None
 
             if isinstance(predicate, AtomicConcept):
                 if var1 == x_variable:
@@ -222,6 +233,7 @@ class DLClauseInfo:
                     z2concepts[var1].add(predicate)
             elif isinstance(predicate, AtomicRole):
                 var2 = atom.argument_variable(1)
+                assert var2 is not None
                 if var1 == x_variable:
                     if var2 == x_variable:
                         x2x_roles.add(predicate)
@@ -293,6 +305,7 @@ class DLClauseInfo:
             atom = dl_clause.head_atom(i)
             predicate = atom.predicate
             var1 = atom.argument_variable(0)
+            assert var1 is not None
             var2 = atom.argument_variable(1) if predicate.arity() == 2 else None
 
             if isinstance(predicate, AtomicConcept):
@@ -318,6 +331,7 @@ class DLClauseInfo:
                 )
                 self.m_consequences_for_nonblocked_x[i] = self.m_consequences_for_blocked_x[i]
             elif predicate == Equality.INSTANCE:
+                assert var2 is not None
                 if var1 == x_variable or var2 == x_variable:
                     if var2 == x_variable:
                         var1, var2 = var2, var1
@@ -347,6 +361,7 @@ class DLClauseInfo:
             elif isinstance(predicate, AnnotatedEquality):
                 var1 = atom.argument_variable(0)
                 var2 = atom.argument_variable(1)
+                assert var1 is not None and var2 is not None
                 var1_index = self._get_index_for(self.m_y_variables, var1)
                 var2_index = self._get_index_for(self.m_y_variables, var2)
                 self.m_consequences_for_blocked_x[i] = _SimpleConsequenceAtom(
@@ -408,7 +423,7 @@ class DLClauseInfo:
             if hasattr(retrieval, "clear"):
                 retrieval.clear()
 
-    def _get_index_for(self, variables: list[Variable], variable: Variable) -> int:
+    def _get_index_for(self, variables: list[Variable], variable: "Variable | None") -> int:
         for index, var in enumerate(variables):
             if var == variable:
                 return index
@@ -509,12 +524,14 @@ class BlockingValidator:
 
     def blocker_changed(self, node: Node) -> None:
         parent = node.parent
+        assert parent is not None
         blocking_obj = parent.get_blocking_object()
         assert isinstance(blocking_obj, ValidatedBlockingObject)
         blocking_obj.set_has_already_been_checked(False)
 
     def is_block_valid(self, blocked: Node) -> bool:
         blocked_parent = blocked.parent
+        assert blocked_parent is not None
         blocking_obj = blocked_parent.get_blocking_object()
         assert isinstance(blocking_obj, ValidatedBlockingObject)
         if not blocking_obj.has_already_been_checked():
@@ -555,6 +572,7 @@ class BlockingValidator:
 
     def _satisfies_constraints_for_blocked_x(self, blocked_x: Node) -> bool:
         blocker = blocked_x.get_blocker()
+        assert blocker is not None
         blocker_parent = blocker.parent
         self.m_binary_retrieval_1_bound.get_bindings_buffer()[1] = blocker
         self.m_binary_retrieval_1_bound.open()
@@ -568,6 +586,7 @@ class BlockingValidator:
                         if not self._satisfies_dl_clause_for_blocked_x(dl_clause_info, blocked_x):
                             return False
             elif hasattr(item, "number"):  # AtLeastConcept
+                assert blocker_parent is not None
                 if (
                     self.m_extension_manager.contains_role_assertion(item.on_role, blocker, blocker_parent)
                     and self.m_extension_manager.contains_concept_assertion(item.to_concept, blocker_parent)
@@ -587,6 +606,7 @@ class BlockingValidator:
         r = atleast.on_role
         c = atleast.to_concept
         blocked_x_parent = blocked_x.parent
+        assert blocked_x_parent is not None
 
         if self.m_extension_manager.contains_role_assertion(r, blocked_x, blocked_x_parent) \
                 and self.m_extension_manager.contains_concept_assertion(c, blocked_x_parent):
@@ -623,7 +643,9 @@ class BlockingValidator:
     def _satisfies_dl_clause_for_blocked_x(self, dl_clause_info: DLClauseInfo, blocked_x: Node) -> bool:
         assert blocked_x.is_directly_blocked()
         blocked_x_parent = blocked_x.parent
+        assert blocked_x_parent is not None
         blocker = blocked_x.get_blocker()
+        assert blocker is not None
 
         for atomic_concept in dl_clause_info.m_x_concepts:
             if not self.m_extension_manager.contains_assertion(atomic_concept, blocker):
@@ -711,6 +733,7 @@ class BlockingValidator:
             x_to_y_increment = 0
             y_to_x_increment = 0
             blocker = blocked_x.get_blocker()
+            assert blocker is not None
             blocker_parent = blocker.parent
             y_constraint = dl_clause_info.m_y_constraints[to_match_index_x_to_y + to_match_index_y_to_x]
             assert len(y_constraint.m_x2y_roles) != 0 or len(y_constraint.m_y2x_roles) != 0
@@ -921,7 +944,7 @@ class BlockingValidator:
                     and yi.is_blocked()
                     and not yi.get_blocking_object().block_violates_parent_constraints()  # type: ignore[union-attr]
                     and not self.m_extension_manager.contains_assertion(c, yi)
-                    and self.m_extension_manager.contains_assertion(c, yi.get_blocker())
+                    and self.m_extension_manager.contains_assertion(c, yi.get_blocker())  # type: ignore[arg-type]
                 ):
                     yi.get_blocking_object().set_block_violates_parent_constraints(True)  # type: ignore[union-attr]
                     return

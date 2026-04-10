@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
+from hermit.tableau.dependency_set import DependencySet
 
 
-class PermanentDependencySet:
+class PermanentDependencySet(DependencySet):
     """A permanent, interned dependency set.
 
     Permanent dependency sets are managed by :class:`DependencySetFactory`

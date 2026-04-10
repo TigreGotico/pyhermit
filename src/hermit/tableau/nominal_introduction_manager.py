@@ -8,13 +8,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from typing import cast
+
+from hermit.tableau.branching_point import BranchingPoint
 from hermit.tableau.dependency_set import DependencySet
 from hermit.tableau.tuple_table import TupleTable
 from hermit.tableau.tuple_table_full_index import TupleTableFullIndex
 
 if TYPE_CHECKING:
     from hermit.model import AnnotatedEquality
-    from hermit.tableau.branching_point import BranchingPoint
     from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau
 
@@ -203,7 +205,7 @@ class NominalIntroductionManager:
                 node2, ni_target_node, annotated_equality, node0, node1
             )
         if annotated_equality.cardinality > 1:
-            branching_point: BranchingPoint = _NominalIntroductionBranchingPoint(
+            branching_point = _NominalIntroductionBranchingPoint(
                 self.m_tableau,
                 node2,
                 ni_target_node,
@@ -261,10 +263,10 @@ class NominalIntroductionManager:
             )
             self.m_new_root_nodes_table.add_tuple(self.m_buffer_for_root_nodes)
             return new_root_node
-        return self.m_new_root_nodes_table.get_tuple_object(tuple_index, 3)
+        return cast("Node", self.m_new_root_nodes_table.get_tuple_object(tuple_index, 3))
 
 
-class _NominalIntroductionBranchingPoint:
+class _NominalIntroductionBranchingPoint(BranchingPoint):
     """Branching point for nominal introduction choices."""
 
     def __init__(
@@ -275,18 +277,12 @@ class _NominalIntroductionBranchingPoint:
         other_node: Node,
         annotated_equality: AnnotatedEquality,
     ) -> None:
-        from hermit.tableau.branching_point import BranchingPoint
-
-        self._bp = BranchingPoint(tableau)
+        super().__init__(tableau)
         self.m_root_node = root_node
         self.m_ni_target_node = ni_target_node
         self.m_other_node = other_node
         self.m_annotated_equality = annotated_equality
         self.m_current_root_node = 1  # First merge is performed from the manager
-
-    @property
-    def level(self) -> int:
-        return self._bp.level
 
     def start_next_choice(
         self, tableau: Tableau, clash_dependency_set: DependencySet
@@ -296,7 +292,7 @@ class _NominalIntroductionBranchingPoint:
         dependency_set = clash_dependency_set
         if self.m_current_root_node == self.m_annotated_equality.cardinality:
             dependency_set = tableau.m_dependency_set_factory.remove_branching_point(
-                dependency_set, self._bp.level
+                dependency_set, self.level
             )
         # Access the NI manager via tableau
         ni_manager = tableau.m_nominal_introduction_manager

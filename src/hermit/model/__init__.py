@@ -827,7 +827,7 @@ class Equality:
 
     __slots__ = ()
 
-    INSTANCE: ClassVar[Equality | None] = None
+    INSTANCE: ClassVar[Equality]
 
     def __init__(self) -> None:
         pass
@@ -857,7 +857,7 @@ class Inequality:
 
     __slots__ = ()
 
-    INSTANCE: ClassVar[Inequality | None] = None
+    INSTANCE: ClassVar[Inequality]
 
     def __init__(self) -> None:
         pass
@@ -1687,7 +1687,7 @@ class AnnotatedEquality:
 class NodeIDLessEqualThan:
     """Built-in predicate for node ordering in at-most translation."""
     __slots__ = ()
-    INSTANCE: ClassVar[NodeIDLessEqualThan | None] = None
+    INSTANCE: ClassVar[NodeIDLessEqualThan]
 
     def arity(self) -> int:
         return 2
@@ -1834,7 +1834,7 @@ class InternalDatatype(AtomicDataRange):
     """Internal datatype for DL clauses (ignored by datatype manager)."""
     __slots__ = ("_iri",)
     RDFS_LITERAL_IRI = "http://www.w3.org/2000/01/rdf-schema#Literal"
-    RDFS_LITERAL: ClassVar[InternalDatatype | None] = None
+    RDFS_LITERAL: ClassVar[InternalDatatype]
 
     def __init__(self, iri: str) -> None:
         self._iri = iri

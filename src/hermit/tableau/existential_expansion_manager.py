@@ -17,6 +17,7 @@ from hermit.model import (
     InverseRole,
     Role,
 )
+from hermit.tableau.dependency_set import DependencySet
 from hermit.tableau.tuple_table import TupleTable
 from hermit.tableau.union_dependency_set import UnionDependencySet
 
@@ -183,6 +184,7 @@ class ExistentialExpansionManager:
                         at_least, for_node
                     )
                 )
+                assert isinstance(result[1], DependencySet)
                 self.m_binary_union_dependency_set.m_dependency_sets[1] = result[1]
                 self.m_extension_manager.add_role_assertion(
                     at_least.on_role,
@@ -221,6 +223,7 @@ class ExistentialExpansionManager:
                     at_least, for_node
                 )
             )
+            assert existential_dependency_set is not None
             self.m_extension_manager.set_clash(existential_dependency_set)
             if self.m_tableau.m_tableau_monitor is not None:
                 self.m_tableau.m_tableau_monitor.existential_expansion_finished(
@@ -269,6 +272,7 @@ class ExistentialExpansionManager:
                 at_least_concept, for_node
             )
         )
+        assert existential_dependency_set is not None
         cardinality = at_least_concept.number
         if cardinality == 1:
             new_node = self.m_tableau.create_new_tree_node(
@@ -336,6 +340,7 @@ class ExistentialExpansionManager:
                 at_least_data_range, for_node
             )
         )
+        assert existential_dependency_set is not None
         cardinality = at_least_data_range.number
         if cardinality == 1:
             new_node = self.m_tableau.create_new_concrete_node(

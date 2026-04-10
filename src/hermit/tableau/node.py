@@ -146,7 +146,7 @@ class Node:
                 self.m_tableau.put_existential_concepts_buffer(
                     self.m_unprocessed_existentials
                 )
-        self.m_unprocessed_existentials = None
+        self.m_unprocessed_existentials = []  # node is destroyed; reset to empty
         self.m_previous_tableau_node = None
         self.m_next_tableau_node = None
         self.m_previous_merged_or_pruned_node = None
@@ -250,11 +250,11 @@ class Node:
         """Return the node type."""
         return self.m_node_type
 
-    def get_unprocessed_existentials(self) -> list:
+    def get_unprocessed_existentials(self) -> list[ExistentialConcept]:
         """Return unprocessed existentials."""
         return self.m_unprocessed_existentials
 
-    def set_unprocessed_existentials(self, existentials: list) -> None:
+    def set_unprocessed_existentials(self, existentials: list[ExistentialConcept]) -> None:
         """Set unprocessed existentials."""
         self.m_unprocessed_existentials = existentials
 
@@ -426,7 +426,8 @@ class Node:
         factory = self.m_tableau.m_dependency_set_factory
         result = factory.get_permanent(dependency_set)
         node: Node | None = self
-        while node.m_merged_into is not None:
+        while node is not None and node.m_merged_into is not None:
+            assert node.m_merged_into_dependency_set is not None
             result = factory.union_with(result, node.m_merged_into_dependency_set)
             node = node.m_merged_into
         return result
@@ -476,7 +477,7 @@ class Node:
 
     @property
     def unprocessed_existentials(self) -> list[ExistentialConcept]:
-        """Return the list of unprocessed existential concepts."""
+        """Return the list of unprocessed existential concepts (may be the sentinel list)."""
         return self.m_unprocessed_existentials
 
     # ------------------------------------------------------------------

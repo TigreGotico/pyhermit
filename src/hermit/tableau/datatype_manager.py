@@ -6,8 +6,9 @@ value-space subset enumeration, and datatype clash detection.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Sequence, cast
 
+from hermit.tableau.node_type import NodeType
 from hermit.tableau.union_dependency_set import UnionDependencySet
 
 if TYPE_CHECKING:
@@ -82,7 +83,7 @@ class DatatypeManager:
         )
 
     def additional_dl_ontology_set(self, additional_dl_ontology: DLOntology) -> None:
-        self.m_unknown_datatype_restrictions_additional = (
+        self.m_unknown_datatype_restrictions_additional = set(
             additional_dl_ontology.get_all_unknown_datatype_restrictions()
         )
 
@@ -117,10 +118,12 @@ class DatatypeManager:
                         and datatype_restriction in self.m_unknown_datatype_restrictions_additional
                     )
                 ):
+                    dep_set1 = self.m_assertions_delta_old_retrieval.get_dependency_set()
+                    assert dep_set1 is not None
                     self._generate_inequalities_for(
                         datatype_restriction,
                         tuple_buffer[1],
-                        self.m_assertions_delta_old_retrieval.get_dependency_set(),
+                        dep_set1,
                         AtomicNegationDataRange.create(datatype_restriction),
                     )
             elif isinstance(data_range_object, AtomicNegationDataRange):
@@ -135,10 +138,12 @@ class DatatypeManager:
                             and datatype_restriction in self.m_unknown_datatype_restrictions_additional
                         )
                     ):
+                        dep_set2 = self.m_assertions_delta_old_retrieval.get_dependency_set()
+                        assert dep_set2 is not None
                         self._generate_inequalities_for(
                             negation_data_range,
                             tuple_buffer[1],
-                            self.m_assertions_delta_old_retrieval.get_dependency_set(),
+                            dep_set2,
                             datatype_restriction,
                         )
             self.m_assertions_delta_old_retrieval.next()
@@ -155,7 +160,9 @@ class DatatypeManager:
 
         self.m_union_dependency_set.clear_constituents()
         self.m_union_dependency_set.add_constituent(dependency_set1)
-        self.m_union_dependency_set.add_constituent(None)
+        # Reserve slot 1 for the second dependency set set inside the loop below.
+        self.m_union_dependency_set.m_dependency_sets[self.m_union_dependency_set.m_number_of_constituents] = None
+        self.m_union_dependency_set.m_number_of_constituents += 1
         self.m_assertions0_retrieval.get_bindings_buffer()[0] = data_range2
         tuple_buffer = self.m_assertions0_retrieval.get_tuple_buffer()
         self.m_assertions0_retrieval.open()
@@ -237,7 +244,7 @@ class DatatypeManager:
             if reached_variable not in self.m_conjunction.m_active_variables:
                 self.m_conjunction.m_active_variables.add(reached_variable)
                 # Concrete root nodes act as "breakers" in the conjunction.
-                if reached_variable.m_node is not None and reached_variable.m_node.node_type != "ROOT_CONSTANT_NODE":
+                if reached_variable.m_node is not None and reached_variable.m_node.node_type != NodeType.ROOT_CONSTANT_NODE:
                     # Look for inequalities where reached_node occurs in first position.
                     self.m_inequality01_retrieval.get_bindings_buffer()[0] = Inequality.INSTANCE
                     self.m_inequality01_retrieval.get_bindings_buffer()[1] = reached_variable.m_node
@@ -326,16 +333,17 @@ class DatatypeManager:
                     data_range.datatype_iri,
                 ):
                     self.m_union_dependency_set.clear_constituents()
-                    self.m_union_dependency_set.add_constituent(
-                        self.m_extension_manager.get_assertion_dependency_set_unary(
-                            variable.m_most_specific_restriction, variable.m_node
-                        )
+                    assert variable.m_node is not None
+                    ds1 = self.m_extension_manager.get_assertion_dependency_set_unary(
+                        variable.m_most_specific_restriction, variable.m_node
                     )
-                    self.m_union_dependency_set.add_constituent(
-                        self.m_extension_manager.get_assertion_dependency_set_unary(
-                            data_range, variable.m_node
-                        )
+                    assert ds1 is not None
+                    self.m_union_dependency_set.add_constituent(ds1)
+                    ds2 = self.m_extension_manager.get_assertion_dependency_set_unary(
+                        data_range, variable.m_node
                     )
+                    assert ds2 is not None
+                    self.m_union_dependency_set.add_constituent(ds2)
                     if self.m_tableau_monitor is not None:
                         self.m_tableau_monitor.clash_detection_started(
                             [variable.m_most_specific_restriction, variable.m_node],
@@ -411,13 +419,17 @@ class DatatypeManager:
         variable.m_forbidden_data_values.clear()
         for restriction in reversed(variable.m_positive_datatype_restrictions):
             if explicit_data_values:
-                value_space_subset = DatatypeRegistry.create_value_space_subset(restriction)
+                value_space_subset = DatatypeRegistry.create_value_space_subset(
+                    restriction.datatype_iri, restriction._facet_uris, restriction._facet_values
+                )
                 self._eliminate_data_values_using_value_space_subset(
                     value_space_subset, explicit_data_values, False
                 )
         for restriction in reversed(variable.m_negative_datatype_restrictions):
             if explicit_data_values:
-                value_space_subset = DatatypeRegistry.create_value_space_subset(restriction)
+                value_space_subset = DatatypeRegistry.create_value_space_subset(
+                    restriction.datatype_iri, restriction._facet_uris, restriction._facet_values
+                )
                 self._eliminate_data_values_using_value_space_subset(
                     value_space_subset, explicit_data_values, True
                 )
@@ -451,6 +463,7 @@ class DatatypeManager:
         from hermit.datatypes.registry import DatatypeRegistry
 
         restriction = variable.m_most_specific_restriction
+        assert restriction is not None
         most_specific_datatype_uri = restriction.datatype_iri
         variable.m_value_space_subset = DatatypeRegistry.create_value_space_subset(
             most_specific_datatype_uri,
@@ -610,37 +623,45 @@ class DatatypeManager:
         self.m_union_dependency_set.clear_constituents()
         for variable in reversed(variables):
             self._load_assertion_dependency_sets(variable)
+            assert variable.m_node is not None
             for neighbor_variable in variable.m_unequal_to_direct:
+                assert neighbor_variable.m_node is not None
                 dependency_set = self.m_extension_manager.get_assertion_dependency_set_binary(
                     Inequality.INSTANCE, variable.m_node, neighbor_variable.m_node
                 )
+                assert dependency_set is not None
                 self.m_union_dependency_set.add_constituent(dependency_set)
         self.m_extension_manager.set_clash(self.m_union_dependency_set)
 
     def _load_assertion_dependency_sets(self, variable: DVariable) -> None:
         """Load dependency sets for all assertions on a variable."""
         node = variable.m_node
+        assert node is not None
         for data_range in reversed(variable.m_positive_datatype_restrictions):
             dependency_set = self.m_extension_manager.get_assertion_dependency_set_unary(
                 data_range, node
             )
+            assert dependency_set is not None
             self.m_union_dependency_set.add_constituent(dependency_set)
         for data_range in reversed(variable.m_negative_datatype_restrictions):
             literal_data_range = data_range.get_negation()
             dependency_set = self.m_extension_manager.get_assertion_dependency_set_unary(
                 literal_data_range, node
             )
+            assert dependency_set is not None
             self.m_union_dependency_set.add_constituent(dependency_set)
-        for data_range in reversed(variable.m_positive_constant_enumerations):
+        for const_enum in reversed(variable.m_positive_constant_enumerations):
             dependency_set = self.m_extension_manager.get_assertion_dependency_set_unary(
-                data_range, node
+                const_enum, node
             )
+            assert dependency_set is not None
             self.m_union_dependency_set.add_constituent(dependency_set)
-        for data_range in reversed(variable.m_negative_constant_enumerations):
-            literal_data_range = data_range.get_negation()
+        for const_enum in reversed(variable.m_negative_constant_enumerations):
+            literal_data_range = const_enum.get_negation()
             dependency_set = self.m_extension_manager.get_assertion_dependency_set_unary(
                 literal_data_range, node
             )
+            assert dependency_set is not None
             self.m_union_dependency_set.add_constituent(dependency_set)
 
 
@@ -749,7 +770,7 @@ class DConjunction:
         from hermit.model import Prefixes as Pfx
 
         if prefixes is None:
-            prefixes = Pfx.SEMANTIC_WEB_PREFIXES
+            prefixes = cast("Prefixes", Pfx.SEMANTIC_WEB_PREFIXES)
         parts = []
         first = True
         active_list = list(self.m_active_variables)
@@ -826,9 +847,9 @@ class DVariable:
         if self.m_has_explicit_data_values:
             return len(self.m_explicit_data_values) >= number
         if self.m_value_space_subset is not None:
-            return self.m_value_space_subset.has_cardinality_at_least(
+            return bool(self.m_value_space_subset.has_cardinality_at_least(
                 number + len(self.m_forbidden_data_values)
-            )
+            ))
         return True
 
     @property
@@ -880,7 +901,7 @@ class DVariable:
         )
 
     @staticmethod
-    def _lists_equal(first: list[object], second: list[object]) -> bool:
+    def _lists_equal(first: Sequence[object], second: Sequence[object]) -> bool:
         if len(first) != len(second):
             return False
         for item in first:
@@ -891,30 +912,30 @@ class DVariable:
     def __str__(self) -> str:
         parts = ["["]
         first = True
-        for item in self.m_positive_constant_enumerations:
+        for ce in self.m_positive_constant_enumerations:
             if first:
                 first = False
             else:
                 parts.append(", ")
-            parts.append(str(item))
-        for item in self.m_negative_constant_enumerations:
+            parts.append(str(ce))
+        for ce in self.m_negative_constant_enumerations:
             if first:
                 first = False
             else:
                 parts.append(", ")
-            parts.append(str(item.get_negation()))
-        for item in self.m_positive_datatype_restrictions:
+            parts.append(str(ce.get_negation()))
+        for dr in self.m_positive_datatype_restrictions:
             if first:
                 first = False
             else:
                 parts.append(", ")
-            parts.append(str(item))
-        for item in self.m_negative_datatype_restrictions:
+            parts.append(str(dr))
+        for dr in self.m_negative_datatype_restrictions:
             if first:
                 first = False
             else:
                 parts.append(", ")
-            parts.append(str(item.get_negation()))
+            parts.append(str(dr.get_negation()))
         parts.append("]")
         return "".join(parts)
 

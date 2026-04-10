@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from hermit.monitor import TableauMonitor
@@ -128,7 +128,7 @@ class ClashManager:
             or is_negated_concept_with_positives
         ):
             negation = (
-                dl_predicate_object.get_negation()
+                cast(LiteralConcept, dl_predicate_object).get_negation()
                 if isinstance(dl_predicate_object, (LiteralDataRange, LiteralConcept))
                 else None
             )

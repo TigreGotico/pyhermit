@@ -119,6 +119,7 @@ class Tableau:
             self.m_permanent_hyperresolution_manager = HyperresolutionManager(
                 self, permanent_dl_ontology.get_dl_clauses()
             )
+            self.m_additional_hyperresolution_manager: HyperresolutionManager | None
             if self.m_additional_dl_ontology is not None:
                 self.m_additional_hyperresolution_manager = HyperresolutionManager(
                     self, self.m_additional_dl_ontology.get_dl_clauses()
@@ -206,7 +207,7 @@ class Tableau:
         """Return the tableau monitor."""
         return self.m_tableau_monitor
 
-    def get_tableau_monitor(self):
+    def get_tableau_monitor(self) -> Any:
         """Return the tableau monitor (Java-compatible alias)."""
         return self.m_tableau_monitor
 
@@ -226,7 +227,7 @@ class Tableau:
             self.m_additional_dl_ontology is None
             or self.m_additional_dl_ontology.is_horn()
         )
-        strat_det = self.m_existential_expansion_strategy.is_deterministic()
+        strat_det = bool(self.m_existential_expansion_strategy.is_deterministic())
         return perm_horn and add_horn and strat_det
 
     @property
@@ -279,12 +280,12 @@ class Tableau:
         self.m_number_of_nodes_in_tableau = 0
         self.m_number_of_merged_or_pruned_nodes = 0
         self.m_number_of_node_creations = 0
-        self.m_first_free_node: Node | None = None
-        self.m_first_tableau_node: Node | None = None
-        self.m_last_tableau_node: Node | None = None
-        self.m_last_merged_or_pruned_node: Node | None = None
-        self.m_first_ground_disjunction: Any = None
-        self.m_first_unprocessed_ground_disjunction: Any = None
+        self.m_first_free_node = None
+        self.m_first_tableau_node = None
+        self.m_last_tableau_node = None
+        self.m_last_merged_or_pruned_node = None
+        self.m_first_ground_disjunction = None
+        self.m_first_unprocessed_ground_disjunction = None
         self.m_branching_points = [None, None]
         self.m_current_branching_point = -1
         self.m_nonbacktrackable_branching_point = -1
@@ -875,21 +876,23 @@ class Tableau:
         # Backtracking
         if self.m_extension_manager.contains_clash():
             clash_dependency_set = self.m_extension_manager.clash_dependency_set
+            assert clash_dependency_set is not None
             new_current_branching_point = (
-                clash_dependency_set.get_maximum_branching_point()  # type: ignore[union-attr]
+                clash_dependency_set.get_maximum_branching_point()
             )
             if new_current_branching_point <= self.m_nonbacktrackable_branching_point:
                 return False
             self._backtrack_to(new_current_branching_point)
-            branching_point = self.get_current_branching_point()
+            current_bp = self.get_current_branching_point()
+            assert current_bp is not None
             if self.m_tableau_monitor is not None:
                 self.m_tableau_monitor.start_next_branching_point_started(
-                    branching_point
+                    current_bp
                 )
-            branching_point.start_next_choice(self, clash_dependency_set)
+            current_bp.start_next_choice(self, clash_dependency_set)
             if self.m_tableau_monitor is not None:
                 self.m_tableau_monitor.start_next_branching_point_finished(
-                    branching_point
+                    current_bp
                 )
             self.m_dependency_set_factory.remove_unused_sets()
             return True
@@ -970,6 +973,7 @@ class Tableau:
             new_current_branching_point: The level to backtrack to.
         """
         branching_point = self.m_branching_points[new_current_branching_point]
+        assert branching_point is not None
         if self.m_tableau_monitor is not None:
             self.m_tableau_monitor.backtrack_to_started(branching_point)
 
@@ -980,11 +984,11 @@ class Tableau:
 
         # Backtrack unprocessed ground disjunctions
         self.m_first_unprocessed_ground_disjunction = (
-            branching_point.m_first_unprocessed_ground_disjunction
+            branching_point._first_unprocessed_ground_disjunction
         )
 
         # Backtrack added ground disjunctions
-        first_should_be = branching_point.m_first_ground_disjunction
+        first_should_be = branching_point._first_ground_disjunction
         while self.m_first_ground_disjunction is not first_should_be:
             self.m_first_ground_disjunction.destroy(self)
             self.m_first_ground_disjunction = (
@@ -1004,12 +1008,12 @@ class Tableau:
         self.m_extension_manager.backtrack()
 
         # Backtrack node merges / prunes
-        last_should_be = branching_point.m_last_merged_or_pruned_node
+        last_should_be = branching_point._last_merged_or_pruned_node
         while self.m_last_merged_or_pruned_node is not last_should_be:
             self._backtrack_last_merged_or_pruned_node()
 
         # Backtrack node change list
-        last_tableau_should_be = branching_point.m_last_tableau_node
+        last_tableau_should_be = branching_point._last_tableau_node
         while last_tableau_should_be is not self.m_last_tableau_node:
             self._destroy_last_tableau_node()
 
@@ -1170,6 +1174,7 @@ class Tableau:
 
         saved_merged_info: Node | None = None
         if node.m_node_state == NodeState.MERGED:
+            assert node.m_merged_into_dependency_set is not None
             self.m_dependency_set_factory.remove_usage(
                 node.m_merged_into_dependency_set
             )

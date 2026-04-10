@@ -81,16 +81,17 @@ class AnywhereBlocking(BlockingStrategy):
 
     def compute_blocking(self, final_chance: bool) -> None:
         if self.m_first_changed_node is not None:
-            node = self.m_first_changed_node
+            node: Node | None = self.m_first_changed_node
             while node is not None:
                 self.m_current_blockers_cache.remove_node(node)
                 node = node.get_next_tableau_node()
 
             node = self.m_first_changed_node
+            _bsc = self.m_blocking_signature_cache
             check_blocking_signature_cache = (
                 self.m_use_blocking_signature_cache
-                and self.m_blocking_signature_cache is not None
-                and not self.m_blocking_signature_cache.is_empty()
+                and _bsc is not None
+                and not _bsc.is_empty()
             )
 
             while node is not None:
@@ -113,7 +114,8 @@ class AnywhereBlocking(BlockingStrategy):
                         elif parent.is_blocked():
                             node.set_blocked(parent, False)
                         elif check_blocking_signature_cache:
-                            if self.m_blocking_signature_cache.contains_signature(node):
+                            assert _bsc is not None
+                            if _bsc.contains_signature(node):
                                 node.set_blocked(Node.SIGNATURE_CACHE_BLOCKER, True)
                             else:
                                 blocker = self.m_current_blockers_cache.get_blocker(node)
@@ -287,7 +289,7 @@ class _BlockersCache:
         bucket_index = self._get_index_for(hash_code, len(self.m_buckets))
         entry = self.m_buckets[bucket_index]
         while entry is not None:
-            if hash_code == entry.m_hash_code and self.m_direct_blocking_checker.is_blocked_by(entry.m_node, node):
+            if entry.m_node is not None and hash_code == entry.m_hash_code and self.m_direct_blocking_checker.is_blocked_by(entry.m_node, node):
                 raise RuntimeError("Internal error: node already in the cache!")
             entry = entry.m_next_entry
 
@@ -311,7 +313,7 @@ class _BlockersCache:
             bucket_index = self._get_index_for(hash_code, len(self.m_buckets))
             entry = self.m_buckets[bucket_index]
             while entry is not None:
-                if hash_code == entry.m_hash_code and self.m_direct_blocking_checker.is_blocked_by(entry.m_node, node):
+                if entry.m_node is not None and hash_code == entry.m_hash_code and self.m_direct_blocking_checker.is_blocked_by(entry.m_node, node):
                     return entry.m_node
                 entry = entry.m_next_entry
         return None

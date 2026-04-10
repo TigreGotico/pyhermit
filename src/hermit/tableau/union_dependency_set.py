@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from hermit.tableau.dependency_set import DependencySet
+from hermit.tableau.dependency_set import DependencySet
 
 
-class UnionDependencySet:
+class UnionDependencySet(DependencySet):
     """A temporary dependency set that is the union of multiple constituents.
 
     This is a lightweight, mutable structure used during computation.  When

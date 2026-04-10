@@ -104,6 +104,7 @@ class PairWiseDirectBlockingChecker(DirectBlockingChecker):
 
     def blocking_hash_code(self, node: Node) -> int:
         node_obj = node.get_blocking_object()
+        assert node.parent is not None
         parent_obj = node.parent.get_blocking_object()
         assert isinstance(node_obj, PairWiseBlockingObject)
         assert isinstance(parent_obj, PairWiseBlockingObject)
@@ -118,6 +119,8 @@ class PairWiseDirectBlockingChecker(DirectBlockingChecker):
         from hermit.tableau import NodeType
 
         parent = node.parent
+        if parent is None:
+            return False
         return (
             node.node_type == NodeType.TREE_NODE
             and (parent.node_type == NodeType.TREE_NODE or parent.node_type == NodeType.GRAPH_NODE)
@@ -127,6 +130,8 @@ class PairWiseDirectBlockingChecker(DirectBlockingChecker):
         from hermit.tableau import NodeType
 
         parent = node.parent
+        if parent is None:
+            return False
         return (
             node.node_type == NodeType.TREE_NODE
             and (parent.node_type == NodeType.TREE_NODE or parent.node_type == NodeType.GRAPH_NODE)
@@ -328,6 +333,7 @@ class PairWiseBlockingObject:
 
     def get_from_parent_label(self) -> Entry[AtomicRole] | frozenset[AtomicRole]:
         if self.m_from_parent_label is None:
+            assert self.m_node.parent is not None
             self.m_from_parent_label = self._checker._fetch_edge_label(self.m_node.parent, self.m_node)
             self._checker._atomic_roles_set_factory.add_reference(self.m_from_parent_label)
         return self.m_from_parent_label
@@ -348,6 +354,7 @@ class PairWiseBlockingObject:
 
     def get_to_parent_label(self) -> Entry[AtomicRole] | frozenset[AtomicRole]:
         if self.m_to_parent_label is None:
+            assert self.m_node.parent is not None
             self.m_to_parent_label = self._checker._fetch_edge_label(self.m_node, self.m_node.parent)
             self._checker._atomic_roles_set_factory.add_reference(self.m_to_parent_label)
         return self.m_to_parent_label
@@ -381,6 +388,7 @@ class PairWiseBlockingSignature(BlockingSignature):
     def __init__(self, checker: PairWiseDirectBlockingChecker, node: Node) -> None:
         super().__init__()
         node_obj = node.get_blocking_object()
+        assert node.parent is not None
         parent_obj = node.parent.get_blocking_object()
         assert isinstance(node_obj, PairWiseBlockingObject)
         assert isinstance(parent_obj, PairWiseBlockingObject)
@@ -402,6 +410,7 @@ class PairWiseBlockingSignature(BlockingSignature):
 
     def blocks_node(self, node: Node) -> bool:
         node_obj = node.get_blocking_object()
+        assert node.parent is not None
         parent_obj = node.parent.get_blocking_object()
         assert isinstance(node_obj, PairWiseBlockingObject)
         assert isinstance(parent_obj, PairWiseBlockingObject)

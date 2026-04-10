@@ -134,7 +134,7 @@ class DescriptionGraphManager:
                                     retrieval.get_dependency_set()
                                 )
                                 self.m_binary_union_dependency_set.m_dependency_sets[1] = (
-                                    extension_table.get_dependency_set(tuple_index)
+                                    extension_table.get_dependency_set_by_index(tuple_index)
                                 )
                                 if self.m_tableau_monitor is not None:
                                     self.m_tableau_monitor.description_graph_checking_started(
@@ -232,9 +232,9 @@ class DescriptionGraphManager:
             extension_table.m_tuple_table.retrieve_tuple(auxiliary_tuple, tuple_index)
             if extension_table.is_tuple_active(tuple_index):
                 self.m_binary_union_dependency_set.m_dependency_sets[0] = (
-                    extension_table.get_dependency_set(tuple_index)
+                    extension_table.get_dependency_set_by_index(tuple_index)
                 )
-                is_core = extension_table.is_core(tuple_index)
+                is_core = extension_table.is_core_by_index(tuple_index)
                 if self.m_tableau_monitor is not None:
                     source_tuple = self.m_auxiliary_tuples2[graph_index]
                     for i in range(len(auxiliary_tuple)):
@@ -316,6 +316,7 @@ class DescriptionGraphManager:
         dependency_set = self.m_extension_manager.get_concept_assertion_dependency_set(
             exists_description_graph, for_node
         )
+        assert dependency_set is not None
         graph_index = self.m_description_graph_indices[description_graph]
         auxiliary_tuple = self.m_auxiliary_tuples1[graph_index]
         auxiliary_tuple[0] = description_graph

@@ -15,9 +15,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from hermit.tableau.dl_clause_evaluator import Worker
+
 if TYPE_CHECKING:
     from hermit.model import AtomicRole, DLClause, DataRange, Variable
-    from hermit.tableau import DLClauseEvaluator, ExtensionManager, Tableau, Worker
+    from hermit.tableau import DLClauseEvaluator, ExtensionManager, Tableau
 
 from hermit.tableau.node import Node
 from .blocking_strategy import BlockingStrategy
@@ -84,6 +86,7 @@ class AnywhereValidatedBlocking(BlockingStrategy):
             self.m_additional_blocking_validator = None
         else:
             additional_ontology = self.m_tableau.additional_dl_ontology
+            assert additional_ontology is not None
             self.m_additional_blocking_validator = BlockingValidator(
                 self.m_tableau, additional_ontology.dl_clauses
             )
@@ -106,7 +109,7 @@ class AnywhereValidatedBlocking(BlockingStrategy):
 
     def compute_pre_blocking(self) -> None:
         if self.m_first_changed_node is not None:
-            node = self.m_first_changed_node
+            node: Node | None = self.m_first_changed_node
             while node is not None:
                 self.m_current_blockers_cache.remove_node(node)
                 node = node.get_next_tableau_node()
@@ -179,12 +182,14 @@ class AnywhereValidatedBlocking(BlockingStrategy):
             if node.is_active():
                 if node.is_blocked():
                     # Check whether the block is a correct one
+                    _parent = node.parent
+                    _blocker = node.get_blocker()
                     if (
                         node.is_directly_blocked()
                         and (
                             self.m_direct_blocking_checker.has_changed_since_validation(node)
-                            or self.m_direct_blocking_checker.has_changed_since_validation(node.parent)
-                            or self.m_direct_blocking_checker.has_changed_since_validation(node.get_blocker())
+                            or (_parent is not None and self.m_direct_blocking_checker.has_changed_since_validation(_parent))
+                            or (_blocker is not None and self.m_direct_blocking_checker.has_changed_since_validation(_blocker))
                         )
                     ) or (node.parent is not None and not node.parent.is_blocked()):
                         valid_blocker: Node | None = None
@@ -218,9 +223,9 @@ class AnywhereValidatedBlocking(BlockingStrategy):
             if node.is_active():
                 self.m_direct_blocking_checker.set_has_changed_since_validation(node, False)
                 blocking_obj = node.get_blocking_object()
-                if hasattr(blocking_obj, "set_block_violates_parent_constraints"):
+                if blocking_obj is not None and hasattr(blocking_obj, "set_block_violates_parent_constraints"):
                     blocking_obj.set_block_violates_parent_constraints(False)
-                if hasattr(blocking_obj, "set_has_already_been_checked"):
+                if blocking_obj is not None and hasattr(blocking_obj, "set_has_already_been_checked"):
                     blocking_obj.set_has_already_been_checked(False)
             node = node.get_next_tableau_node()
 
@@ -400,7 +405,7 @@ class AnywhereValidatedBlocking(BlockingStrategy):
                     workers.append(_ComputeCoreVariables(dl_clause, variables, values_buffer, core_variables))
 
 
-class _ComputeCoreVariables:
+class _ComputeCoreVariables(Worker):
     """Worker that computes which variables should be treated as core.
 
     Mirrors the inner class ``ComputeCoreVariables`` from the Java original.

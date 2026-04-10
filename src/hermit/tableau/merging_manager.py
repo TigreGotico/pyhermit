@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
+
+from hermit.tableau.dependency_set import DependencySet
 
 if TYPE_CHECKING:
     from hermit.monitor import TableauMonitor
-    from hermit.tableau.dependency_set import DependencySet
     from hermit.tableau.extension_manager import ExtensionManager
     from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau
@@ -88,6 +89,7 @@ class MergingManager:
         """
         from hermit.model import DescriptionGraph
 
+        assert node0.node_type is not None and node1.node_type is not None
         assert node0.node_type.is_abstract == node1.node_type.is_abstract
 
         if not node0.is_active() or not node1.is_active() or node0 is node1:
@@ -148,7 +150,7 @@ class MergingManager:
             self.m_tableau_monitor.merge_started(merge_from, merge_into)
 
         # --- Prune the subtree rooted at merge_from ---
-        node = merge_from
+        node: Node | None = merge_from
         while node is not None:
             if (
                 node.is_active()
@@ -255,8 +257,9 @@ class MergingManager:
             retrieval3.next()
 
         # --- Merge description graphs ---
+        from hermit.tableau.union_dependency_set import UnionDependencySet as _UDS
         self.m_tableau.m_description_graph_manager.merge_graphs(
-            merge_from, merge_into, self.m_binary_union_dependency_set
+            merge_from, merge_into, cast(_UDS, self.m_binary_union_dependency_set)
         )
 
         # --- Finally merge the nodes ---
@@ -300,7 +303,7 @@ class MergingManager:
         return False
 
 
-class _UnionDependencySet:
+class _UnionDependencySet(DependencySet):
     """Minimal union-of-two dependency sets used inline by MergingManager."""
 
     __slots__ = ("m_dependency_sets", "m_number_of_constituents")

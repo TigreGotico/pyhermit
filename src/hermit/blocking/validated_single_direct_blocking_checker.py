@@ -147,6 +147,8 @@ class ValidatedSingleDirectBlockingChecker(DirectBlockingChecker):
         from hermit.tableau import NodeType
 
         parent = node.parent
+        if parent is None:
+            return False
         return (
             node.node_type == NodeType.TREE_NODE
             and (not self._has_inverses
@@ -158,6 +160,8 @@ class ValidatedSingleDirectBlockingChecker(DirectBlockingChecker):
         from hermit.tableau import NodeType
 
         parent = node.parent
+        if parent is None:
+            return False
         return (
             node.node_type == NodeType.TREE_NODE
             and (not self._has_inverses
@@ -371,6 +375,7 @@ class ValidatedSingleBlockingObject(ValidatedBlockingObject):
 
     def get_full_from_parent_label(self) -> Entry[AtomicRole] | frozenset[AtomicRole]:
         if self.m_has_changed_for_validation or self.m_full_from_parent_label is None:
+            assert self.m_node.parent is not None
             self.m_full_from_parent_label = self._checker._fetch_atomic_roles_label(
                 self.m_node.parent, self.m_node, False
             )
@@ -379,6 +384,7 @@ class ValidatedSingleBlockingObject(ValidatedBlockingObject):
 
     def get_full_to_parent_label(self) -> Entry[AtomicRole] | frozenset[AtomicRole]:
         if self.m_has_changed_for_validation or self.m_full_to_parent_label is None:
+            assert self.m_node.parent is not None
             self.m_full_to_parent_label = self._checker._fetch_atomic_roles_label(
                 self.m_node, self.m_node.parent, False
             )
@@ -413,6 +419,7 @@ class ValidatedSingleBlockingSignature(BlockingSignature):
     def __init__(self, checker: ValidatedSingleDirectBlockingChecker, node: Node) -> None:
         super().__init__()
         node_obj = node.get_blocking_object()
+        assert node.parent is not None
         parent_obj = node.parent.get_blocking_object()
         assert isinstance(node_obj, ValidatedSingleBlockingObject)
         assert isinstance(parent_obj, ValidatedSingleBlockingObject)

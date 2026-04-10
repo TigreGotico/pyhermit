@@ -81,6 +81,7 @@ class ValidatedPairwiseDirectBlockingChecker(DirectBlockingChecker):
 
         blocker_obj = blocker.get_blocking_object()
         blocked_obj = blocked.get_blocking_object()
+        assert blocker.parent is not None and blocked.parent is not None
         blocker_parent_obj = blocker.parent.get_blocking_object()
         blocked_parent_obj = blocked.parent.get_blocking_object()
         assert isinstance(blocker_obj, ValidatedPairwiseBlockingObject)
@@ -100,6 +101,7 @@ class ValidatedPairwiseDirectBlockingChecker(DirectBlockingChecker):
 
     def blocking_hash_code(self, node: Node) -> int:
         node_obj = node.get_blocking_object()
+        assert node.parent is not None
         parent_obj = node.parent.get_blocking_object()
         assert isinstance(node_obj, ValidatedPairwiseBlockingObject)
         assert isinstance(parent_obj, ValidatedPairwiseBlockingObject)
@@ -112,6 +114,8 @@ class ValidatedPairwiseDirectBlockingChecker(DirectBlockingChecker):
         from hermit.tableau import NodeType
 
         parent = node.parent
+        if parent is None:
+            return False
         return (
             node.node_type == NodeType.TREE_NODE
             and (not self._has_inverses
@@ -123,6 +127,8 @@ class ValidatedPairwiseDirectBlockingChecker(DirectBlockingChecker):
         from hermit.tableau import NodeType
 
         parent = node.parent
+        if parent is None:
+            return False
         return (
             node.node_type == NodeType.TREE_NODE
             and (not self._has_inverses
@@ -338,6 +344,7 @@ class ValidatedPairwiseBlockingObject(ValidatedBlockingObject):
 
     def get_full_from_parent_label(self) -> Entry[AtomicRole] | frozenset[AtomicRole]:
         if self.m_has_changed_for_validation or self.m_full_from_parent_label is None:
+            assert self.m_node.parent is not None
             self.m_full_from_parent_label = self._checker._fetch_atomic_roles_label(
                 self.m_node.parent, self.m_node, False
             )
@@ -346,6 +353,7 @@ class ValidatedPairwiseBlockingObject(ValidatedBlockingObject):
 
     def get_full_to_parent_label(self) -> Entry[AtomicRole] | frozenset[AtomicRole]:
         if self.m_has_changed_for_validation or self.m_full_to_parent_label is None:
+            assert self.m_node.parent is not None
             self.m_full_to_parent_label = self._checker._fetch_atomic_roles_label(
                 self.m_node, self.m_node.parent, False
             )
@@ -380,6 +388,7 @@ class ValidatedPairwiseBlockingSignature(BlockingSignature):
     def __init__(self, checker: ValidatedPairwiseDirectBlockingChecker, node: Node) -> None:
         super().__init__()
         node_obj = node.get_blocking_object()
+        assert node.parent is not None
         parent_obj = node.parent.get_blocking_object()
         assert isinstance(node_obj, ValidatedPairwiseBlockingObject)
         assert isinstance(parent_obj, ValidatedPairwiseBlockingObject)

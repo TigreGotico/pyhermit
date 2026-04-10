@@ -67,7 +67,6 @@ warn_unused_ignores = false
 
 # ---------------------------------------------------------------------------
 # mypy per-module overrides — pre-existing type debt outside tableau/blocking
-# These modules are not in scope for the current typing sprint.
 # ---------------------------------------------------------------------------
 
 [[tool.mypy.overrides]]
@@ -157,6 +156,7 @@ module = [
     "hermit.cli",
 ]
 ignore_errors = true
+
 
 
 [tool.ruff]

@@ -6,10 +6,10 @@ predicates applied to specific tableau nodes.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping, cast
 
 if TYPE_CHECKING:
-    from hermit.model import DLPredicate
+    from hermit.model import Concept, DLPredicate, Role
     from hermit.model import Prefixes
     from hermit.tableau.dependency_set import DependencySet
     from hermit.tableau.ground_disjunction_header import GroundDisjunctionHeader
@@ -177,7 +177,7 @@ class GroundDisjunction:
             dependency_set = arg0.add_canonical_node_dependency_set(dependency_set)
             arg0_node = arg0.get_canonical_node()
             return tableau.m_extension_manager.add_concept_assertion(
-                dl_predicate,
+                cast("Concept", dl_predicate),
                 arg0_node,
                 dependency_set,
                 self.is_core(disjunct_index),
@@ -193,7 +193,7 @@ class GroundDisjunction:
             arg0_node = arg0.get_canonical_node()
             arg1_node = arg1.get_canonical_node()
             return tableau.m_extension_manager.add_role_assertion(
-                dl_predicate,
+                cast("Role", dl_predicate),
                 arg0_node,
                 arg1_node,
                 dependency_set,
@@ -223,7 +223,7 @@ class GroundDisjunction:
             raise RuntimeError("Unsupported predicate arity.")
         raise RuntimeError("Unsupported predicate arity.")
 
-    def to_string(self, prefixes: Prefixes | None = None) -> str:
+    def to_string(self, prefixes: "Mapping[str, str] | Prefixes | None" = None) -> str:
         """Return a string representation."""
         from hermit.model import Equality
         from hermit.model import Prefixes as Pfx

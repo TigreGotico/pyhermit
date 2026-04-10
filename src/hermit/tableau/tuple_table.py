@@ -31,8 +31,9 @@ class TupleTable:
         """Estimate memory usage in bytes (approximate)."""
         size = len(self.m_pages) * 4
         for i in range(len(self.m_pages) - 1, -1, -1):
-            if self.m_pages[i] is not None:
-                size += len(self.m_pages[i]) * 4
+            page = self.m_pages[i]
+            if page is not None:
+                size += len(page) * 4
         return size
 
     @property

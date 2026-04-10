@@ -118,7 +118,7 @@ class ObjectPropertyInclusionManager:
             new_positive_concept_facts.append((subject_ind, fresh_concept))
 
             # DL clause: F_i(X) ∧ op(X, Y) → Y ≠ obj
-            head_atom = Atom.create(Inequality.INSTANCE, var_y, obj_ind)  # type: ignore[arg-type]
+            head_atom = Atom.create(Inequality.INSTANCE, var_y, obj_ind)
             body_atoms = (
                 Atom.create(fresh_concept, var_x),
                 Atom.create(role_pred, var_x, var_y),  # type: ignore[arg-type]

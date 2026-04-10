@@ -7,7 +7,9 @@ assertions, along with their dependency sets and core flags.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
+
+from hermit.tableau.permanent_dependency_set import PermanentDependencySet
 
 if TYPE_CHECKING:
     from hermit.model import Concept, DataRange, DLPredicate, Role
@@ -83,7 +85,7 @@ class LastObjectDependencySetManager(DependencySetManager):
     def get_dependency_set(self, tuple_index: int) -> DependencySet | None:
         arity = self._extension_table.m_tuple_arity
         table = self._extension_table.m_tuple_table
-        return table.get_tuple_object(tuple_index, arity)
+        return cast("DependencySet | None", table.get_tuple_object(tuple_index, arity))
 
     def store_dependency_set(self, tuple_index: int, dependency_set: DependencySet) -> None:
         arity = self._extension_table.m_tuple_arity
@@ -200,11 +202,20 @@ class ExtensionTable(ABC):
     @abstractmethod
     def propagate_delta_new(self) -> bool: ...
 
+    def get_dependency_set_by_index(self, tuple_index: int) -> DependencySet | None:
+        """Return the dependency set for the tuple at *tuple_index*."""
+        return self.m_dependency_set_manager.get_dependency_set(tuple_index)
+
+    def is_core_by_index(self, tuple_index: int) -> bool:
+        """Return whether the tuple at *tuple_index* is a core tuple."""
+        return self.m_core_manager.is_core(tuple_index)
+
     def is_tuple_active(self, tuple_index: int) -> bool:
         """Return True if the tuple at the given index is currently active."""
         slot_size = self.m_tuple_arity + 1
         return tuple_index * slot_size < self._after_extension_this_tuple_index * slot_size
 
+    @abstractmethod
     def create_retrieval(
         self,
         bound_mask_or_positions: list[bool] | list[int],
@@ -678,12 +689,12 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         if bound_mask_or_positions and isinstance(bound_mask_or_positions[0], bool):
             # Simple retrieval: (bound_mask, view)
             v = view_or_bindings if isinstance(view_or_bindings, str) else view
-            return _SimpleRetrieval(self, bound_mask_or_positions, v)
+            return _SimpleRetrieval(self, cast("list[bool]", bound_mask_or_positions), v)
         else:
             # Full retrieval: (binding_positions, bindings_buffer, tuple_buffer, owns_buffers, view)
             bindings = view_or_bindings if isinstance(view_or_bindings, list) else []
             return _FullRetrieval(
-                self, bound_mask_or_positions, bindings,
+                self, cast("list[int]", bound_mask_or_positions), bindings,
                 tuple_buffer or [None] * len(bound_mask_or_positions),
                 owns_buffers, view
             )
@@ -788,7 +799,7 @@ class ExtensionManager:
         self.m_fourary_auxiliary_tuple_contains: list[Any] = [None, None, None, None]
         self.m_fourary_auxiliary_tuple_add: list[Any] = [None, None, None, None]
 
-        self._clash_dependency_set: DependencySet | None = None
+        self._clash_dependency_set: PermanentDependencySet | None = None
         self._add_active = False
 
     # ------------------------------------------------------------------
@@ -913,6 +924,7 @@ class ExtensionManager:
         """Check whether *concept* is asserted to *node*."""
         from hermit.model import AtomicConcept
 
+        assert node.node_type is not None
         if node.node_type.is_abstract and AtomicConcept.THING is concept:
             return True
         self.m_binary_auxiliary_tuple_contains[0] = concept
@@ -925,6 +937,7 @@ class ExtensionManager:
         """Check whether *data_range* is asserted to *node*."""
         from hermit.datatypes import InternalDatatype
 
+        assert node.node_type is not None
         if not node.node_type.is_abstract and InternalDatatype.RDFS_LITERAL is data_range:
             return True
         self.m_binary_auxiliary_tuple_contains[0] = data_range

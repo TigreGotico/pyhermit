@@ -8,7 +8,7 @@ machine with a program counter and various instruction types.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from hermit.tableau.union_dependency_set import UnionDependencySet
 
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
         Term,
         Variable,
     )
-    from hermit.monitor.tableau_monitor import TableauMonitor
+    from hermit.monitor import TableauMonitor
     from hermit.tableau.dependency_set import DependencySet
     from hermit.tableau.extension_manager import ExtensionManager, Retrieval
     from hermit.tableau.ground_disjunction_header import GroundDisjunctionHeader
@@ -574,9 +574,9 @@ class DeriveDisjunction(Worker):
 
         arguments: list[Node] = [None] * len(self.m_copy_values_to_arguments)  # type: ignore[list-item]
         for argument_index in range(len(self.m_copy_values_to_arguments) - 1, -1, -1):
-            arguments[argument_index] = self.m_values_buffer[
+            arguments[argument_index] = cast("Node", self.m_values_buffer[
                 self.m_copy_values_to_arguments[argument_index]
-            ]
+            ])
         is_core = [False] * len(self.m_copy_is_core)
         for copy_index in range(len(self.m_copy_is_core) - 1, -1, -1):
             copy_from = self.m_copy_is_core[copy_index]
@@ -926,8 +926,11 @@ class ConjunctionCompiler:
             self._compile_heads()
         elif self.m_body_atoms[body_atom_index].get_dl_predicate() == NodeIDLessEqualThan.INSTANCE:
             atom = self.m_body_atoms[body_atom_index]
-            variable1_index = self.m_variables.index(atom.get_argument_variable(0))
-            variable2_index = self.m_variables.index(atom.get_argument_variable(1))
+            _v0 = atom.get_argument_variable(0)
+            _v1 = atom.get_argument_variable(1)
+            assert _v0 is not None and _v1 is not None
+            variable1_index = self.m_variables.index(_v0)
+            variable2_index = self.m_variables.index(_v1)
             self.m_workers.append(
                 BranchIfNotNodeIDLessEqualThan(
                     last_atom_next_element,
@@ -944,9 +947,9 @@ class ConjunctionCompiler:
             atom = self.m_body_atoms[body_atom_index]
             node_indexes = [0] * atom.arity()
             for index in range(atom.arity()):
-                node_indexes[index] = self.m_variables.index(
-                    atom.get_argument_variable(index)
-                )
+                _av = atom.get_argument_variable(index)
+                assert _av is not None
+                node_indexes[index] = self.m_variables.index(_av)
             self.m_workers.append(
                 BranchIfNotNodeIDsAscendingOrEqual(
                     last_atom_next_element,
@@ -1096,7 +1099,7 @@ class _DLClauseCompiler(ConjunctionCompiler):
         head_dl_clauses: list[DLClause],
         first_atom_retrieval: Retrieval,
     ) -> None:
-        body_atoms = body_dl_clause.get_body_atoms()
+        body_atoms = list(body_dl_clause.get_body_atoms())
         head_variables = _get_head_variables(head_dl_clauses)
         super().__init__(
             buffer_supply,
@@ -1145,6 +1148,7 @@ class _DLClauseCompiler(ConjunctionCompiler):
                 arity = atom.arity()
                 if arity == 1:
                     variable = atom.get_argument_variable(0)
+                    assert variable is not None
                     variable_index = self.m_variables.index(variable)
                     self.m_workers.append(
                         DeriveUnaryFact(
@@ -1159,6 +1163,7 @@ class _DLClauseCompiler(ConjunctionCompiler):
                 elif arity == 2:
                     var0 = atom.get_argument_variable(0)
                     var1 = atom.get_argument_variable(1)
+                    assert var0 is not None and var1 is not None
                     self.m_workers.append(
                         DeriveBinaryFact(
                             self.m_extension_manager,
@@ -1173,6 +1178,7 @@ class _DLClauseCompiler(ConjunctionCompiler):
                     var0 = atom.get_argument_variable(0)
                     var1 = atom.get_argument_variable(1)
                     var2 = atom.get_argument_variable(2)
+                    assert var0 is not None and var1 is not None and var2 is not None
                     self.m_workers.append(
                         DeriveTernaryFact(
                             self.m_extension_manager,
@@ -1204,11 +1210,13 @@ class _DLClauseCompiler(ConjunctionCompiler):
                     head_dl_predicates[head_index] = head_atom.get_dl_predicate()
                     for argument_index in range(head_atom.arity()):
                         variable = head_atom.get_argument_variable(argument_index)
+                        assert variable is not None
                         variable_index = self.m_variables.index(variable)
                         copy_values_to_arguments[index] = variable_index
                         index += 1
                     if head_dl_predicates[head_index].arity() == 1:
                         variable = head_atom.get_argument_variable(0)
+                        assert variable is not None
                         copy_is_core[head_index] = self.m_variables.index(variable)
                     else:
                         copy_is_core[head_index] = -1
