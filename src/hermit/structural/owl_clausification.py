@@ -156,7 +156,7 @@ class OWLClausification:
             dl_clause = clausifier.get_dl_clause()
             dl_clauses.add(dl_clause.get_safe_version(AtomicConcept.THING))
             # Flush pairwise clauses emitted by visit_at_most_concept
-            extra = getattr(clausifier, "_extra_clauses", None)
+            extra = clausifier._extra_clauses
             if extra:
                 for ec in extra:
                     dl_clauses.add(ec.get_safe_version(AtomicConcept.THING))
@@ -429,6 +429,7 @@ class NormalizedAxiomClausifier:
         self._data_range_converter = data_range_converter
         self._head_atoms: list[Atom] = []
         self._body_atoms: list[Atom] = []
+        self._extra_clauses: list[DLClause] = []
         self._positive_facts = positive_facts
         self._y_index = 0
         self._z_index = 0
@@ -541,15 +542,10 @@ class NormalizedAxiomClausifier:
                 Atom.create(role, X, y_var),  # type: ignore[arg-type]
                 Atom.create(filler, y_var),  # type: ignore[arg-type]
             )
-            self._extra_clauses: list[DLClause]
-            if not hasattr(self, "_extra_clauses"):
-                self._extra_clauses = []
             self._extra_clauses.append(DLClause.create((), body))
         else:
             # ≤n R.C: pairwise inequality for n+1 witnesses
             y_vars = [Variable.create(f"Y{i}") for i in range(n + 1)]
-            if not hasattr(self, "_extra_clauses"):
-                self._extra_clauses = []
             for i in range(n + 1):
                 for j in range(i + 1, n + 1):
                     body = tuple(saved_body) + (
