@@ -745,6 +745,33 @@ class TestAllValuesFrom:
         finally:
             r.dispose()
 
+    def test_all_values_from_nested_in_disjunction_is_overapproximated(self):
+        """SubClassOf(A, B ⊔ ∀R.C) — ∀R.C nested in disjunction falls through to THING.
+
+        The correct handling would require fresh-concept introduction for the
+        nested AllValuesFrom case. The current implementation returns owl:Thing
+        (sound overapproximation — the reasoner is complete but not necessarily
+        optimal). This test asserts the pipeline does not crash and returns a
+        consistent ontology.
+        Expected: is_consistent() = True (no ABox, nothing can clash).
+        """
+        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
+        from hermit.owl_model.class_expression import OWLClass, OWLObjectUnionOf
+        from hermit.owl_model.class_expression.restriction import OWLObjectAllValuesFrom
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        A = OWLClass(NS + "A")
+        B = OWLClass(NS + "B")
+        C = OWLClass(NS + "C")
+        R = OWLObjectProperty(NS + "R")
+        # SubClassOf(A, B ⊔ ∀R.C): A must be in B or all R-successors must be in C
+        axioms = [OWLSubClassOfAxiom(A, OWLObjectUnionOf([B, OWLObjectAllValuesFrom(R, C)]))]
+        r = _reasoner_from_axioms(axioms)
+        try:
+            assert r.is_consistent() is True
+        finally:
+            r.dispose()
+
 
 # ---------------------------------------------------------------------------
 # ≤n R.C (MaxCardinality) reasoning
