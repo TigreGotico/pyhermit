@@ -213,7 +213,7 @@ class HyperresolutionManager:
         no_terms_to_nodes: dict[Any, Any] = {}
         values_buffer_manager = ValuesBufferManager(dl_clauses, no_terms_to_nodes)
         ground_disjunction_header_manager = GroundDisjunctionHeaderManager()
-        union_dependency_sets_by_size: dict[int, Any] = {}  # type: ignore[valid-type]
+        union_dependency_sets_by_size: dict[int, Any] = {}
         guarding_atomic_concept_atoms1: list[Atom] = []
         guarding_atomic_concept_atoms2: list[Atom] = []
 
@@ -262,7 +262,7 @@ class HyperresolutionManager:
                         and isinstance(delta_atom.get_argument(0), Variable)
                         and isinstance(delta_atom.get_argument(1), Variable)
                     ):
-                        delta_atomic_role: AtomicRole = delta_dl_predicate  # type: ignore[assignment]
+                        delta_atomic_role: AtomicRole = delta_dl_predicate
                         self._get_atomic_role_clause_guard(
                             swapped_dl_clause,
                             guarding_atomic_concept_atoms1,
@@ -334,7 +334,7 @@ class HyperresolutionManager:
             )
         )
         self.m_buffers_to_clear = buffer_supply.get_all_buffers()
-        self.m_union_dependency_sets_to_clear: list[Any] = [None] * len(  # type: ignore[list-item]
+        self.m_union_dependency_sets_to_clear: list[Any] = [None] * len(
             union_dependency_sets_by_size
         )
         for i, val in enumerate(union_dependency_sets_by_size.values()):
@@ -412,7 +412,7 @@ class HyperresolutionManager:
                     and is_role_assertion
                 ):
                     node1 = delta_old_tuple_buffer[1]
-                    node2: Node = delta_old_tuple_buffer[2]  # type: ignore[assignment]
+                    node2: Node = delta_old_tuple_buffer[2]
                     unguarded_compiled_dl_clause_info = (
                         self.m_atomic_role_tuple_consumers_unguarded.get(
                             delta_old_predicate

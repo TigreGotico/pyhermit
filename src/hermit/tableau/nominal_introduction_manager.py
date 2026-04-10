@@ -170,7 +170,7 @@ class NominalIntroductionManager:
         self.m_buffer_for_annotated_equality[3] = node2
         self.m_buffer_for_annotated_equality[4] = permanent_dependency_set
         self.m_dependency_set_factory.add_usage(permanent_dependency_set)
-        self.m_annotated_equalities.add_tuple(self.m_buffer_for_annotated_equality)  # type: ignore[arg-type]
+        self.m_annotated_equalities.add_tuple(self.m_buffer_for_annotated_equality)
         return True
 
     def _apply_ni_rule(
@@ -249,19 +249,19 @@ class NominalIntroductionManager:
         self.m_buffer_for_root_nodes[1] = annotated_equality
         self.m_buffer_for_root_nodes[2] = number
         tuple_index = self.m_new_root_nodes_index.get_tuple_index_with_positions(
-            self.m_buffer_for_root_nodes,  # type: ignore[arg-type]
+            self.m_buffer_for_root_nodes,
             [0, 1, 2],
         )
         if tuple_index == -1:
             new_root_node = self.m_tableau._create_new_ni_node(dependency_set)
             self.m_buffer_for_root_nodes[3] = new_root_node
             self.m_new_root_nodes_index.add_tuple(
-                self.m_buffer_for_root_nodes,  # type: ignore[arg-type]
+                self.m_buffer_for_root_nodes,
                 self.m_new_root_nodes_table.first_free_tuple_index,
             )
-            self.m_new_root_nodes_table.add_tuple(self.m_buffer_for_root_nodes)  # type: ignore[arg-type]
+            self.m_new_root_nodes_table.add_tuple(self.m_buffer_for_root_nodes)
             return new_root_node
-        return self.m_new_root_nodes_table.get_tuple_object(tuple_index, 3)  # type: ignore[return-value]
+        return self.m_new_root_nodes_table.get_tuple_object(tuple_index, 3)
 
 
 class _NominalIntroductionBranchingPoint:

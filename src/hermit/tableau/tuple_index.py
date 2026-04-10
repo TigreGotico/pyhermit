@@ -442,7 +442,7 @@ class TupleIndexRetrieval:
         for position in range(self.m_selection_indices_length):
             obj = self.m_bindings_buffer[self.m_selection_indices[position]]
             self.m_current_trie_node = self.m_tuple_index._get_child_node(
-                self.m_current_trie_node, obj  # type: ignore[arg-type]
+                self.m_current_trie_node, obj
             )
             if self.m_current_trie_node == -1:
                 return

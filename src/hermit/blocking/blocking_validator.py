@@ -77,8 +77,8 @@ class _YConstraint:
             if not extension_manager.contains_assertion(role, node_y, node_x):
                 return False
         node_y_mirror: Node
-        if node_y.is_blocked() and not node_y.get_blocking_object().block_violates_parent_constraints():  # type: ignore[union-attr]
-            node_y_mirror = node_y.get_blocker()  # type: ignore[union-attr]
+        if node_y.is_blocked() and not node_y.get_blocking_object().block_violates_parent_constraints():
+            node_y_mirror = node_y.get_blocker()
         else:
             node_y_mirror = node_y
         for concept in self.m_y_concepts:
@@ -193,15 +193,15 @@ class DLClauseInfo:
     def __init__(self, dl_clause: DLClause, extension_manager: ExtensionManager) -> None:
         self.m_dl_clause = dl_clause
 
-        x_variable = Variable.create("X")  # type: ignore[name-defined]
+        x_variable = Variable.create("X")
 
         x_concepts: set[AtomicConcept] = set()
         x2x_roles: set[AtomicRole] = set()
-        ys: set[Variable] = set()  # type: ignore[valid-type]
-        y2concepts: dict[Variable, set[AtomicConcept]] = {}  # type: ignore[valid-type]
-        z2concepts: dict[Variable, set[AtomicConcept]] = {}  # type: ignore[valid-type]
-        x2y_roles: dict[Variable, set[AtomicRole]] = {}  # type: ignore[valid-type]
-        y2x_roles: dict[Variable, set[AtomicRole]] = {}  # type: ignore[valid-type]
+        ys: set[Variable] = set()
+        y2concepts: dict[Variable, set[AtomicConcept]] = {}
+        z2concepts: dict[Variable, set[AtomicConcept]] = {}
+        x2y_roles: dict[Variable, set[AtomicRole]] = {}
+        y2x_roles: dict[Variable, set[AtomicRole]] = {}
 
         for i in range(dl_clause.body_length()):
             atom = dl_clause.body_atom(i)
@@ -408,7 +408,7 @@ class DLClauseInfo:
             if hasattr(retrieval, "clear"):
                 retrieval.clear()
 
-    def _get_index_for(self, variables: list[Variable], variable: Variable) -> int:  # type: ignore[valid-type]
+    def _get_index_for(self, variables: list[Variable], variable: Variable) -> int:
         for index, var in enumerate(variables):
             if var == variable:
                 return index
@@ -797,7 +797,7 @@ class BlockingValidator:
         possibly_invalidly_blocked: list[Node] = []
         while not retrieval.after_last() and suitable_successors < required_successors:
             r_successor = tuple_buffer[position]
-            if r_successor.is_blocked() and not r_successor.get_blocking_object().block_violates_parent_constraints():  # type: ignore[union-attr]
+            if r_successor.is_blocked() and not r_successor.get_blocking_object().block_violates_parent_constraints():
                 if self.m_extension_manager.contains_concept_assertion(c, r_successor.get_blocker()):
                     suitable_successors += 1
                 else:

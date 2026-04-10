@@ -119,7 +119,7 @@ class DatatypeManager:
                 ):
                     self._generate_inequalities_for(
                         datatype_restriction,
-                        tuple_buffer[1],  # type: ignore[arg-type]
+                        tuple_buffer[1],
                         self.m_assertions_delta_old_retrieval.get_dependency_set(),
                         AtomicNegationDataRange.create(datatype_restriction),
                     )
@@ -137,7 +137,7 @@ class DatatypeManager:
                     ):
                         self._generate_inequalities_for(
                             negation_data_range,
-                            tuple_buffer[1],  # type: ignore[arg-type]
+                            tuple_buffer[1],
                             self.m_assertions_delta_old_retrieval.get_dependency_set(),
                             datatype_restriction,
                         )
@@ -160,7 +160,7 @@ class DatatypeManager:
         tuple_buffer = self.m_assertions0_retrieval.get_tuple_buffer()
         self.m_assertions0_retrieval.open()
         while not self.m_assertions0_retrieval.after_last():
-            node2: Node = tuple_buffer[1]  # type: ignore[assignment]
+            node2: Node = tuple_buffer[1]
             self.m_union_dependency_set.m_dependency_sets[1] = (
                 self.m_assertions0_retrieval.get_dependency_set()
             )
@@ -188,7 +188,7 @@ class DatatypeManager:
             from hermit.model import DataRange
 
             if isinstance(tuple_buffer[0], DataRange):
-                node: Node = tuple_buffer[1]  # type: ignore[assignment]
+                node: Node = tuple_buffer[1]
                 variable = self._get_and_initialize_variable_for(node, self.m_new_variable_added)
                 if self.m_new_variable_added[0]:
                     self.m_conjunction.clear_active_variables()
@@ -201,8 +201,8 @@ class DatatypeManager:
             from hermit.model import Inequality
 
             if tuple_buffer[0] is Inequality.INSTANCE:
-                node1: Node = tuple_buffer[1]  # type: ignore[assignment]
-                node2: Node = tuple_buffer[2]  # type: ignore[assignment]
+                node1: Node = tuple_buffer[1]
+                node2: Node = tuple_buffer[2]
                 if not node1.node_type.is_abstract and not node2.node_type.is_abstract:  # type: ignore[union-attr]
                     self.m_conjunction.clear_active_variables()
                     variable1 = self._get_and_initialize_variable_for(
@@ -237,7 +237,7 @@ class DatatypeManager:
             if reached_variable not in self.m_conjunction.m_active_variables:
                 self.m_conjunction.m_active_variables.add(reached_variable)
                 # Concrete root nodes act as "breakers" in the conjunction.
-                if reached_variable.m_node is not None and reached_variable.m_node.node_type != "ROOT_CONSTANT_NODE":  # type: ignore[union-attr]
+                if reached_variable.m_node is not None and reached_variable.m_node.node_type != "ROOT_CONSTANT_NODE":
                     # Look for inequalities where reached_node occurs in first position.
                     self.m_inequality01_retrieval.get_bindings_buffer()[0] = Inequality.INSTANCE
                     self.m_inequality01_retrieval.get_bindings_buffer()[1] = reached_variable.m_node
@@ -247,7 +247,7 @@ class DatatypeManager:
                         not self.m_extension_manager.contains_clash()
                         and not self.m_inequality01_retrieval.after_last()
                     ):
-                        new_node: Node = tuple_buffer[2]  # type: ignore[assignment]
+                        new_node: Node = tuple_buffer[2]
                         new_variable = self._get_and_initialize_variable_for(
                             new_node, self.m_new_variable_added
                         )
@@ -264,7 +264,7 @@ class DatatypeManager:
                         not self.m_extension_manager.contains_clash()
                         and not self.m_inequality02_retrieval.after_last()
                     ):
-                        new_node = tuple_buffer[1]  # type: ignore[assignment]
+                        new_node = tuple_buffer[1]
                         new_variable = self._get_and_initialize_variable_for(
                             new_node, self.m_new_variable_added
                         )

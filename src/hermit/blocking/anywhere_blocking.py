@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hermit.model import DLClause, Variable
-    from hermit.tableau import DLClauseEvaluator, Tableau
+    from hermit.tableau import DLClauseEvaluator, Tableau, Worker
 
 from hermit.tableau.node import Node
 
@@ -114,7 +114,7 @@ class AnywhereBlocking(BlockingStrategy):
                             node.set_blocked(parent, False)
                         elif check_blocking_signature_cache:
                             if self.m_blocking_signature_cache.contains_signature(node):
-                                node.set_blocked(Node.SIGNATURE_CACHE_BLOCKER, True)  # type: ignore[arg-type]
+                                node.set_blocked(Node.SIGNATURE_CACHE_BLOCKER, True)
                             else:
                                 blocker = self.m_current_blockers_cache.get_blocker(node)
                                 node.set_blocked(blocker, blocker is not None)
@@ -218,7 +218,7 @@ class AnywhereBlocking(BlockingStrategy):
 
     def dl_clause_body_compiled(
         self,
-        workers: list[DLClauseEvaluator.Worker],
+        workers: list[Worker],
         dl_clause: DLClause,
         variables: list[Variable],
         values_buffer: list[object],

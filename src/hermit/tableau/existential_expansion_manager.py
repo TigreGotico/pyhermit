@@ -115,7 +115,7 @@ class ExistentialExpansionManager:
         """Mark an existential as processed on a node."""
         self.m_auxiliary_tuple[0] = existential_concept
         self.m_auxiliary_tuple[1] = for_node
-        self.m_expanded_existentials.add_tuple(self.m_auxiliary_tuple)  # type: ignore[arg-type]
+        self.m_expanded_existentials.add_tuple(self.m_auxiliary_tuple)
         for_node._remove_from_unprocessed_existentials(existential_concept)
 
     def branching_point_pushed(self) -> None:
@@ -183,7 +183,7 @@ class ExistentialExpansionManager:
                         at_least, for_node
                     )
                 )
-                self.m_binary_union_dependency_set.m_dependency_sets[1] = result[1]  # type: ignore[index]
+                self.m_binary_union_dependency_set.m_dependency_sets[1] = result[1]
                 self.m_extension_manager.add_role_assertion(
                     at_least.on_role,
                     for_node,

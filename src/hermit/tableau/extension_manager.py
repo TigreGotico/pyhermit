@@ -83,7 +83,7 @@ class LastObjectDependencySetManager(DependencySetManager):
     def get_dependency_set(self, tuple_index: int) -> DependencySet | None:
         arity = self._extension_table.m_tuple_arity
         table = self._extension_table.m_tuple_table
-        return table.get_tuple_object(tuple_index, arity)  # type: ignore[return-value]
+        return table.get_tuple_object(tuple_index, arity)
 
     def store_dependency_set(self, tuple_index: int, dependency_set: DependencySet) -> None:
         arity = self._extension_table.m_tuple_arity
@@ -1028,9 +1028,9 @@ class ExtensionManager:
             return (
                 self.m_tableau.m_nominal_introduction_manager.can_forget_annotation(
                     tuple_data[0],
-                    tuple_data[1],  # type: ignore[arg-type]
-                    tuple_data[2],  # type: ignore[arg-type]
-                    tuple_data[3],  # type: ignore[arg-type]
+                    tuple_data[1],
+                    tuple_data[2],
+                    tuple_data[3],
                 )
                 and tuple_data[1] is tuple_data[2]
             )
@@ -1360,16 +1360,16 @@ class ExtensionManager:
             return result
         if Equality.INSTANCE is tuple_data[0]:
             return self.m_tableau.m_merging_manager.merge_nodes(
-                tuple_data[1],  # type: ignore[arg-type]
-                tuple_data[2],  # type: ignore[arg-type]
+                tuple_data[1],
+                tuple_data[2],
                 dependency_set,
             )
         if isinstance(tuple_data[0], AnnotatedEquality):
             return self.m_tableau.m_nominal_introduction_manager.add_annotated_equality(
                 tuple_data[0],
-                tuple_data[1],  # type: ignore[arg-type]
-                tuple_data[2],  # type: ignore[arg-type]
-                tuple_data[3],  # type: ignore[arg-type]
+                tuple_data[1],
+                tuple_data[2],
+                tuple_data[3],
                 dependency_set,
             )
         if self._add_active:

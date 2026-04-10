@@ -107,10 +107,10 @@ class DescriptionGraphManager:
             arity = len(tuple_buffer)
             while not retrieval.after_last() and not self.m_extension_manager.contains_clash():
                 if isinstance(tuple_buffer[0], DescriptionGraph):
-                    this_graph_index = self.m_description_graph_indices[tuple_buffer[0]]  # type: ignore[index]
+                    this_graph_index = self.m_description_graph_indices[tuple_buffer[0]]
                     this_tuple_index = retrieval.get_current_tuple_index()
                     for this_position_in_tuple in range(1, arity):
-                        node: Node = tuple_buffer[this_position_in_tuple]  # type: ignore[assignment]
+                        node: Node = tuple_buffer[this_position_in_tuple]
                         list_node = node.m_first_graph_occurrence_node
                         while list_node != -1:
                             graph_index = self.m_occurrence_manager.get_list_node_component(
@@ -155,8 +155,8 @@ class DescriptionGraphManager:
                                         )
                                         if node_first != node_second:
                                             self.m_merging_manager.merge_nodes(
-                                                node_first,  # type: ignore[arg-type]
-                                                node_second,  # type: ignore[arg-type]
+                                                node_first,
+                                                node_second,
                                                 self.m_binary_union_dependency_set,
                                             )
                                             has_change = True

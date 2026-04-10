@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hermit.model import AtomicRole, DLClause, DataRange, Variable
-    from hermit.tableau import DLClauseEvaluator, Tableau
+    from hermit.tableau import DLClauseEvaluator, Tableau, Worker
 
 from hermit.tableau.node import Node
 from .blocking_signature_cache import BlockingSignatureCache
@@ -84,7 +84,7 @@ class AncestorBlocking(BlockingStrategy):
                     and self.m_blocking_signature_cache is not None
                     and self.m_blocking_signature_cache.contains_signature(node)
                 ):
-                    node.set_blocked(Node.SIGNATURE_CACHE_BLOCKER, True)  # type: ignore[arg-type]
+                    node.set_blocked(Node.SIGNATURE_CACHE_BLOCKER, True)
                 else:
                     self._check_parent_blocking(node)
             node = node.get_next_tableau_node()
@@ -163,7 +163,7 @@ class AncestorBlocking(BlockingStrategy):
 
     def dl_clause_body_compiled(
         self,
-        workers: list[DLClauseEvaluator.Worker],
+        workers: list[Worker],
         dl_clause: DLClause,
         variables: list[Variable],
         values_buffer: list[object],

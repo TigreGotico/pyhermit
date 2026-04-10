@@ -11,6 +11,11 @@ SingleDirectBlockingChecker
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from hermit.model import Concept
+    from hermit.tableau import Node, Tableau
 
 from hermit.model import AtomicConcept, AtomicRole, DataRange
 from hermit.blocking.set_factory import Entry, SetFactory
@@ -53,7 +58,7 @@ class SingleDirectBlockingChecker(DirectBlockingChecker):
         if retrieval is not None and hasattr(retrieval, "clear"):
             retrieval.clear()
 
-    def is_blocked_by(self, blocker: Node, blocked: Node) -> bool:  # type: ignore[name-defined]
+    def is_blocked_by(self, blocker: Node, blocked: Node) -> bool:
         from hermit.tableau import NodeType
 
         blocker_obj = blocker.get_blocking_object()
@@ -68,50 +73,50 @@ class SingleDirectBlockingChecker(DirectBlockingChecker):
             == blocked_obj.get_atomic_concepts_label()
         )
 
-    def blocking_hash_code(self, node: Node) -> int:  # type: ignore[name-defined]
+    def blocking_hash_code(self, node: Node) -> int:
         obj = node.get_blocking_object()
         assert isinstance(obj, SingleBlockingObject)
         return obj.m_atomic_concepts_label_hash_code
 
-    def can_be_blocker(self, node: Node) -> bool:  # type: ignore[name-defined]
+    def can_be_blocker(self, node: Node) -> bool:
         from hermit.tableau import NodeType
 
         return node.node_type == NodeType.TREE_NODE
 
-    def can_be_blocked(self, node: Node) -> bool:  # type: ignore[name-defined]
+    def can_be_blocked(self, node: Node) -> bool:
         from hermit.tableau import NodeType
 
         return node.node_type == NodeType.TREE_NODE
 
-    def has_blocking_info_changed(self, node: Node) -> bool:  # type: ignore[name-defined]
+    def has_blocking_info_changed(self, node: Node) -> bool:
         obj = node.get_blocking_object()
         assert isinstance(obj, SingleBlockingObject)
         return obj.m_has_changed
 
-    def clear_blocking_info_changed(self, node: Node) -> None:  # type: ignore[name-defined]
+    def clear_blocking_info_changed(self, node: Node) -> None:
         obj = node.get_blocking_object()
         assert isinstance(obj, SingleBlockingObject)
         obj.m_has_changed = False
 
-    def has_changed_since_validation(self, node: Node) -> bool:  # type: ignore[name-defined]
+    def has_changed_since_validation(self, node: Node) -> bool:
         return False
 
-    def set_has_changed_since_validation(self, node: Node, has_changed: bool) -> None:  # type: ignore[name-defined]
+    def set_has_changed_since_validation(self, node: Node, has_changed: bool) -> None:
         pass  # no-op for single blocking
 
-    def node_initialized(self, node: Node) -> None:  # type: ignore[name-defined]
+    def node_initialized(self, node: Node) -> None:
         if node.get_blocking_object() is None:
             node.set_blocking_object(SingleBlockingObject(self, node))
         obj = node.get_blocking_object()
         assert isinstance(obj, SingleBlockingObject)
         obj.initialize()
 
-    def node_destroyed(self, node: Node) -> None:  # type: ignore[name-defined]
+    def node_destroyed(self, node: Node) -> None:
         obj = node.get_blocking_object()
         assert isinstance(obj, SingleBlockingObject)
         obj.destroy()
 
-    def assertion_added(self, concept: Concept, node: Node, is_core: bool) -> Node | None:  # type: ignore[name-defined]
+    def assertion_added(self, concept: Concept, node: Node, is_core: bool) -> Node | None:
         if isinstance(concept, AtomicConcept):
             obj = node.get_blocking_object()
             assert isinstance(obj, SingleBlockingObject)
@@ -119,7 +124,7 @@ class SingleDirectBlockingChecker(DirectBlockingChecker):
             return node
         return None
 
-    def assertion_removed(self, concept: Concept, node: Node, is_core: bool) -> Node | None:  # type: ignore[name-defined]
+    def assertion_removed(self, concept: Concept, node: Node, is_core: bool) -> Node | None:
         if isinstance(concept, AtomicConcept):
             obj = node.get_blocking_object()
             assert isinstance(obj, SingleBlockingObject)
@@ -127,34 +132,34 @@ class SingleDirectBlockingChecker(DirectBlockingChecker):
             return node
         return None
 
-    def assertion_added_dr(self, data_range: DataRange, node: Node, is_core: bool) -> Node | None:  # type: ignore[name-defined]
+    def assertion_added_dr(self, data_range: DataRange, node: Node, is_core: bool) -> Node | None:
         return None
 
-    def assertion_removed_dr(self, data_range: DataRange, node: Node, is_core: bool) -> Node | None:  # type: ignore[name-defined]
+    def assertion_removed_dr(self, data_range: DataRange, node: Node, is_core: bool) -> Node | None:
         return None
 
     def assertion_added_role(
         self, atomic_role: AtomicRole, node_from: Node, node_to: Node, is_core: bool
-    ) -> Node | None:  # type: ignore[name-defined]
+    ) -> Node | None:
         return None
 
     def assertion_removed_role(
         self, atomic_role: AtomicRole, node_from: Node, node_to: Node, is_core: bool
-    ) -> Node | None:  # type: ignore[name-defined]
+    ) -> Node | None:
         return None
 
-    def nodes_merged(self, merge_from: Node, merge_into: Node) -> Node | None:  # type: ignore[name-defined]
+    def nodes_merged(self, merge_from: Node, merge_into: Node) -> Node | None:
         return None
 
-    def nodes_unmerged(self, merge_from: Node, merge_into: Node) -> Node | None:  # type: ignore[name-defined]
+    def nodes_unmerged(self, merge_from: Node, merge_into: Node) -> Node | None:
         return None
 
-    def get_blocking_signature_for(self, node: Node) -> BlockingSignature:  # type: ignore[name-defined]
+    def get_blocking_signature_for(self, node: Node) -> BlockingSignature:
         return SingleBlockingSignature(self, node)
 
     # -- internal helpers --------------------------------------------------
 
-    def _fetch_atomic_concepts_label(self, node: Node) -> Entry[AtomicConcept] | frozenset[AtomicConcept]:  # type: ignore[name-defined]
+    def _fetch_atomic_concepts_label(self, node: Node) -> Entry[AtomicConcept] | frozenset[AtomicConcept]:
         self._atomic_concepts_buffer.clear()
         retrieval = self._binary_table_search_1_bound
         retrieval.get_bindings_buffer()[1] = node  # type: ignore[union-attr]
@@ -186,7 +191,7 @@ class SingleBlockingObject:
         "m_atomic_concepts_label_hash_code",
     )
 
-    def __init__(self, checker: SingleDirectBlockingChecker, node: Node) -> None:  # type: ignore[name-defined]
+    def __init__(self, checker: SingleDirectBlockingChecker, node: Node) -> None:
         self._checker = checker
         self.m_node = node
         self.m_has_changed = False
@@ -229,14 +234,14 @@ class SingleBlockingSignature(BlockingSignature):
 
     __slots__ = ("m_atomic_concepts_label",)
 
-    def __init__(self, checker: SingleDirectBlockingChecker, node: Node) -> None:  # type: ignore[name-defined]
+    def __init__(self, checker: SingleDirectBlockingChecker, node: Node) -> None:
         super().__init__()
         obj = node.get_blocking_object()
         assert isinstance(obj, SingleBlockingObject)
         self.m_atomic_concepts_label = obj.get_atomic_concepts_label()
         checker._atomic_concepts_set_factory.make_permanent(self.m_atomic_concepts_label)
 
-    def blocks_node(self, node: Node) -> bool:  # type: ignore[name-defined]
+    def blocks_node(self, node: Node) -> bool:
         obj = node.get_blocking_object()
         assert isinstance(obj, SingleBlockingObject)
         return obj.get_atomic_concepts_label() == self.m_atomic_concepts_label

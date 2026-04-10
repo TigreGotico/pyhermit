@@ -98,7 +98,7 @@ class DisjunctionBranchingPoint(BranchingPoint):
                 )
             elif isinstance(dl_predicate, AtomicConcept):
                 tableau.m_extension_manager.add_concept_assertion(
-                    dl_predicate.get_negation(),  # type: ignore[attr-defined]
+                    dl_predicate.get_negation(),
                     self._ground_disjunction.get_argument(previous_disjunct_index, 0),
                     dependency_set,
                     False,

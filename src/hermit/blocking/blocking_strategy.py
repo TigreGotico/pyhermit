@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hermit.model import AtomicConcept, AtomicRole, DLClause, DataRange, Variable
-    from hermit.tableau import DLClauseEvaluator, Node, Tableau
+    from hermit.tableau import DLClauseEvaluator, Node, Tableau, Worker
 
 
 class BlockingStrategy(ABC):
@@ -128,7 +128,7 @@ class BlockingStrategy(ABC):
     @abstractmethod
     def dl_clause_body_compiled(
         self,
-        workers: list[DLClauseEvaluator.Worker],
+        workers: list[Worker],
         dl_clause: DLClause,
         variables: list[Variable],
         values_buffer: list[object],

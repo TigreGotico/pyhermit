@@ -576,7 +576,7 @@ class DeriveDisjunction(Worker):
         for argument_index in range(len(self.m_copy_values_to_arguments) - 1, -1, -1):
             arguments[argument_index] = self.m_values_buffer[
                 self.m_copy_values_to_arguments[argument_index]
-            ]  # type: ignore[assignment]
+            ]
         is_core = [False] * len(self.m_copy_is_core)
         for copy_index in range(len(self.m_copy_is_core) - 1, -1, -1):
             copy_from = self.m_copy_is_core[copy_index]
@@ -642,11 +642,11 @@ class ValuesBufferManager:
     def __init__(
         self,
         dl_clauses: set[DLClause],
-        terms_to_nodes: dict[Term, Node],  # type: ignore[type-arg]
+        terms_to_nodes: dict[Term, Node],
     ) -> None:
         body_dl_predicates: set[DLPredicate] = set()
         variables: set[Variable] = set()
-        self.m_body_nonvariable_terms_to_indexes: dict[Term, int] = {}  # type: ignore[type-arg]
+        self.m_body_nonvariable_terms_to_indexes: dict[Term, int] = {}
         max_number_of_variables = 0
         for dl_clause in dl_clauses:
             variables.clear()
