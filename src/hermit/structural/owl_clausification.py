@@ -511,12 +511,15 @@ class NormalizedAxiomClausifier:
             self._head_atoms.append(Atom.create(concept, X))
 
     def visit_at_most_concept(self, concept: AtMostConcept) -> None:
-        """AtMostConcept (≤n R.C) -> pairwise inequality DL clauses.
+        """AtMostConcept (≤n R.C) -> pairwise equality DL clauses.
 
         For ≤n R.C: generate n+1 fresh Y-variables.  For each pair (Yi, Yj)
         with i < j, emit a separate DL clause:
 
-            A(X) ∧ R(X, Yi) ∧ C(Yi) ∧ R(X, Yj) ∧ C(Yj) → Yi ≠ Yj
+            A(X) ∧ R(X, Yi) ∧ C(Yi) ∧ R(X, Yj) ∧ C(Yj) → Yi = Yj
+
+        The equality head forces the tableau to nondeterministically merge
+        the two successor nodes — this is the correct DL encoding of ≤n R.C.
 
         The body atom A(X) is whatever is currently in self._body_atoms
         (the subclass of the current GCI).  The method temporarily builds
@@ -552,7 +555,7 @@ class NormalizedAxiomClausifier:
                         Atom.create(role, X, y_vars[j]),  # type: ignore[arg-type]
                         Atom.create(filler, y_vars[j]),  # type: ignore[arg-type]
                     )
-                    head = (Atom.create(Inequality.INSTANCE, y_vars[i], y_vars[j]),)  # type: ignore[arg-type]
+                    head = (Atom.create(Equality.INSTANCE, y_vars[i], y_vars[j]),)  # type: ignore[arg-type]
                     self._extra_clauses.append(DLClause.create(head, body))
 
         # No head atoms from this visit — the clauses are in _extra_clauses

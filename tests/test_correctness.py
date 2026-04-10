@@ -851,6 +851,98 @@ class TestMaxCardinality:
         finally:
             r.dispose()
 
+    def test_max_cardinality_one_violated_is_inconsistent(self):
+        """≤1 R.C with two distinct R-successors in C → inconsistent.
+
+        At-most-1 says R-successors in C must be merged (identical).
+        With DifferentIndividuals(b, c) the merge is forbidden, so the
+        ontology is inconsistent.
+        Expected: is_consistent() = False.
+        """
+        from hermit.model import Equality, AtomicRole as AR
+
+        C = _concept("C")
+        R = _role("R")
+        a = _ind("a")
+        b = _ind("b")
+        c = _ind("c")
+
+        Y1 = Variable.create("Y1")
+        Y2 = Variable.create("Y2")
+
+        # ≤1 R.C: A(X) ∧ R(X,Y1) ∧ C(Y1) ∧ R(X,Y2) ∧ C(Y2) → Y1 = Y2
+        at_most_clause = DLClause.create(
+            (Atom.create(Equality.INSTANCE, Y1, Y2),),
+            (
+                Atom.create(R, X, Y1),
+                Atom.create(C, Y1),
+                Atom.create(R, X, Y2),
+                Atom.create(C, Y2),
+            ),
+        )
+        # DifferentIndividuals(b, c) — encoded as Inequality fact
+        from hermit.model import Inequality
+        ineq_fact = Atom.create(Inequality.INSTANCE, b, c)
+
+        r = _reasoner_from_dl(
+            [at_most_clause],
+            positive_facts=[
+                Atom.create(R, a, b),
+                Atom.create(C, b),
+                Atom.create(R, a, c),
+                Atom.create(C, c),
+                ineq_fact,
+            ],
+        )
+        try:
+            assert r.is_consistent() is False, (
+                "Two distinct R-successors in C violates ≤1 R.C"
+            )
+        finally:
+            r.dispose()
+
+    def test_max_cardinality_one_owl_pipeline_violated(self):
+        """OWL pipeline: SubClassOf(A, ≤1 R.C) + ABox with 2 distinct R-successors → inconsistent.
+
+        This tests the full OWL → DL pipeline, including that the equality
+        head is emitted correctly and the tableau can detect the clash.
+        Expected: is_consistent() = False.
+        """
+        from hermit.owl_model.owl_axiom import (
+            OWLSubClassOfAxiom,
+            OWLClassAssertionAxiom,
+            OWLObjectPropertyAssertionAxiom,
+            OWLDifferentIndividualsAxiom,
+        )
+        from hermit.owl_model.class_expression import OWLClass
+        from hermit.owl_model.class_expression.restriction import OWLObjectMaxCardinality
+        from hermit.owl_model.owl_property import OWLObjectProperty
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+
+        A = OWLClass(NS + "A")
+        C = OWLClass(NS + "C")
+        R = OWLObjectProperty(NS + "R")
+        ind_a = OWLNamedIndividual(NS + "a")
+        ind_b = OWLNamedIndividual(NS + "b")
+        ind_c = OWLNamedIndividual(NS + "c")
+
+        axioms = [
+            OWLSubClassOfAxiom(A, OWLObjectMaxCardinality(1, R, C)),
+            OWLClassAssertionAxiom(ind_a, A),
+            OWLClassAssertionAxiom(ind_b, C),
+            OWLClassAssertionAxiom(ind_c, C),
+            OWLObjectPropertyAssertionAxiom(ind_a, R, ind_b),
+            OWLObjectPropertyAssertionAxiom(ind_a, R, ind_c),
+            OWLDifferentIndividualsAxiom([ind_b, ind_c]),
+        ]
+        r = _reasoner_from_axioms(axioms)
+        try:
+            assert r.is_consistent() is False, (
+                "OWL pipeline must detect ≤1 R.C violation with two distinct successors"
+            )
+        finally:
+            r.dispose()
+
     def test_exact_cardinality_from_owl_pipeline_consistent(self):
         """OWLObjectExactCardinality(1, R, C) decomposes to ≥1 R.C ∧ ≤1 R.C.
 

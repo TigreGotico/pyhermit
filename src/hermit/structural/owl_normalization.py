@@ -280,6 +280,27 @@ class OWLNormalization:
 
         # Simplify and normalize
         simplified = self._expression_manager.get_simplified(inclusion)
+
+        # If the simplified form is a disjunction containing ∀R.C operands,
+        # replace each with a fresh auxiliary concept and emit the DL clause
+        # directly.  This avoids the overapproximation (→ ⊤) that occurred
+        # when ∀R.C appeared nested inside a union.
+        from hermit.owl_model.class_expression.restriction import OWLObjectAllValuesFrom
+        if isinstance(simplified, OWLObjectUnionOf):
+            operand_list = list(simplified.operands())
+            changed = False
+            new_operands: list[OWLClassExpression] = []
+            for operand in operand_list:
+                if isinstance(operand, OWLObjectAllValuesFrom):
+                    fresh = self._fresh_concept("internal:allvalues-aux")
+                    self._emit_all_values_from_clause(fresh, operand, result)
+                    new_operands.append(fresh)
+                    changed = True
+                else:
+                    new_operands.append(operand)
+            if changed:
+                simplified = OWLObjectUnionOf(new_operands)  # type: ignore[arg-type]
+
         result.add_concept_inclusion(simplified)
 
     def _emit_all_values_from_clause(
