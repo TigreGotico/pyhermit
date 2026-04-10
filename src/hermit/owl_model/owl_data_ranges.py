@@ -8,7 +8,8 @@ DataRange := Datatype | DataIntersectionOf | DataUnionOf | DataComplementOf | Da
 """
 from .owl_object import OWLObject
 from .meta_classes import HasOperands
-from typing import Final, Sequence, Iterable
+from typing import Final
+from collections.abc import Sequence, Iterable
 
 from abc import ABCMeta
 
@@ -44,7 +45,7 @@ class OWLNaryDataRange(OWLDataRange, HasOperands[OWLDataRange]):
     def __eq__(self, other):
         if type(other) is type(self):
             return (set(self._operands) == set(other._operands)
-                    and len(list((self._operands))) == len(list((other._operands))))
+                    and len(list(self._operands)) == len(list(other._operands)))
         return False
 
     def __hash__(self):

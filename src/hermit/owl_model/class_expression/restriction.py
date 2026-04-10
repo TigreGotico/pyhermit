@@ -3,7 +3,8 @@
 """OWL Restrictions"""
 from abc import ABCMeta, abstractmethod
 from ..meta_classes import HasFiller, HasCardinality, HasOperands
-from typing import TypeVar, Generic, Final, Sequence, Union, Iterable
+from typing import TypeVar, Generic, Final, Union
+from collections.abc import Sequence, Iterable
 from .nary_boolean_expression import OWLObjectIntersectionOf, OWLObjectUnionOf
 from .class_expression import OWLAnonymousClassExpression, OWLClassExpression
 from ..owl_property import OWLPropertyExpression, OWLObjectPropertyExpression, OWLDataPropertyExpression
@@ -756,7 +757,7 @@ class OWLDataOneOf(OWLDataRange, HasOperands[OWLLiteral]):
 
     _values: Sequence[OWLLiteral]
 
-    def __init__(self, values: Union[OWLLiteral, Iterable[OWLLiteral]]):
+    def __init__(self, values: OWLLiteral | Iterable[OWLLiteral]):
         if isinstance(values, OWLLiteral):
             self._values = values,
         else:

@@ -1,114 +1,92 @@
 # PyHermit Documentation
 
-Welcome to PyHermit — a Python implementation of the HermiT OWL 2 DL reasoner. This guide takes you from complete beginner to advanced user.
+Welcome to PyHermit — a Python port of the HermiT OWL 2 DL reasoner.
 
-## 🚀 Getting Started (15 minutes)
+## Getting Started
 
 1. **[Installation](./installation.md)** — Set up PyHermit
 2. **[Concepts](./concepts.md)** — What are ontologies and reasoning?
 3. **[First Program](./first-program.md)** — Your first reasoner code
 
-## 📚 Tutorials (Zero to Hero)
+## Tutorials
 
 ### Level 0: Foundations
-- **[What is an Ontology?](./tutorials/00-ontologies.md)** — Understanding the concepts before coding
+- **[What is an Ontology?](./tutorials/00-ontologies.md)**
 
-### Level 1: Beginner (Classes & Rules)
+### Level 1: Beginner
 - **[Building Your First Ontology](./tutorials/01-build-ontology.md)**
-  - Creating classes and properties
-  - Class hierarchies and inheritance
-  - Adding constraints and rules
 
-### Level 2: Intermediate (Instances & Queries)
+### Level 2: Intermediate
 - **[Restrictions & Cardinality](./tutorials/02-restrictions.md)**
-  - Existential restrictions (∃)
-  - Universal restrictions (∀)
-  - Cardinality constraints
-  
 - **[Working with Instances](./tutorials/03-instances.md)**
-  - Adding data and individuals
-  - Type checking
-  - Running queries
 
-### Level 3: Advanced (Rules & Optimization)
+### Level 3: Advanced
 - **[Rules & Complex Queries](./tutorials/03-rules-and-queries.md)**
-  - SWRL-like rules
-  - Complex queries
-  - Reasoning chains
-
 - **[Advanced Reasoning Strategies](./tutorials/04-advanced-reasoning.md)**
-  - Performance optimization
-  - Precomputation vs on-demand
-  - Profiling and tuning
 
-## 🔍 How PyHermit Works
+## Architecture
 
-**Coming soon:** Deep dives into the algorithms and architecture
+PyHermit processes OWL ontologies through a fixed pipeline:
 
-- Tableau algorithm explanation
-- Normalization and clausification
-- Blocking strategies
-- Class hierarchy computation
+```
+OWL Axioms
+    |
+    v
+OWLNormalization          src/hermit/structural/owl_normalization.py
+    |  - Converts to Negation Normal Form
+    |  - Populates simple_object_property_inclusions
+    |    (from SubObjectPropertyOf, InverseObjectProperties)
+    |  - Populates complex_object_property_inclusions
+    |    (from TransitiveObjectProperty, SubPropertyChainOf)
+    v
+OWLClausification         src/hermit/structural/owl_clausification.py
+    |  - Calls ObjectPropertyInclusionManager.rewrite_axioms()
+    |  - Raises ValueError for OWL 2 non-simplicity violations
+    |  - Produces DLClauses and fact sets
+    v
+Tableau Expansion         src/hermit/tableau/
+    |  - Hyperresolution with configurable blocking
+    v
+DLOntology / Reasoner     src/hermit/reasoner.py
+```
 
-## 📖 API Reference
+### Key Classes
+
+| Class | Purpose | Source |
+|---|---|---|
+| `OWLNormalization` | Transforms OWL axioms to NNF; classifies simple/complex properties | `src/hermit/structural/owl_normalization.py:94` |
+| `OWLClausification` | Converts normalized axioms to DL clauses; enforces non-simplicity | `src/hermit/structural/owl_clausification.py:82` |
+| `ObjectPropertyInclusionManager` | Detects non-simple properties; validates OWL 2 constraints | `src/hermit/structural/object_property_inclusion_manager.py:21` |
+| `NormalizedAxioms` | Dataclass holding all normalized axiom collections | `src/hermit/structural/normalized_axioms.py` |
+| `load_ontology` | Loads OWL/RDF files via owlready2 into `OWLAxiom` objects | `src/hermit/parser.py:25` |
+| `Reasoner` | Main entry point for queries: consistency, classification, retrieval | `src/hermit/reasoner.py` |
+
+### Non-Simple Property Validation
+
+`ObjectPropertyInclusionManager.rewrite_axioms()` is called inside `OWLClausification.clausify()` at `src/hermit/structural/owl_clausification.py:132`. It raises `ValueError` if a non-simple property (transitive, in a role chain, or a superrole thereof) appears in:
+
+- `AsymmetricObjectProperty`
+- `IrreflexiveObjectProperty`
+- `DisjointObjectProperties`
+- `ObjectMinCardinality`, `ObjectMaxCardinality`, `ObjectExactCardinality`
+- `ObjectHasSelf`
+
+Detection uses a fixpoint propagation through `simple_object_property_inclusions` and always marks inverses of complex properties as complex. Source: `ObjectPropertyInclusionManager._detect_complex_properties` — `src/hermit/structural/object_property_inclusion_manager.py:167`.
+
+## API Reference
 
 - **[Core API](./api/core.md)** — Reasoner, classes, properties, axioms
 
-**Coming soon:**
-- OWL model reference
-- Query API
-- Configuration options
+## Recipes & Patterns
 
-## 💡 Recipes & Patterns
+- **[Common Design Patterns](./recipes/patterns.md)**
+- **[Debugging Guide](./recipes/debugging.md)**
 
-- **[Common Design Patterns](./recipes/patterns.md)** — 15 reusable ontology patterns
-- **[Debugging Guide](./recipes/debugging.md)** — How to find and fix issues
+## FAQ
 
-**Coming soon:**
-- Integration examples
-- Performance optimization
+- **[Frequently Asked Questions](./faq.md)**
 
-## ❓ FAQ
-
-- **[Frequently Asked Questions](./faq.md)** — Quick answers to 30+ common questions
-
-## 🔗 External Resources
+## External Resources
 
 - **[HermiT Official](http://hermit-reasoner.com)** — Original Java reasoner
 - **[OWL 2 Specification](https://www.w3.org/OWL/)** — W3C standard
-- **[RDF Concepts](https://www.w3.org/TR/rdf-concepts/)** — RDF basics
-
-## 🎯 Learning Paths
-
-### I want to...
-
-**...understand ontologies**
-1. [What is an Ontology?](./tutorials/00-ontologies.md)
-2. [Concepts](./concepts.md)
-3. [First Program](./first-program.md)
-
-**...build a simple ontology**
-1. [Installation](./installation.md)
-2. [Building Your First Ontology](./tutorials/01-build-ontology.md)
-3. [First Program](./first-program.md) (reference)
-
-**...add data and query it**
-1. [Restrictions](./tutorials/02-restrictions.md)
-2. [Instances](./tutorials/03-instances.md)
-3. [Rules & Queries](./tutorials/03-rules-and-queries.md)
-
-**...debug my ontology**
-1. [Debugging Guide](./recipes/debugging.md)
-2. [FAQ](./faq.md)
-3. [Concepts](./concepts.md) (for deeper understanding)
-
-**...optimize for performance**
-1. [Advanced Reasoning](./tutorials/04-advanced-reasoning.md)
-2. [FAQ - Performance section](./faq.md#performance--optimization)
-3. [Debugging Guide](./recipes/debugging.md)
-
----
-
-**Recommendation:** Start with [Concepts](./concepts.md) if you're new to ontologies, or jump to [Installation](./installation.md) if you're ready to code.
-
-**Questions?** Check the [FAQ](./faq.md) or [Debugging Guide](./recipes/debugging.md).

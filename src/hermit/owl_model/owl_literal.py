@@ -6,7 +6,7 @@ from abc import ABCMeta, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from .owl_annotation import OWLAnnotationValue
-from typing import Final, Optional, Union, Set
+from typing import Final, Union
 from .owl_datatype import OWLDatatype
 from datetime import datetime
 from datetime import timedelta, date, time
@@ -90,11 +90,11 @@ DurationOWLDatatype: Final = OWLDatatype(XSDVocabulary.DURATION)
 TopOWLDatatype: Final = OWLDatatype(OWLRDFVocabulary.RDFS_LITERAL)
 
 
-NUMERIC_DATATYPES: Final[Set[OWLDatatype]] = {FloatOWLDatatype, DoubleOWLDatatype, DecimalOWLDatatype,
+NUMERIC_DATATYPES: Final[set[OWLDatatype]] = {FloatOWLDatatype, DoubleOWLDatatype, DecimalOWLDatatype,
                                               IntegerOWLDatatype, IntOWLDatatype, PositiveIntegerOWLDatatype,
                                               NegativeIntegerOWLDatatype, NonPositiveIntegerOWLDatatype,
                                               NonNegativeIntegerOWLDatatype}
-TIME_DATATYPES: Final[Set[OWLDatatype]] = {DateOWLDatatype, DateTimeOWLDatatype, DurationOWLDatatype}
+TIME_DATATYPES: Final[set[OWLDatatype]] = {DateOWLDatatype, DateTimeOWLDatatype, DurationOWLDatatype}
 
 
 class FloatSpecialValue(Enum):
@@ -120,7 +120,7 @@ class OWLLiteral(OWLAnnotationValue, metaclass=ABCMeta):
 
     type_index: Final = 4008
 
-    def __new__(cls, value, type_: Optional[OWLDatatype] = None):
+    def __new__(cls, value, type_: OWLDatatype | None = None):
         """Convenience method that obtains a literal.
 
         Args:
@@ -425,7 +425,7 @@ class OWLLiteral(OWLAnnotationValue, metaclass=ABCMeta):
 class _OWLNumericLiteralInterface(OWLLiteral):
     __slots__ = '_v', '_type'
 
-    _v: Union[int, float, Decimal, FloatSpecialValue]
+    _v: int | float | Decimal | FloatSpecialValue
     _type: OWLDatatype
 
     def __init__(self, value, type_=None):
@@ -509,7 +509,7 @@ class _OWLLiteralImplFloat(_OWLNumericLiteralInterface):
     def is_float(self):
         return True
 
-    def parse_float(self) -> Union[float, FloatSpecialValue]:
+    def parse_float(self) -> float | FloatSpecialValue:
         return self._v
 
     def has_float_special_value(self):
@@ -527,7 +527,7 @@ class _OWLLiteralImplDouble(_OWLNumericLiteralInterface):
     def is_double(self):
         return True
 
-    def parse_double(self) -> Union[float, FloatSpecialValue]:
+    def parse_double(self) -> float | FloatSpecialValue:
         return self._v
 
     def has_float_special_value(self):
@@ -703,7 +703,7 @@ class _OWLLiteralImplString(OWLLiteral):
 
 class _OWLLiteralBasicsInterface(OWLLiteral):
     __slots__ = '_v', '_type'
-    _v: Union[datetime, date, time, timedelta, tuple, int]
+    _v: datetime | date | time | timedelta | tuple | int
     _type: OWLDatatype
 
     def __eq__(self, other):
@@ -746,7 +746,7 @@ class _OWLLiteralBasicsInterface(OWLLiteral):
 @total_ordering
 class _OWLDateAndTimeLiteralInterface(_OWLLiteralBasicsInterface):
     __slots__ = '_v', '_type'
-    _v: Union[datetime, date, time, timedelta]
+    _v: datetime | date | time | timedelta
     _type: OWLDatatype
 
     def __init__(self, value, type_=None):
@@ -820,7 +820,7 @@ class _OWLLiteralImplDuration(_OWLDateAndTimeLiteralInterface):
         hours, remainder = divmod(remainder, 3600)
         minutes, seconds = divmod(remainder, 60)
         sign = "-" if total_seconds < 0 else ""
-        parts = f"P"
+        parts = "P"
         if days:
             parts += f"{days}D"
         if hours or minutes or seconds:
@@ -860,7 +860,7 @@ class _OWLLiteralImplTime(_OWLDateAndTimeLiteralInterface):
 class _OWLGDatesInterface(_OWLLiteralBasicsInterface):
     __slots__ = '_v', '_type'
     # represent dual values as tuple of integers and single values as integers
-    _v: Union[tuple, int]
+    _v: tuple | int
     _type: OWLDatatype
 
     def __init__(self, value, type_=None):

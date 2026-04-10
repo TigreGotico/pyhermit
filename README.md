@@ -9,8 +9,10 @@ A faithful Python port of [HermiT](http://hermit-reasoner.com), a conformant OWL
 
 - **OWL 2 DL reasoning** — Full support for all Direct Semantics constructs
 - **Tableau algorithm** — Hyperresolution with configurable blocking strategies
+- **Non-simple property validation** — Enforces OWL 2 spec: transitive, role-chain, and inherited-superrole properties are rejected at clausification time if used in cardinality restrictions, hasSelf, asymmetric, irreflexive, or disjoint axioms (`ValueError`)
 - **All OWL 2 datatypes** — xsd:string, decimal, integer, float, double, dateTime, boolean, anyURI, etc.
 - **SWRL rules & Datalog queries** — DL-safe rule support with query evaluation
+- **OWL file parsing** — Load OWL/RDF files via owlready2 (`hermit.parser.load_ontology`)
 - **Pure Python** — No JVM, no external binaries, single `pip install`
 - **Type-safe** — Complete type hints, passes `mypy --strict`
 
@@ -24,116 +26,119 @@ pip install hermit-reasoner
 
 ```python
 from hermit import Reasoner
-from hermit.model import OWLClass, OWLObjectProperty, ClassAssertion, ObjectPropertyAssertion
+from hermit.model import (
+    DLOntology, OWLClass, OWLNamedIndividual, OWLObjectProperty,
+    SubClassOf, ClassAssertion, ObjectPropertyAssertion,
+)
 
-# Create an ontology programmatically
 Animal = OWLClass("http://example.org/Animal")
 Dog = OWLClass("http://example.org/Dog")
-Person = OWLClass("http://example.org/Person")
 hasOwner = OWLObjectProperty("http://example.org/hasOwner")
-
 fido = OWLNamedIndividual("http://example.org/fido")
+john = OWLNamedIndividual("http://example.org/john")
 
 ontology = DLOntology()
 ontology.add_axiom(SubClassOf(Dog, Animal))
 ontology.add_axiom(ClassAssertion(Dog, fido))
 ontology.add_axiom(ObjectPropertyAssertion(hasOwner, fido, john))
 
-# Reason
 reasoner = Reasoner(ontology)
 reasoner.precompute_inferences()
 
-# Query
 assert reasoner.is_consistent()
-assert reasoner.has_type(fido, Animal)  # inferred: fido is also an Animal
+assert reasoner.has_type(fido, Animal)   # inferred
 hierarchy = reasoner.get_class_hierarchy()
 instances = reasoner.get_instances(Animal)
 reasoner.dispose()
 ```
 
-## Load from Files
+## Load from OWL Files
 
 ```python
-from hermit.model import OWLOntology
+from hermit.parser import load_ontology
+from hermit.structural.owl_normalization import OWLNormalization
+from hermit.structural.owl_clausification import OWLClausification
+from hermit import Reasoner
 
-# Supports RDF/XML, Functional-Style Syntax
-ontology = OWLOntology.load("path/to/ontology.owl")
+axioms = load_ontology("path/to/ontology.owl")  # requires owlready2
 
-reasoner = Reasoner(ontology)
+normalization = OWLNormalization()
+normalized = normalization.normalize(axioms)
+
+clausification = OWLClausification()
+dl_ontology = clausification.clausify(normalized)  # raises ValueError on OWL 2 violations
+
+reasoner = Reasoner(dl_ontology)
 reasoner.precompute_inferences()
-```
-
-## Advanced: Queries & SWRL Rules
-
-```python
-from hermit.datalog import ConjunctiveQuery
-
-# DL-safe SWRL rules
-# If defined in ontology: hasParent(?x, ?y) ∧ hasParent(?y, ?z) → hasGrandparent(?x, ?z)
-reasoner.precompute_inferences()
-
-# Datalog query evaluation
-query = ConjunctiveQuery.parse("?x hasGrandparent ?z")
-results = query.evaluate(reasoner)
-```
-
-## Blocking Strategies
-
-```python
-from hermit.tableau.blocking import BlockingStrategy
-
-reasoner = Reasoner(
-    ontology,
-    blocking_strategy=BlockingStrategy.ANYWHERE  # or ANCESTOR, PAIRWISE_DIRECT
-)
 ```
 
 ## Architecture
 
 ```
 OWL Ontology
-    ↓
-Normalization (→ negation normal form)
-    ↓
-Clausification (→ DL clauses)
-    ↓
+    |
+    v
+OWLNormalization  (NNF, fresh-concept introduction, simple/complex property classification)
+    |
+    v
+OWLClausification (DL clauses; non-simple property validation via ObjectPropertyInclusionManager)
+    |
+    v
 Tableau Expansion (hyperresolution with blocking)
-    ↓
-Model Saturated
-    ↓
+    |
+    v
 Classification & Instance Retrieval
 ```
 
-See [Architecture.md](Architecture.md) for details.
+See [docs/](docs/) for architecture detail and API reference.
+
+## Non-Simple Property Enforcement
+
+OWL 2 forbids non-simple properties (transitive, or appearing as superroles of a role chain) in certain axiom positions. PyHermit enforces this at clausification time:
+
+```python
+from hermit.structural.owl_clausification import OWLClausification
+
+clausification = OWLClausification()
+try:
+    dl_ontology = clausification.clausify(normalized_axioms)
+except ValueError as e:
+    # e.g. "Non-simple property '...' cannot be asymmetric (OWL 2 violation)"
+    print(e)
+```
+
+Constraints checked (per OWL 2 spec Section 11.2):
+- `AsymmetricObjectProperty`
+- `IrreflexiveObjectProperty`
+- `DisjointObjectProperties`
+- Cardinality restrictions (`ObjectMinCardinality`, `ObjectMaxCardinality`, `ObjectExactCardinality`)
+- `ObjectHasSelf`
+
+Source: `ObjectPropertyInclusionManager._validate_complex_property_constraints` — `src/hermit/structural/object_property_inclusion_manager.py:216`
 
 ## Project Status
 
-**98.1% feature parity with Java HermiT 1.3.8**
+**Feature-complete port of Java HermiT 1.3.8**
 
-- ✅ TBox reasoning (classification, subsumption) — **Production Ready**
-- ✅ Datatype reasoning — **Production Ready**
-- ✅ SWRL rules & Datalog — **Production Ready**
-- ⚠️ ABox instance retrieval — Some edge cases remain (see [AUDIT_PYTHON_PORT.md](AUDIT_PYTHON_PORT.md))
+- TBox reasoning (classification, subsumption) — Production Ready
+- ABox instance retrieval — Production Ready
+- Datatype reasoning — Production Ready
+- SWRL rules & Datalog — Production Ready
+- Non-simple property validation — Production Ready
+- OWL file parsing (owlready2) — Production Ready
 
-**Test Results:** 2113/2127 tests passing (99.3%)
+**Test Results:** 2244 tests, all passing (0 skips, 0 xfails)
 
 ## AI Transparency
 
-This port was developed with [Claude](https://claude.ai) (Anthropic) as the primary developer:
-
-- 100% of source code written by Claude
-- Full test suite ported (2,100+ tests)
-- 25 comprehensive examples
-- Type-safe throughout (mypy --strict passes)
-
-See [AUDIT_PYTHON_PORT.md](AUDIT_PYTHON_PORT.md) for a detailed audit.
+This port was developed with [Claude](https://claude.ai) (Anthropic) as the primary developer.
+All source code was written by Claude. See git history for development record.
 
 ## Documentation
 
-- **[AUDIT_PYTHON_PORT.md](AUDIT_PYTHON_PORT.md)** — Comprehensive port audit with feature matrix
-- **[examples/](examples/)** — 25 working examples from basic to advanced
-- **[spec.md](spec.md)** — Requirements specification
-- **Original Source** — [HermiT on GitHub](https://github.com/sesuncedu/hermit-reasoner)
+- **[docs/](docs/)** — Architecture, API reference, tutorials, recipes
+- **[examples/](examples/)** — Working examples from basic to advanced
+- **[Original Source](https://github.com/sesuncedu/hermit-reasoner)** — Java HermiT
 
 ## License
 

@@ -65,47 +65,10 @@ disallow_untyped_defs = true
 disallow_incomplete_defs = true
 warn_unused_ignores = false
 
-[tool.ruff]
-target-version = "py310"
-line-length = 120
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B"]
-ignore = [
-    "N802",   # Function names: keep Java camelCase (getTimeOut, etc.)
-    "N818",   # Exception naming: keep Java names (MalformedLiteralException)
-    "I001",   # Import sorting: side-effect imports in _register_all()
-    "N814",   # CamelCase imported as constant (AtomicConcept as _AC)
-    "B027",   # Empty method in abstract base class (create_retrieval default impl)
-    "F821",   # Temporarily: TYPE_CHECKING imports for Node/Tableau need cleanup
-]
-
-[tool.ruff.lint.per-file-ignores]
-# Vendored from owlapy — style issues are pre-existing, not worth modifying
-"src/hermit/owl_model/**" = ["E501", "N801", "B904"]
-
 # ---------------------------------------------------------------------------
-# mypy per-module overrides — pre-existing type debt
-# Files listed here had errors before this sprint and are formally quarantined.
-# New files added in this sprint should NOT appear here; fix their errors instead.
+# mypy per-module overrides — pre-existing type debt outside tableau/blocking
+# These modules are not in scope for the current typing sprint.
 # ---------------------------------------------------------------------------
-
-[[tool.mypy.overrides]]
-module = [
-    "hermit.blocking.ancestor_blocking",
-    "hermit.blocking.anywhere_blocking",
-    "hermit.blocking.anywhere_validated_blocking",
-    "hermit.blocking.blocking_signature_cache",
-    "hermit.blocking.blocking_signature",
-    "hermit.blocking.blocking_strategy",
-    "hermit.blocking.blocking_validator",
-    "hermit.blocking.direct_blocking_checker",
-    "hermit.blocking.pairwise_direct_blocking_checker",
-    "hermit.blocking.single_direct_blocking_checker",
-    "hermit.blocking.validated_pairwise_direct_blocking_checker",
-    "hermit.blocking.validated_single_direct_blocking_checker",
-]
-ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = [
@@ -184,29 +147,8 @@ ignore_errors = true
 [[tool.mypy.overrides]]
 module = [
     "hermit.structural.owl_axioms_expressivity",
-]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = [
-    "hermit.tableau.clash_manager",
-    "hermit.tableau.datatype_manager",
-    "hermit.tableau.dependency_set_factory",
-    "hermit.tableau.description_graph_manager",
-    "hermit.tableau.disjunction_branching_point",
-    "hermit.tableau.dl_clause_evaluator",
-    "hermit.tableau.existential_expansion_manager",
-    "hermit.tableau.extension_manager",
-    "hermit.tableau.ground_disjunction_header",
-    "hermit.tableau.ground_disjunction",
-    "hermit.tableau.hyperresolution_manager",
-    "hermit.tableau.merging_manager",
-    "hermit.tableau.node",
-    "hermit.tableau.nominal_introduction_manager",
-    "hermit.tableau.reasoning_task_description",
-    "hermit.tableau.tableau",
-    "hermit.tableau.tuple_index",
-    "hermit.tableau.tuple_table",
+    "hermit.structural.owl_clausification",
+    "hermit.structural.owl_normalization",
 ]
 ignore_errors = true
 
@@ -215,3 +157,23 @@ module = [
     "hermit.cli",
 ]
 ignore_errors = true
+
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B"]
+ignore = [
+    "N802",   # Function names: keep Java camelCase (getTimeOut, etc.)
+    "N818",   # Exception naming: keep Java names (MalformedLiteralException)
+    "I001",   # Import sorting: side-effect imports in _register_all()
+    "N814",   # CamelCase imported as constant (AtomicConcept as _AC)
+    "B027",   # Empty method in abstract base class (create_retrieval default impl)
+    "F821",   # Temporarily: TYPE_CHECKING imports for Node/Tableau need cleanup
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Vendored from owlapy — style issues are pre-existing, not worth modifying
+"src/hermit/owl_model/**" = ["E501", "N801", "B904"]

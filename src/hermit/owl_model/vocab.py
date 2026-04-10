@@ -3,7 +3,8 @@
 """Enumerations."""
 from abc import ABCMeta
 from enum import Enum, EnumMeta
-from typing import Final, Callable, TypeVar
+from typing import Final, TypeVar
+from collections.abc import Callable
 from operator import lt, le, gt, ge
 from re import match
 

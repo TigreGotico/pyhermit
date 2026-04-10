@@ -4,7 +4,8 @@
 from abc import ABCMeta, abstractmethod
 from itertools import combinations
 
-from typing import TypeVar, List, Optional, Iterable, Generic, Union, Sequence
+from typing import TypeVar, Generic
+from collections.abc import Iterable, Sequence
 from .owl_property import OWLDataPropertyExpression, OWLObjectPropertyExpression
 from .owl_object import OWLObject, OWLEntity
 from .owl_datatype import OWLDatatype, OWLDataRange
@@ -29,12 +30,12 @@ class OWLAxiom(OWLObject, metaclass=ABCMeta):
     """
     __slots__ = '_annotations'
 
-    _annotations: List['OWLAnnotation']
+    _annotations: list['OWLAnnotation']
 
-    def __init__(self, annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, annotations: Iterable['OWLAnnotation'] | None = None):
         self._annotations = list(annotations) if annotations is not None else list()
 
-    def annotations(self) -> Optional[List['OWLAnnotation']]:
+    def annotations(self) -> list['OWLAnnotation'] | None:
         return self._annotations
 
     def is_annotated(self) -> bool:
@@ -54,7 +55,7 @@ class OWLLogicalAxiom(OWLAxiom, metaclass=ABCMeta):
     """
     __slots__ = ()
 
-    def __init__(self, annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(annotations=annotations)
 
     def is_logical_axiom(self) -> bool:
@@ -65,7 +66,7 @@ class OWLPropertyAxiom(OWLLogicalAxiom, metaclass=ABCMeta):
     """The base interface for property axioms."""
     __slots__ = ()
 
-    def __init__(self, annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(annotations=annotations)
 
 
@@ -83,7 +84,7 @@ class OWLIndividualAxiom(OWLLogicalAxiom, metaclass=ABCMeta):
     """The base interface for individual axioms."""
     __slots__ = ()
 
-    def __init__(self, annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(annotations=annotations)
 
 
@@ -91,7 +92,7 @@ class OWLClassAxiom(OWLLogicalAxiom, metaclass=ABCMeta):
     """The base interface for class axioms."""
     __slots__ = ()
 
-    def __init__(self, annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(annotations=annotations)
 
 
@@ -102,7 +103,7 @@ class OWLDeclarationAxiom(OWLAxiom):
 
     _entity: OWLEntity
 
-    def __init__(self, entity: OWLEntity, annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, entity: OWLEntity, annotations: Iterable['OWLAnnotation'] | None = None):
         self._entity = entity
         super().__init__(annotations=annotations)
 
@@ -134,7 +135,7 @@ class OWLDatatypeDefinitionAxiom(OWLLogicalAxiom):
     _datarange: OWLDataRange
 
     def __init__(self, datatype: OWLDatatype, datarange: OWLDataRange,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         self._datatype = datatype
         self._datarange = datarange
         super().__init__(annotations=annotations)
@@ -177,10 +178,10 @@ class OWLHasKeyAxiom(OWLLogicalAxiom, HasOperands[OWLPropertyExpression]):
     __slots__ = '_class_expression', '_property_expressions'
 
     _class_expression: OWLClassExpression
-    _property_expressions: List[OWLPropertyExpression]
+    _property_expressions: list[OWLPropertyExpression]
 
-    def __init__(self, class_expression: OWLClassExpression, property_expressions: List[OWLPropertyExpression],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, class_expression: OWLClassExpression, property_expressions: list[OWLPropertyExpression],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         self._class_expression = class_expression
         self._property_expressions = property_expressions
         super().__init__(annotations=annotations)
@@ -188,7 +189,7 @@ class OWLHasKeyAxiom(OWLLogicalAxiom, HasOperands[OWLPropertyExpression]):
     def get_class_expression(self) -> OWLClassExpression:
         return self._class_expression
 
-    def get_property_expressions(self) -> List[OWLPropertyExpression]:
+    def get_property_expressions(self) -> list[OWLPropertyExpression]:
         return self._property_expressions
 
     def operands(self) -> Iterable[OWLPropertyExpression]:
@@ -230,11 +231,11 @@ class OWLNaryClassAxiom(OWLClassAxiom, OWLNaryAxiom[OWLClassExpression], metacla
     """Represents an axiom that contains two or more operands that could also be represented with
         multiple pairwise axioms."""
     __slots__ = '_class_expressions'
-    _class_expressions: List[OWLClassExpression]
+    _class_expressions: list[OWLClassExpression]
 
     @abstractmethod
-    def __init__(self, class_expressions: List[OWLClassExpression],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, class_expressions: list[OWLClassExpression],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         self._class_expressions = [*class_expressions]
         super().__init__(annotations=annotations)
 
@@ -283,8 +284,8 @@ class OWLEquivalentClassesAxiom(OWLNaryClassAxiom):
     """
     __slots__ = ()
 
-    def __init__(self, class_expressions: List[OWLClassExpression],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, class_expressions: list[OWLClassExpression],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(class_expressions=class_expressions, annotations=annotations)
 
     def __iter__(self):
@@ -311,8 +312,8 @@ class OWLDisjointClassesAxiom(OWLNaryClassAxiom):
     """
     __slots__ = ()
 
-    def __init__(self, class_expressions: List[OWLClassExpression],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, class_expressions: list[OWLClassExpression],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(class_expressions=class_expressions, annotations=annotations)
 
 
@@ -321,11 +322,11 @@ class OWLNaryIndividualAxiom(OWLIndividualAxiom, OWLNaryAxiom[OWLIndividual], me
             multiple pairwise individual axioms."""
     __slots__ = '_individuals'
 
-    _individuals: List[OWLIndividual]
+    _individuals: list[OWLIndividual]
 
     @abstractmethod
-    def __init__(self, individuals: List[OWLIndividual],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, individuals: list[OWLIndividual],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         self._individuals = [*individuals]
         super().__init__(annotations=annotations)
 
@@ -365,8 +366,8 @@ class OWLDifferentIndividualsAxiom(OWLNaryIndividualAxiom):
       """
     __slots__ = ()
 
-    def __init__(self, individuals: List[OWLIndividual],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, individuals: list[OWLIndividual],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(individuals=individuals, annotations=annotations)
 
 
@@ -380,8 +381,8 @@ class OWLSameIndividualAxiom(OWLNaryIndividualAxiom):
     """
     __slots__ = ()
 
-    def __init__(self, individuals: List[OWLIndividual],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, individuals: list[OWLIndividual],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(individuals=individuals, annotations=annotations)
 
 
@@ -390,10 +391,10 @@ class OWLNaryPropertyAxiom(Generic[_P], OWLPropertyAxiom, OWLNaryAxiom[_P], meta
        multiple pairwise property axioms."""
     __slots__ = '_properties'
 
-    _properties: List[_P]
+    _properties: list[_P]
 
     @abstractmethod
-    def __init__(self, properties: List[_P], annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, properties: list[_P], annotations: Iterable['OWLAnnotation'] | None = None):
         self._properties = [*properties]
         super().__init__(annotations=annotations)
 
@@ -435,8 +436,8 @@ class OWLEquivalentObjectPropertiesAxiom(OWLNaryPropertyAxiom[OWLObjectPropertyE
     """
     __slots__ = ()
 
-    def __init__(self, properties: List[OWLObjectPropertyExpression],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, properties: list[OWLObjectPropertyExpression],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(properties=properties, annotations=annotations)
 
 
@@ -448,8 +449,8 @@ class OWLDisjointObjectPropertiesAxiom(OWLNaryPropertyAxiom[OWLObjectPropertyExp
      (https://www.w3.org/TR/owl2-syntax/#Disjoint_Object_Properties)"""
     __slots__ = ()
 
-    def __init__(self, properties: List[OWLObjectPropertyExpression],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, properties: list[OWLObjectPropertyExpression],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(properties=properties, annotations=annotations)
 
 
@@ -466,7 +467,7 @@ class OWLInverseObjectPropertiesAxiom(OWLNaryPropertyAxiom[OWLObjectPropertyExpr
     _second: OWLObjectPropertyExpression
 
     def __init__(self, first: OWLObjectPropertyExpression, second: OWLObjectPropertyExpression,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         self._first = first
         self._second = second
         super().__init__(properties=[first, second], annotations=annotations)
@@ -500,8 +501,8 @@ class OWLEquivalentDataPropertiesAxiom(OWLNaryPropertyAxiom[OWLDataPropertyExpre
     """
     __slots__ = ()
 
-    def __init__(self, properties: List[OWLDataPropertyExpression],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, properties: list[OWLDataPropertyExpression],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(properties=properties, annotations=annotations)
 
 
@@ -513,8 +514,8 @@ class OWLDisjointDataPropertiesAxiom(OWLNaryPropertyAxiom[OWLDataPropertyExpress
      (https://www.w3.org/TR/owl2-syntax/#Disjoint_Data_Properties)"""
     __slots__ = ()
 
-    def __init__(self, properties: List[OWLDataPropertyExpression],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, properties: list[OWLDataPropertyExpression],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(properties=properties, annotations=annotations)
 
 
@@ -532,7 +533,7 @@ class OWLSubClassOfAxiom(OWLClassAxiom):
     _super_class: OWLClassExpression
 
     def __init__(self, sub_class: OWLClassExpression, super_class: OWLClassExpression,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         """Get an equivalent classes axiom with specified operands and no annotations.
 
         Args:
@@ -583,10 +584,10 @@ class OWLDisjointUnionAxiom(OWLClassAxiom):
     __slots__ = '_cls', '_class_expressions'
 
     _cls: OWLClass
-    _class_expressions: List[OWLClassExpression]
+    _class_expressions: list[OWLClassExpression]
 
-    def __init__(self, cls_: OWLClass, class_expressions: List[OWLClassExpression],
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+    def __init__(self, cls_: OWLClass, class_expressions: list[OWLClassExpression],
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         self._cls = cls_
         self._class_expressions = class_expressions
         super().__init__(annotations=annotations)
@@ -629,7 +630,7 @@ class OWLClassAssertionAxiom(OWLIndividualAxiom):
     _class_expression: OWLClassExpression
 
     def __init__(self, individual: OWLIndividual, class_expression: OWLClassExpression,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         """Get a ClassAssertion axiom for the specified individual and class expression.
         Args:
             individual: The individual.
@@ -666,7 +667,7 @@ class OWLAnnotationProperty(OWLProperty):
 
     _iri: IRI
 
-    def __init__(self, iri: Union[IRI, str]):
+    def __init__(self, iri: IRI | str):
         """Get a new OWLAnnotationProperty object.
 
         Args:
@@ -754,7 +755,7 @@ class OWLAnnotationAssertionAxiom(OWLAnnotationAxiom):
     _annotation: OWLAnnotation
 
     def __init__(self, subject: OWLAnnotationSubject, annotation: OWLAnnotation,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         """Get an annotation assertion axiom - with annotations.
 
         Args:
@@ -813,7 +814,7 @@ class OWLSubAnnotationPropertyOfAxiom(OWLAnnotationAxiom):
     _super_property: OWLAnnotationProperty
 
     def __init__(self, sub_property: OWLAnnotationProperty, super_property: OWLAnnotationProperty,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         self._sub_property = sub_property
         self._super_property = super_property
         super().__init__(annotations=annotations)
@@ -849,7 +850,7 @@ class OWLAnnotationPropertyDomainAxiom(OWLAnnotationAxiom):
     _domain: IRI
 
     def __init__(self, property_: OWLAnnotationProperty, domain: IRI,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         self._property = property_
         self._domain = domain
         super().__init__(annotations=annotations)
@@ -885,7 +886,7 @@ class OWLAnnotationPropertyRangeAxiom(OWLAnnotationAxiom):
     _range: IRI
 
     def __init__(self, property_: OWLAnnotationProperty, range_: IRI,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         self._property = property_
         self._range = range_
         super().__init__(annotations=annotations)
@@ -921,7 +922,7 @@ class OWLSubPropertyAxiom(Generic[_P], OWLPropertyAxiom):
 
     @abstractmethod
     def __init__(self, sub_property: _P, super_property: _P,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         self._sub_property = sub_property
         self._super_property = super_property
         super().__init__(annotations=annotations)
@@ -958,7 +959,7 @@ class OWLSubObjectPropertyOfAxiom(OWLSubPropertyAxiom[OWLObjectPropertyExpressio
     __slots__ = ()
 
     def __init__(self, sub_property: OWLObjectPropertyExpression, super_property: OWLObjectPropertyExpression,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(sub_property=sub_property, super_property=super_property, annotations=annotations)
 
 
@@ -971,7 +972,7 @@ class OWLSubDataPropertyOfAxiom(OWLSubPropertyAxiom[OWLDataPropertyExpression], 
     __slots__ = ()
 
     def __init__(self, sub_property: OWLDataPropertyExpression, super_property: OWLDataPropertyExpression,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(sub_property=sub_property, super_property=super_property, annotations=annotations)
 
 
@@ -985,7 +986,7 @@ class OWLPropertyAssertionAxiom(Generic[_P, _C], OWLIndividualAxiom, metaclass=A
 
     @abstractmethod
     def __init__(self, subject: OWLIndividual, property_: _P, object_: _C,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         """Get a PropertyAssertion axiom for the specified subject, property, object.
         Args:
             subject: The subject of the property assertion.
@@ -1032,7 +1033,7 @@ class OWLObjectPropertyAssertionAxiom(OWLPropertyAssertionAxiom[OWLObjectPropert
     __slots__ = ()
 
     def __init__(self, subject: OWLIndividual, property_: OWLObjectPropertyExpression, object_: OWLIndividual,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(subject, property_, object_, annotations)
 
 
@@ -1045,7 +1046,7 @@ class OWLNegativeObjectPropertyAssertionAxiom(OWLPropertyAssertionAxiom[OWLObjec
     __slots__ = ()
 
     def __init__(self, subject: OWLIndividual, property_: OWLObjectPropertyExpression, object_: OWLIndividual,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(subject, property_, object_, annotations)
 
 
@@ -1058,7 +1059,7 @@ class OWLDataPropertyAssertionAxiom(OWLPropertyAssertionAxiom[OWLDataPropertyExp
     __slots__ = ()
 
     def __init__(self, subject: OWLIndividual, property_: OWLDataPropertyExpression, object_: OWLLiteral,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         assert isinstance(subject,OWLIndividual), f"subject must be an OWLIndividual. Currently, {subject} of {type(subject)}"
         assert isinstance(property_,OWLDataPropertyExpression), f"property_ must be an OWLDataPropertyExpression. Currently, {type(property_)}"
         assert isinstance(object_,OWLLiteral), f"object_ must be an OWLLiteral. Currently, {type(object_)}"
@@ -1074,7 +1075,7 @@ class OWLNegativeDataPropertyAssertionAxiom(OWLPropertyAssertionAxiom[OWLDataPro
     __slots__ = ()
 
     def __init__(self, subject: OWLIndividual, property_: OWLDataPropertyExpression, object_: OWLLiteral,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(subject, property_, object_, annotations)
 
 
@@ -1084,7 +1085,7 @@ class OWLUnaryPropertyAxiom(Generic[_P], OWLPropertyAxiom, metaclass=ABCMeta):
 
     _property: _P
 
-    def __init__(self, property_: _P, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: _P, annotations: Iterable[OWLAnnotation] | None = None):
         self._property = property_
         super().__init__(annotations=annotations)
 
@@ -1098,7 +1099,7 @@ class OWLObjectPropertyCharacteristicAxiom(OWLUnaryPropertyAxiom[OWLObjectProper
     __slots__ = ()
 
     @abstractmethod
-    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, annotations=annotations)
 
     def __eq__(self, other):
@@ -1121,7 +1122,7 @@ class OWLFunctionalObjectPropertyAxiom(OWLObjectPropertyCharacteristicAxiom):
     (https://www.w3.org/TR/owl2-syntax/#Functional_Object_Properties)"""
     __slots__ = ()
 
-    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, annotations=annotations)
 
 
@@ -1133,7 +1134,7 @@ class OWLAsymmetricObjectPropertyAxiom(OWLObjectPropertyCharacteristicAxiom):
     (https://www.w3.org/TR/owl2-syntax/#Symmetric_Object_Properties)"""
     __slots__ = ()
 
-    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, annotations=annotations)
 
 
@@ -1146,7 +1147,7 @@ class OWLInverseFunctionalObjectPropertyAxiom(OWLObjectPropertyCharacteristicAxi
     """
     __slots__ = ()
 
-    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, annotations=annotations)
 
 
@@ -1159,7 +1160,7 @@ class OWLIrreflexiveObjectPropertyAxiom(OWLObjectPropertyCharacteristicAxiom):
     """
     __slots__ = ()
 
-    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, annotations=annotations)
 
 
@@ -1172,7 +1173,7 @@ class OWLReflexiveObjectPropertyAxiom(OWLObjectPropertyCharacteristicAxiom):
     (https://www.w3.org/TR/owl2-syntax/#Reflexive_Object_Properties)"""
     __slots__ = ()
 
-    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, annotations=annotations)
 
 
@@ -1187,7 +1188,7 @@ class OWLSymmetricObjectPropertyAxiom(OWLObjectPropertyCharacteristicAxiom):
      """
     __slots__ = ()
 
-    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, annotations=annotations)
 
 
@@ -1202,7 +1203,7 @@ class OWLTransitiveObjectPropertyAxiom(OWLObjectPropertyCharacteristicAxiom):
      """
     __slots__ = ()
 
-    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: OWLObjectPropertyExpression, annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, annotations=annotations)
 
 
@@ -1212,7 +1213,7 @@ class OWLDataPropertyCharacteristicAxiom(OWLUnaryPropertyAxiom[OWLDataPropertyEx
     __slots__ = ()
 
     @abstractmethod
-    def __init__(self, property_: OWLDataPropertyExpression, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: OWLDataPropertyExpression, annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, annotations=annotations)
 
     def __eq__(self, other):
@@ -1238,7 +1239,7 @@ class OWLFunctionalDataPropertyAxiom(OWLDataPropertyCharacteristicAxiom):
     """
     __slots__ = ()
 
-    def __init__(self, property_: OWLDataPropertyExpression, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: OWLDataPropertyExpression, annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, annotations=annotations)
 
 
@@ -1250,7 +1251,7 @@ class OWLPropertyDomainAxiom(Generic[_P], OWLUnaryPropertyAxiom[_P], metaclass=A
 
     @abstractmethod
     def __init__(self, property_: _P, domain: OWLClassExpression,
-                 annotations: Optional[Iterable[OWLAnnotation]] = None):
+                 annotations: Iterable[OWLAnnotation] | None = None):
         self._domain = domain
         super().__init__(property_=property_, annotations=annotations)
 
@@ -1277,7 +1278,7 @@ class OWLPropertyRangeAxiom(Generic[_P, _R], OWLUnaryPropertyAxiom[_P], metaclas
     _range: _R
 
     @abstractmethod
-    def __init__(self, property_: _P, range_: _R, annotations: Optional[Iterable[OWLAnnotation]] = None):
+    def __init__(self, property_: _P, range_: _R, annotations: Iterable[OWLAnnotation] | None = None):
         self._range = range_
         super().__init__(property_=property_, annotations=annotations)
 
@@ -1317,7 +1318,7 @@ class OWLObjectPropertyDomainAxiom(OWLPropertyDomainAxiom[OWLObjectPropertyExpre
     __slots__ = ()
 
     def __init__(self, property_: OWLObjectPropertyExpression, domain: OWLClassExpression,
-                 annotations: Optional[Iterable[OWLAnnotation]] = None):
+                 annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, domain=domain, annotations=annotations)
 
     @property
@@ -1337,7 +1338,7 @@ class OWLDataPropertyDomainAxiom(OWLPropertyDomainAxiom[OWLDataPropertyExpressio
     __slots__ = ()
 
     def __init__(self, property_: OWLDataPropertyExpression, domain: OWLClassExpression,
-                 annotations: Optional[Iterable[OWLAnnotation]] = None):
+                 annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, domain=domain, annotations=annotations)
 
 
@@ -1352,7 +1353,7 @@ class OWLObjectPropertyRangeAxiom(OWLPropertyRangeAxiom[OWLObjectPropertyExpress
     __slots__ = ()
 
     def __init__(self, property_: OWLObjectPropertyExpression, range_: OWLClassExpression,
-                 annotations: Optional[Iterable[OWLAnnotation]] = None):
+                 annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, range_=range_, annotations=annotations)
 
 
@@ -1367,7 +1368,7 @@ class OWLDataPropertyRangeAxiom(OWLPropertyRangeAxiom[OWLDataPropertyExpression,
     __slots__ = ()
 
     def __init__(self, property_: OWLDataPropertyExpression, range_: OWLDataRange,
-                 annotations: Optional[Iterable[OWLAnnotation]] = None):
+                 annotations: Iterable[OWLAnnotation] | None = None):
         super().__init__(property_=property_, range_=range_, annotations=annotations)
 
 
@@ -1385,7 +1386,7 @@ class OWLSubPropertyChainAxiom(OWLObjectPropertyAxiom):
     _super_property: OWLObjectPropertyExpression
 
     def __init__(self, property_chain: Sequence[OWLObjectPropertyExpression], super_property: OWLObjectPropertyExpression,
-                 annotations: Optional[Iterable['OWLAnnotation']] = None):
+                 annotations: Iterable['OWLAnnotation'] | None = None):
         super().__init__(annotations=annotations)
         self._property_chain = tuple(property_chain)
         # self._sub_property = self._property_chain
@@ -1394,7 +1395,7 @@ class OWLSubPropertyChainAxiom(OWLObjectPropertyAxiom):
 
     def get_super_property(self) -> _P:
         return self._super_property
-    
+
 
     def get_property_chain(self) -> Sequence[OWLObjectPropertyExpression]:
         yield from self._property_chain

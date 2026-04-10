@@ -843,12 +843,42 @@ class TestDLClauseEvaluator:
             f.dispose()
 
     def test_head_equality_clause(self):
-        """Clause deriving equality - hits merging bug with multi-body ABox -- skip."""
-        pytest.skip("Known bugs: _parent in merging_manager and None node from multi-body evaluator")
+        """Clause deriving equality: A(X) ^ B(Y) -> X=Y."""
+        X = Variable.create("X")
+        Y = Variable.create("Y")
+        a = AtomicConcept.create("http://ex#EQ_A")
+        b = AtomicConcept.create("http://ex#EQ_B")
+        clause = DLClause.create(
+            (Atom.create(Equality.INSTANCE, X, Y),),
+            (Atom.create(a, X), Atom.create(b, Y)),
+        )
+        ind = Individual.create("http://ex#eq_i")
+        t, f = _make_tableau([clause], positive_facts=[Atom.create(a, ind), Atom.create(b, ind)])
+        try:
+            assert _run(t, load_permanent_abox=True) is True
+        finally:
+            f.dispose()
 
     def test_head_inequality_clause(self):
-        """Clause deriving inequality - 2-body ABox hits None node bug -- skip."""
-        pytest.skip("Known bug: multi-body evaluator with ABox produces None node")
+        """Clause deriving inequality: A(X) ^ B(Y) -> X!=Y."""
+        X = Variable.create("X")
+        Y = Variable.create("Y")
+        a = AtomicConcept.create("http://ex#IEQ_A")
+        b = AtomicConcept.create("http://ex#IEQ_B")
+        clause = DLClause.create(
+            (Atom.create(Inequality.INSTANCE, X, Y),),
+            (Atom.create(a, X), Atom.create(b, Y)),
+        )
+        i = Individual.create("http://ex#ieq_i")
+        j = Individual.create("http://ex#ieq_j")
+        t, f = _make_tableau(
+            [clause],
+            positive_facts=[Atom.create(a, i), Atom.create(b, j)],
+        )
+        try:
+            assert _run(t, load_permanent_abox=True) is True
+        finally:
+            f.dispose()
 
     def test_clause_with_existential_head(self):
         """Clause deriving AtLeast concept."""
@@ -1185,8 +1215,16 @@ class TestClashManagerInternals:
     """Exercises specific clash detection paths."""
 
     def test_nothing_clash_via_clause(self):
-        """Clause deriving owl:Nothing -- hits get_permanent bug with empty dep set."""
-        pytest.skip("Known bug: dependency_set_factory.get_permanent fails with empty UnionDependencySet")
+        """Clause deriving owl:Nothing: A(X) -> ⊥ causes a clash."""
+        X = Variable.create("X")
+        a = AtomicConcept.create("http://ex#CLASH_A")
+        clause = DLClause.create((), (Atom.create(a, X),))
+        ind = Individual.create("http://ex#clash_i")
+        t, f = _make_tableau([clause], positive_facts=[Atom.create(a, ind)])
+        try:
+            assert _run(t, load_permanent_abox=True) is False
+        finally:
+            f.dispose()
 
     def test_clash_manager_clear(self):
         """ClashManager.clear() resets state."""
@@ -1653,8 +1691,24 @@ class TestDependencySetFactoryAdvanced:
         assert u.contains_branching_point(5)
 
     def test_union_with_union_dep_set(self):
-        """union_with a UnionDependencySet -- hits bug when union has None deps."""
-        pytest.skip("Known bug: dependency_set_factory.get_permanent fails with empty UnionDependencySet")
+        """get_permanent on a UnionDependencySet with None constituents returns empty set."""
+        from hermit.tableau.union_dependency_set import UnionDependencySet
+        factory = DependencySetFactory()
+        s = factory.add_branching_point(factory.empty_set, 5)
+        # Create a UnionDependencySet with one valid and one None constituent
+        u = UnionDependencySet(2)
+        u.m_dependency_sets[0] = s
+        u.m_dependency_sets[1] = None
+        u.m_number_of_constituents = 2
+        perm = factory.get_permanent(u)
+        assert perm.contains_branching_point(5)
+        # All-None case returns empty set
+        u2 = UnionDependencySet(2)
+        u2.m_dependency_sets[0] = None
+        u2.m_dependency_sets[1] = None
+        u2.m_number_of_constituents = 2
+        perm2 = factory.get_permanent(u2)
+        assert perm2.is_empty()
 
     def test_fifty_branching_points(self):
         factory = DependencySetFactory()
@@ -1725,12 +1779,49 @@ class TestHyperresolutionManagerAdvanced:
             f.dispose()
 
     def test_role_with_concept_clause_body(self):
-        """A(X) ∧ r(X,Y) → B(Y) -- hits extension_manager IndexError with ABox."""
-        pytest.skip("Known bug: extension_manager retrieval IndexError with mixed concept+role body")
+        """A(X) ∧ r(X,Y) → B(Y): concept and role body atoms together."""
+        X = Variable.create("X")
+        Y = Variable.create("Y")
+        a = AtomicConcept.create("http://ex#RC_A")
+        b = AtomicConcept.create("http://ex#RC_B")
+        r = AtomicRole.create("http://ex#rc_r")
+        clause = DLClause.create(
+            (Atom.create(b, Y),),
+            (Atom.create(a, X), Atom.create(r, X, Y)),
+        )
+        i = Individual.create("http://ex#rc_i")
+        j = Individual.create("http://ex#rc_j")
+        t, f = _make_tableau(
+            [clause],
+            positive_facts=[Atom.create(a, i), Atom.create(r, i, j)],
+        )
+        try:
+            assert _run(t, load_permanent_abox=True) is True
+        finally:
+            f.dispose()
 
     def test_inverse_role_clause(self):
-        """inv(r)(X,Y) → s(X,Y) -- hits InverseRole.equals bug in DLClauseCompiler."""
-        pytest.skip("Known bug: InverseRole has no .equals() method in dl_clause_evaluator")
+        """inv(r)(X,Y) → s(X,Y): inverse role in clause body."""
+        X = Variable.create("X")
+        Y = Variable.create("Y")
+        r = AtomicRole.create("http://ex#ir_r")
+        s = AtomicRole.create("http://ex#ir_s")
+        inv_r = InverseRole.create(r)
+        clause = DLClause.create(
+            (Atom.create(s, X, Y),),
+            (Atom.create(inv_r, X, Y),),
+        )
+        i = Individual.create("http://ex#ir_i")
+        j = Individual.create("http://ex#ir_j")
+        # r(j, i) means inv(r)(i, j) — so clause should derive s(i, j)
+        t, f = _make_tableau(
+            [clause],
+            positive_facts=[Atom.create(r, j, i)],
+        )
+        try:
+            assert _run(t, load_permanent_abox=True) is True
+        finally:
+            f.dispose()
 
     def test_hyperresolution_clear_and_reapply(self):
         X = Variable.create("X")
@@ -1786,8 +1877,20 @@ class TestDLClauseEvaluatorAdditional:
     """More DL clause evaluator paths."""
 
     def test_nothing_head_clause_via_reasoner(self):
-        """A -> Nothing -- hits get_permanent IndexError bug."""
-        pytest.skip("Known bug: dependency_set_factory.get_permanent fails with empty UnionDependencySet")
+        """A -> Nothing via Reasoner: concept with Nothing head is unsatisfiable."""
+        from hermit import Reasoner
+        X = Variable.create("X")
+        a = AtomicConcept.create("http://ex#DLCE_NOTHING_A")
+        clause = DLClause.create((), (Atom.create(a, X),))
+        ontology = DLOntology(
+            ontology_iri="urn:test:dlce_nothing",
+            dl_clauses=frozenset([clause]),
+        )
+        reasoner = Reasoner(ontology)
+        try:
+            assert not reasoner.is_satisfiable(a)
+        finally:
+            reasoner.dispose()
 
     def test_existential_concept_head_via_reasoner(self):
         """A -> ∃r.B."""
@@ -1828,8 +1931,27 @@ class TestDLClauseEvaluatorAdditional:
             f.dispose()
 
     def test_clause_inv_role_body(self):
-        """inv(r)(X,Y) -> A(X) -- hits InverseRole.equals bug."""
-        pytest.skip("Known bug: InverseRole has no .equals() method in dl_clause_evaluator._DLClauseCompiler")
+        """inv(r)(X,Y) -> A(X): inverse role body atom derives concept."""
+        X = Variable.create("X")
+        Y = Variable.create("Y")
+        r = AtomicRole.create("http://ex#dlce_ir_r")
+        a = AtomicConcept.create("http://ex#DLCE_IR_A")
+        inv_r = InverseRole.create(r)
+        clause = DLClause.create(
+            (Atom.create(a, X),),
+            (Atom.create(inv_r, X, Y),),
+        )
+        i = Individual.create("http://ex#dlce_ir_i")
+        j = Individual.create("http://ex#dlce_ir_j")
+        # r(j, i) means inv(r)(i, j), so clause should derive A(i)
+        t, f = _make_tableau(
+            [clause],
+            positive_facts=[Atom.create(r, j, i)],
+        )
+        try:
+            assert _run(t, load_permanent_abox=True) is True
+        finally:
+            f.dispose()
 
     def test_existential_chain_via_reasoner(self):
         """A -> ∃r.B -> ∃r.C chain."""

@@ -478,9 +478,80 @@ reasoner.dispose()
 
 ---
 
+---
+
+## Clausification Pipeline
+
+### OWLNormalization
+
+Transforms raw `OWLAxiom` objects into `NormalizedAxioms`. Source: `src/hermit/structural/owl_normalization.py:94`.
+
+```python
+from hermit.structural.owl_normalization import OWLNormalization
+
+normalization = OWLNormalization()
+normalized = normalization.normalize(axioms)  # list[OWLAxiom] -> NormalizedAxioms
+```
+
+`normalize()` populates:
+- `normalized.simple_object_property_inclusions` — from `SubObjectPropertyOf` and `InverseObjectProperties` axioms (`owl_normalization.py:271`, `owl_normalization.py:208`)
+- `normalized.complex_object_property_inclusions` — from `TransitiveObjectProperty` and `SubPropertyChainOf` axioms (`owl_normalization.py:190`, `owl_normalization.py:280`)
+
+### OWLClausification
+
+Converts `NormalizedAxioms` to a `DLOntology`. Source: `src/hermit/structural/owl_clausification.py:82`.
+
+```python
+from hermit.structural.owl_clausification import OWLClausification
+
+clausification = OWLClausification()
+dl_ontology = clausification.clausify(normalized)
+```
+
+`clausify()` calls `ObjectPropertyInclusionManager.rewrite_axioms()` before producing DL clauses (`owl_clausification.py:132`). This raises `ValueError` for any OWL 2 non-simplicity violation — see below.
+
+### ObjectPropertyInclusionManager
+
+Detects non-simple properties and validates OWL 2 constraints. Source: `src/hermit/structural/object_property_inclusion_manager.py:21`.
+
+A property is **non-simple** if it:
+1. Appears as the superrole of a transitive axiom or role chain (`_detect_complex_properties` — `object_property_inclusion_manager.py:167`)
+2. Is a superrole of a non-simple property via `SubObjectPropertyOf`
+3. Is the inverse of a non-simple property
+
+`rewrite_axioms()` raises `ValueError` if a non-simple property appears in (`object_property_inclusion_manager.py:216`):
+- `AsymmetricObjectProperty`
+- `IrreflexiveObjectProperty`
+- `DisjointObjectProperties`
+- `ObjectMinCardinality`, `ObjectMaxCardinality`, `ObjectExactCardinality`
+- `ObjectHasSelf`
+
+### load_ontology
+
+Loads OWL/RDF files via owlready2. Source: `src/hermit/parser.py:25`.
+
+```python
+from hermit.parser import load_ontology
+
+axioms = load_ontology("path/to/ontology.owl")  # list[OWLAxiom]
+```
+
+Raises `ImportError` if owlready2 is not installed, `FileNotFoundError` if the path does not exist, `ValueError` if the file cannot be parsed.
+
+### NonSimicityError (ValueError)
+
+`OWLClausification.clausify()` raises `ValueError` with a message of the form:
+
+```
+Non-simple property '<iri>' cannot be asymmetric (OWL 2 violation)
+Non-simple property '<iri>' cannot be irreflexive (OWL 2 violation)
+Non-simple property '<iri>' cannot be in disjoint properties axiom (OWL 2 violation)
+Non-simple property '<iri>' or its inverse appears in the cardinality restriction '...' (OWL 2 violation)
+Non-simple property '<iri>' appears in a Self restriction (OWL 2 violation)
+```
+
+---
+
 ## See Also
 
-- **[OWL Model API](./owl-model.md)** — Detailed property and axiom API
-- **[Query API](./queries.md)** — Advanced querying
-- **[Configuration](./configuration.md)** — Reasoner configuration options
 - **[Tutorials](../tutorials/)** — Guided examples

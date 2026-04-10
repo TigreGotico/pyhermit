@@ -5,7 +5,8 @@ from abc import abstractmethod, ABCMeta
 from ..owl_data_ranges import OWLPropertyRange
 from ..meta_classes import HasOperands
 
-from typing import Final, Iterable
+from typing import Final
+from collections.abc import Iterable
 
 
 class OWLClassExpression(OWLPropertyRange):
@@ -95,7 +96,7 @@ class OWLObjectComplementOf(OWLBooleanClassExpression, HasOperands[OWLClassExpre
         if isinstance(op, OWLObjectComplementOf):
             return op.get_operand()
         else:
-            return super(OWLObjectComplementOf, cls).__new__(cls)
+            return super().__new__(cls)
 
     def __init__(self, op: OWLClassExpression):
         """

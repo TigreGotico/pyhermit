@@ -3,7 +3,7 @@
 """OWL Class"""
 from .class_expression import OWLClassExpression, OWLObjectComplementOf
 from ..owl_object import OWLEntity
-from typing import Final, Union
+from typing import Final
 from ..iri import IRI
 
 
@@ -17,7 +17,7 @@ class OWLClass(OWLClassExpression, OWLEntity):
     _is_nothing: bool
     _is_thing: bool
 
-    def __init__(self, iri: Union[IRI, str]):
+    def __init__(self, iri: IRI | str):
         """Gets an instance of OWLClass that has the specified IRI.
 
         Args:

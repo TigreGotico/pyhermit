@@ -225,7 +225,9 @@ class DependencySetFactory:
             union_ds = self._unprocessed_sets.pop()
             for idx in range(union_ds.m_number_of_constituents):
                 constituent = union_ds.m_dependency_sets[idx]
-                if isinstance(constituent, UnionDependencySet):
+                if constituent is None:
+                    continue
+                elif isinstance(constituent, UnionDependencySet):
                     self._unprocessed_sets.append(constituent)
                 else:
                     self._merge_sets.append(constituent)  # type: ignore[arg-type]
@@ -310,7 +312,7 @@ class DependencySetFactory:
         new_set._rest = rest
         new_set._branching_point = branching_point
         new_set._usage_counter = 0
-        self.add_usage(new_set._rest)  # type: ignore[arg-type]
+        self.add_usage(new_set._rest)
         self._add_to_unused_list(new_set)
         self._size += 1
         return new_set
@@ -323,7 +325,7 @@ class DependencySetFactory:
         assert dependency_set._rest._usage_counter > 0
 
         self._remove_from_unused_list(dependency_set)
-        self.remove_usage(dependency_set._rest)  # type: ignore[arg-type]
+        self.remove_usage(dependency_set._rest)
         self._remove_from_entries(dependency_set)
         dependency_set._rest = None
         dependency_set._branching_point = -2

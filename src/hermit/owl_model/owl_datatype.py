@@ -5,7 +5,7 @@ from .owl_object import OWLEntity
 from .owl_data_ranges import OWLDataRange
 from .iri import IRI
 from .meta_classes import HasIRI
-from typing import Final, Union
+from typing import Final
 
 
 class OWLDatatype(OWLEntity, OWLDataRange):
@@ -23,7 +23,7 @@ class OWLDatatype(OWLEntity, OWLDataRange):
 
     _iri: IRI
 
-    def __init__(self, iri: Union[IRI, HasIRI, str]):
+    def __init__(self, iri: IRI | HasIRI | str):
         """Gets an instance of OWLDatatype that has the specified IRI.
 
         Args:

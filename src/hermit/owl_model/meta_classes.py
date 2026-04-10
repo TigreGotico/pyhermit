@@ -3,7 +3,8 @@
 """Meta classes for OWL objects."""
 
 # https://docs.python.org/3/reference/datamodel.html#metaclasses
-from typing import TypeVar, Generic, Iterable
+from typing import TypeVar, Generic
+from collections.abc import Iterable
 from abc import ABCMeta, abstractmethod
 
 _T = TypeVar('_T')  #:

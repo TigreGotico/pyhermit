@@ -9,13 +9,12 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from hermit.hierarchy.hierarchy import Hierarchy
 from hermit.hierarchy.hierarchy_node import HierarchyNode
-from hermit.model import AtomicConcept, Individual
+from hermit.model import AtomicConcept
 
 if TYPE_CHECKING:
     from hermit.hierarchy.classification_progress_monitor import (
         ClassificationProgressMonitor,
     )
-    from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau
 
 T = TypeVar("T")
@@ -47,9 +46,6 @@ class DeterministicClassification(Generic[T]):
         # FALLBACK: DeterministicClassification has issues with extension table queries.
         # Use QuasiOrderClassification instead, which is more robust.
         from hermit.hierarchy.quasi_order_classification import QuasiOrderClassification
-        from hermit.hierarchy.classification_progress_monitor import (
-            ClassificationProgressMonitor,
-        )
 
         return QuasiOrderClassification(
             self.m_tableau,

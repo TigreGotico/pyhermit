@@ -3,7 +3,7 @@
 """OWL IRI"""
 import weakref
 from abc import ABCMeta
-from typing import Final, Union
+from typing import Final
 from weakref import WeakKeyDictionary
 
 from hermit.owl_model import namespaces
@@ -41,7 +41,7 @@ class IRI(OWLAnnotationSubject, OWLAnnotationValue, metaclass=_meta_IRI):
     _namespace: str
     _remainder: str
 
-    def __init__(self, namespace: Union[str, Namespaces], remainder: str="", is_file_path=False):
+    def __init__(self, namespace: str | Namespaces, remainder: str="", is_file_path=False):
         if isinstance(namespace, Namespaces):
             namespace = namespace.ns
         elif not is_file_path:

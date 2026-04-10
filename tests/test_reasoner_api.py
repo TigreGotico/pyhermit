@@ -1328,11 +1328,16 @@ class TestCLI:
             Path(path).unlink()
 
     def test_load_dl_ontology_json(self):
-        from hermit.cli import _load_dl_ontology
-        path = self._make_json({"ontology_iri": "urn:test:json"})
+        from hermit.cli import _load_dl_ontology, _dl_ontology_to_json
+        ont, _ = _taxonomy_ontology()
+        data = _dl_ontology_to_json(ont)
+        path = self._make_json(data)
         try:
             loaded = _load_dl_ontology(path)
             assert isinstance(loaded, DLOntology)
+            assert loaded.ontology_iri == ont.ontology_iri
+            assert len(loaded.dl_clauses) == len(ont.dl_clauses)
+            assert len(loaded.positive_facts) == len(ont.positive_facts)
         finally:
             Path(path).unlink()
 

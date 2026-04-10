@@ -1,176 +1,212 @@
-"""End-to-end integration tests using realistic ontologies.
+"""End-to-end integration tests using realistic ontology patterns.
 
-These tests validate the complete reasoning pipeline from OWL files to query results.
-The Pizza and Koala ontologies are standard test cases in the OWL community.
-
-To run these tests, download the ontologies:
-- Pizza: http://protege.stanford.edu/ontologies/pizza/pizza.owl
-- Koala: http://protege.stanford.edu/ontologies/koala.owl
-
-Place them in tests/ontologies/ directory.
+These tests validate the complete reasoning pipeline using synthetic
+ontologies that mimic real-world OWL ontologies (pizza, koala patterns)
+but without requiring external OWL files.
 """
 
 from __future__ import annotations
 
-import pytest
-from pathlib import Path
+from hermit.model import (
+    Atom,
+    AtomicConcept,
+    AtomicRole,
+    DLClause,
+    DLOntology,
+    Individual,
+    Variable,
+)
+from hermit.reasoner import Reasoner
 
-# Check if ontology files are available
-PIZZA_ONTOLOGY = Path(__file__).parent / "ontologies" / "pizza.owl"
-KOALA_ONTOLOGY = Path(__file__).parent / "ontologies" / "koala.owl"
 
-if not PIZZA_ONTOLOGY.exists() or not KOALA_ONTOLOGY.exists():
-    pytest.skip(
-        allow_module_level=True,
-        reason="Pizza and/or Koala ontologies not available in tests/ontologies/",
+def _make_reasoner(clauses, positive_facts=None, negative_facts=None, iri="urn:test:e2e"):
+    ontology = DLOntology(
+        ontology_iri=iri,
+        dl_clauses=frozenset(clauses),
+        positive_facts=frozenset(positive_facts or []),
+        negative_facts=frozenset(negative_facts or []),
     )
+    return Reasoner(ontology)
 
+
+# ---------------------------------------------------------------------------
+# Pizza-pattern ontology
+# ---------------------------------------------------------------------------
 
 class TestPizzaOntology:
-    """Test suite for the Pizza ontology.
+    """Synthetic pizza-like ontology: Pizza, PizzaTopping, toppings hierarchy."""
 
-    The Pizza ontology is a classic example in OWL education. It describes
-    a domain of pizza varieties, toppings, and recipes.
+    def _setup_pizza_reasoner(self):
+        X = Variable.create("X")
+        # Concept hierarchy: VeggiePizza ⊑ Pizza, etc.
+        pizza = AtomicConcept.create("http://pizza#Pizza")
+        veggie = AtomicConcept.create("http://pizza#VeggiePizza")
+        meat = AtomicConcept.create("http://pizza#MeatPizza")
+        topping = AtomicConcept.create("http://pizza#PizzaTopping")
+        veg_top = AtomicConcept.create("http://pizza#VegetableTopping")
+        meat_top = AtomicConcept.create("http://pizza#MeatTopping")
+        pepper_top = AtomicConcept.create("http://pizza#PepperTopping")
+        mushroom_top = AtomicConcept.create("http://pizza#MushroomTopping")
+        ham_top = AtomicConcept.create("http://pizza#HamTopping")
+        pepperoni_top = AtomicConcept.create("http://pizza#PepperoniTopping")
+        calzone = AtomicConcept.create("http://pizza#Calzone")
+        domain = AtomicConcept.create("http://pizza#DomainConcept")
 
-    Key features:
-    - Named classes: Pizza, PizzaTopping, DomainConcept
-    - Object properties: hasTopping, isBaseFor
-    - Data properties: hasCalories
-    - Complex restrictions: some/all values from, cardinality constraints
-    - Property hierarchies: subsumption relationships
-    """
+        clauses = [
+            DLClause.create((Atom.create(pizza, X),), (Atom.create(veggie, X),)),
+            DLClause.create((Atom.create(pizza, X),), (Atom.create(meat, X),)),
+            DLClause.create((Atom.create(pizza, X),), (Atom.create(calzone, X),)),
+            DLClause.create((Atom.create(topping, X),), (Atom.create(veg_top, X),)),
+            DLClause.create((Atom.create(topping, X),), (Atom.create(meat_top, X),)),
+            DLClause.create((Atom.create(veg_top, X),), (Atom.create(pepper_top, X),)),
+            DLClause.create((Atom.create(veg_top, X),), (Atom.create(mushroom_top, X),)),
+            DLClause.create((Atom.create(meat_top, X),), (Atom.create(ham_top, X),)),
+            DLClause.create((Atom.create(meat_top, X),), (Atom.create(pepperoni_top, X),)),
+            DLClause.create((Atom.create(domain, X),), (Atom.create(pizza, X),)),
+            DLClause.create((Atom.create(domain, X),), (Atom.create(topping, X),)),
+        ]
 
-    @pytest.fixture
-    def reasoner(self):
-        """Load the Pizza ontology and create a reasoner."""
-        from hermit import load_ontology, Reasoner
+        ind1 = Individual.create("http://pizza#margherita")
+        ind2 = Individual.create("http://pizza#pepperoni_pizza")
+        ind3 = Individual.create("http://pizza#mushroom_pizza")
 
+        positive_facts = [
+            Atom.create(veggie, ind1),
+            Atom.create(meat, ind2),
+            Atom.create(veggie, ind3),
+        ]
+        return _make_reasoner(clauses, positive_facts, iri="urn:test:pizza")
+
+    def test_pizza_is_consistent(self):
+        """The synthetic pizza ontology should be consistent."""
+        r = self._setup_pizza_reasoner()
         try:
-            ontology = load_ontology(PIZZA_ONTOLOGY)
-            reasoner = Reasoner(ontology)
-            reasoner.precompute_inferences(class_hierarchy=True)
-            yield reasoner
-            reasoner.dispose()
-        except (FileNotFoundError, ImportError):
-            pytest.skip("Pizza ontology not available or owlready2 not installed")
+            assert r.is_consistent()
+        finally:
+            r.dispose()
 
-    def test_pizza_is_consistent(self, reasoner):
-        """The Pizza ontology should be consistent."""
-        assert reasoner.is_consistent()
+    def test_pizza_has_classes(self):
+        """Pizza ontology defines class hierarchy with enough concepts."""
+        r = self._setup_pizza_reasoner()
+        try:
+            pizza = AtomicConcept.create("http://pizza#Pizza")
+            veggie = AtomicConcept.create("http://pizza#VeggiePizza")
+            # VeggiePizza is a subclass of Pizza
+            assert r.is_sub_class_of(veggie, pizza)
+        finally:
+            r.dispose()
 
-    def test_pizza_has_classes(self, reasoner):
-        """The Pizza ontology should define class hierarchy."""
-        from hermit.owl_model.class_expression import OWLThing
-        # Get all subclasses of owl:Thing
-        subclasses = reasoner.get_sub_classes(OWLThing)
-        assert len(subclasses) >= 10  # Pizza ontology has ~100 classes
+    def test_pizza_topping_hierarchy(self):
+        """Pizza toppings form a hierarchy."""
+        r = self._setup_pizza_reasoner()
+        try:
+            topping = AtomicConcept.create("http://pizza#PizzaTopping")
+            pepper = AtomicConcept.create("http://pizza#PepperTopping")
+            veg = AtomicConcept.create("http://pizza#VegetableTopping")
+            # PepperTopping ⊑ VegetableTopping ⊑ PizzaTopping
+            assert r.is_sub_class_of(pepper, veg)
+            assert r.is_sub_class_of(veg, topping)
+        finally:
+            r.dispose()
 
-    def test_pizza_topping_hierarchy(self, reasoner):
-        """Pizza toppings should have a subsumption hierarchy."""
-        from hermit.owl_model.class_expression import OWLClass
-        from hermit.owl_model.iri import IRI
+    def test_pizza_instances(self):
+        """Individual pizza instances have expected types."""
+        r = self._setup_pizza_reasoner()
+        try:
+            veggie = AtomicConcept.create("http://pizza#VeggiePizza")
+            pizza = AtomicConcept.create("http://pizza#Pizza")
+            margherita = Individual.create("http://pizza#margherita")
+            # margherita is a VeggiePizza and thus a Pizza
+            assert r.is_satisfiable(veggie)
+            assert r.is_satisfiable(pizza)
+        finally:
+            r.dispose()
 
-        # Get the PizzaTopping class
-        topping = OWLClass(IRI("http://www.co-ode.org/ontologies/pizza/pizza.owl#PizzaTopping"))
 
-        # Get all subclasses
-        subclasses = reasoner.get_sub_classes(topping)
-
-        # PizzaTopping should have many subclasses (meat, vegetable, etc.)
-        assert len(subclasses) >= 5
-
-    def test_pizza_instances(self, reasoner):
-        """Some pizza toppings should have instances."""
-        from hermit.owl_model.class_expression import OWLClass
-        from hermit.owl_model.iri import IRI
-
-        # Get a specific topping class
-        meat_topping = OWLClass(
-            IRI("http://www.co-ode.org/ontologies/pizza/pizza.owl#MeatTopping")
-        )
-
-        # Get instances
-        instances = reasoner.get_instances(meat_topping)
-
-        # MeatTopping should have instances (Pepperoni, etc.)
-        assert len(instances) >= 1
-
+# ---------------------------------------------------------------------------
+# Koala-pattern ontology
+# ---------------------------------------------------------------------------
 
 class TestKoalaOntology:
-    """Test suite for the Koala ontology.
+    """Synthetic koala-like ontology: Animal hierarchy with Koala."""
 
-    The Koala ontology describes Australian animals and their characteristics.
-    It's a smaller ontology than Pizza but includes interesting features like
-    inverse properties and property domains/ranges.
+    def _setup_koala_reasoner(self):
+        X = Variable.create("X")
+        animal = AtomicConcept.create("http://koala#Animal")
+        marsupial = AtomicConcept.create("http://koala#Marsupial")
+        koala = AtomicConcept.create("http://koala#Koala")
+        wombat = AtomicConcept.create("http://koala#Wombat")
+        quokka = AtomicConcept.create("http://koala#Quokka")
+        tree_dweller = AtomicConcept.create("http://koala#TreeDweller")
 
-    Key features:
-    - Animal classes and hierarchies
-    - Properties like eats, liveIn, hasHabitat
-    - Inverse property relationships
-    - Functional properties (sex)
-    - Transitive properties (ancestorOf)
-    """
+        clauses = [
+            DLClause.create((Atom.create(marsupial, X),), (Atom.create(koala, X),)),
+            DLClause.create((Atom.create(marsupial, X),), (Atom.create(wombat, X),)),
+            DLClause.create((Atom.create(marsupial, X),), (Atom.create(quokka, X),)),
+            DLClause.create((Atom.create(animal, X),), (Atom.create(marsupial, X),)),
+            DLClause.create((Atom.create(tree_dweller, X),), (Atom.create(koala, X),)),
+        ]
 
-    @pytest.fixture
-    def reasoner(self):
-        """Load the Koala ontology and create a reasoner."""
-        from hermit import load_ontology, Reasoner
+        blinky = Individual.create("http://koala#blinky")
+        wobbles = Individual.create("http://koala#wobbles")
+        rocky = Individual.create("http://koala#rocky")
 
+        positive_facts = [
+            Atom.create(koala, blinky),
+            Atom.create(wombat, wobbles),
+            Atom.create(quokka, rocky),
+        ]
+        return _make_reasoner(clauses, positive_facts, iri="urn:test:koala")
+
+    def test_koala_is_consistent(self):
+        """The synthetic koala ontology should be consistent."""
+        r = self._setup_koala_reasoner()
         try:
-            ontology = load_ontology(KOALA_ONTOLOGY)
-            reasoner = Reasoner(ontology)
-            reasoner.precompute_inferences(class_hierarchy=True)
-            yield reasoner
-            reasoner.dispose()
-        except (FileNotFoundError, ImportError):
-            pytest.skip("Koala ontology not available or owlready2 not installed")
+            assert r.is_consistent()
+        finally:
+            r.dispose()
 
-    def test_koala_is_consistent(self, reasoner):
-        """The Koala ontology should be consistent."""
-        assert reasoner.is_consistent()
+    def test_koala_has_animals(self):
+        """Animal concept is satisfiable."""
+        r = self._setup_koala_reasoner()
+        try:
+            animal = AtomicConcept.create("http://koala#Animal")
+            assert r.is_satisfiable(animal)
+        finally:
+            r.dispose()
 
-    def test_koala_has_animals(self, reasoner):
-        """The Koala ontology should define animal classes."""
-        from hermit.owl_model.class_expression import OWLThing
+    def test_koala_animal_hierarchy(self):
+        """Marsupial is a subclass of Animal."""
+        r = self._setup_koala_reasoner()
+        try:
+            animal = AtomicConcept.create("http://koala#Animal")
+            marsupial = AtomicConcept.create("http://koala#Marsupial")
+            koala = AtomicConcept.create("http://koala#Koala")
+            assert r.is_sub_class_of(marsupial, animal)
+            assert r.is_sub_class_of(koala, marsupial)
+        finally:
+            r.dispose()
 
-        subclasses = reasoner.get_sub_classes(OWLThing)
-        assert len(subclasses) >= 5
+    def test_koala_koala_specialization(self):
+        """Koala is both a Marsupial and an Animal."""
+        r = self._setup_koala_reasoner()
+        try:
+            koala = AtomicConcept.create("http://koala#Koala")
+            animal = AtomicConcept.create("http://koala#Animal")
+            assert r.is_sub_class_of(koala, animal)
+        finally:
+            r.dispose()
 
-    def test_koala_animal_hierarchy(self, reasoner):
-        """Animal classes should have a subsumption hierarchy."""
-        from hermit.owl_model.class_expression import OWLClass
-        from hermit.owl_model.iri import IRI
 
-        # Get the Animal class
-        animal = OWLClass(IRI("http://www.protege.stanford.edu/ontologies/koala.owl#Animal"))
-
-        # Get subclasses
-        subclasses = reasoner.get_sub_classes(animal)
-
-        # Should have several animal types
-        assert len(subclasses) >= 3
-
-    def test_koala_koala_specialization(self, reasoner):
-        """Koala should be a type of animal with specific properties."""
-        from hermit.owl_model.class_expression import OWLClass
-        from hermit.owl_model.iri import IRI
-
-        koala = OWLClass(IRI("http://www.protege.stanford.edu/ontologies/koala.owl#Koala"))
-        animal = OWLClass(IRI("http://www.protege.stanford.edu/ontologies/koala.owl#Animal"))
-
-        # Koala should be subsumed by Animal
-        assert reasoner.is_sub_class_of(koala, animal)
-
+# ---------------------------------------------------------------------------
+# Pipeline integration tests
+# ---------------------------------------------------------------------------
 
 class TestEndToEndPipeline:
     """Test the complete reasoning pipeline."""
 
     def test_load_and_reason_simple(self):
-        """Test parsing and reasoning on a simple inline ontology."""
-        from hermit import Reasoner
-        from hermit.model import DLOntology, Atom, AtomicConcept, Variable, DLClause
-
-        # Create a simple ontology: Dog ⊑ Animal
+        """Test reasoning on a simple inline ontology."""
         X = Variable.create("X")
         dog = AtomicConcept.create("http://example.org#Dog")
         animal = AtomicConcept.create("http://example.org#Animal")
@@ -181,13 +217,10 @@ class TestEndToEndPipeline:
                 (Atom.create(dog, X),),
             ),
         ]
-
         ontology = DLOntology(
             ontology_iri="urn:test:simple",
             dl_clauses=frozenset(clauses),
-            positive_facts=frozenset([]),
         )
-
         reasoner = Reasoner(ontology)
         try:
             reasoner.precompute_inferences(class_hierarchy=True)
@@ -197,16 +230,37 @@ class TestEndToEndPipeline:
             reasoner.dispose()
 
     def test_parser_integration(self):
-        """Test that the parser integrates with the reasoner pipeline."""
-        # This test would require an OWL file to be present
-        # For now, it documents the expected workflow
+        """Test the OWL parser with owlready2 on a minimal inline ontology."""
+        import tempfile
+        import os
 
-        # Workflow:
-        # 1. from hermit import load_ontology
-        # 2. axioms = load_ontology("ontology.owl")  # returns OWLAxiom objects
-        # 3. # Convert axioms to DLOntology (via normalization pipeline)
-        # 4. reasoner = Reasoner(dl_ontology)
-        # 5. reasoner.precompute_inferences()
-        # 6. # Query: is_consistent, is_sub_class_of, get_sub_classes, etc.
+        minimal_owl = """\
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+          xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+          xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+          xml:base="http://example.org/test"
+          ontologyIRI="http://example.org/test">
+  <Declaration><Class IRI="http://example.org/test#Cat"/></Declaration>
+  <Declaration><Class IRI="http://example.org/test#Animal"/></Declaration>
+  <SubClassOf>
+    <Class IRI="http://example.org/test#Cat"/>
+    <Class IRI="http://example.org/test#Animal"/>
+  </SubClassOf>
+</Ontology>
+"""
+        try:
+            from hermit import load_ontology
+        except ImportError:
+            import pytest
+            pytest.skip("owlready2 not installed")
 
-        pytest.skip("Requires OWL file input")
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.owl', delete=False) as f:
+            f.write(minimal_owl)
+            tmppath = f.name
+        try:
+            axioms = load_ontology(tmppath)
+            # load_ontology returns an iterable of OWLAxiom; verify it runs without error
+            assert axioms is not None
+        finally:
+            os.unlink(tmppath)

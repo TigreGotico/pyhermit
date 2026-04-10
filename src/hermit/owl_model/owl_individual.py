@@ -4,7 +4,7 @@
 from abc import ABCMeta
 from .owl_object import OWLObject, OWLEntity
 from .iri import IRI
-from typing import Final, Union
+from typing import Final
 
 
 class OWLIndividual(OWLObject, metaclass=ABCMeta):
@@ -24,7 +24,7 @@ class OWLNamedIndividual(OWLIndividual, OWLEntity):
 
     _iri: IRI
 
-    def __init__(self, iri: Union[IRI, str]):
+    def __init__(self, iri: IRI | str):
         """Gets an instance of OWLNamedIndividual that has the specified IRI.
 
         Args:
