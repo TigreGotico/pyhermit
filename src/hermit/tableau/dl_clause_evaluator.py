@@ -653,7 +653,7 @@ class ValuesBufferManager:
             for body_index in range(dl_clause.get_body_length() - 1, -1, -1):
                 atom = dl_clause.get_body_atom(body_index)
                 body_dl_predicates.add(atom.get_dl_predicate())
-                for argument_index in range(atom.get_arity()):
+                for argument_index in range(atom.arity()):
                     term = atom.get_argument(argument_index)
                     from hermit.model import Variable
 
@@ -854,7 +854,7 @@ class ConjunctionCompiler:
         seen_variables: set[Variable] = set()
         for body_index in range(len(self.m_body_atoms)):
             atom = self.m_body_atoms[body_index]
-            for argument_index in range(atom.get_arity()):
+            for argument_index in range(atom.arity()):
                 variable = atom.get_argument_variable(argument_index)
                 if variable is not None and variable not in seen_variables:
                     self.m_variables.append(variable)
@@ -942,8 +942,8 @@ class ConjunctionCompiler:
             NodeIDsAscendingOrEqual,
         ):
             atom = self.m_body_atoms[body_atom_index]
-            node_indexes = [0] * atom.get_arity()
-            for index in range(atom.get_arity()):
+            node_indexes = [0] * atom.arity()
+            for index in range(atom.arity()):
                 node_indexes[index] = self.m_variables.index(
                     atom.get_argument_variable(index)
                 )
@@ -972,13 +972,13 @@ class ConjunctionCompiler:
             # binding_positions has one slot per tuple element (predicate + args + dep_set)
             # The extension table stores tuples as [predicate, arg0, ..., argN, dep_set]
             # slot_size in the retrieval = m_tuple_arity + 1, so we need that many positions
-            ext_table = self.m_extension_manager.get_extension_table(atom.get_arity() + 1)
+            ext_table = self.m_extension_manager.get_extension_table(atom.arity() + 1)
             slot_size = ext_table.m_tuple_arity + 1
             binding_positions = [-1] * slot_size
             binding_positions[0] = self.m_values_buffer_manager.m_body_dl_predicates_to_indexes[
                 atom.get_dl_predicate()
             ]
-            for argument_index in range(atom.get_arity()):
+            for argument_index in range(atom.arity()):
                 term = atom.get_argument(argument_index)
                 from hermit.model import Variable
 
@@ -1024,11 +1024,11 @@ class ConjunctionCompiler:
         self, atom: Atom, retrieval: Retrieval, jump_index: int
     ) -> None:
         """Add workers that check unbound variables match within an atom."""
-        for outer_argument_index in range(atom.get_arity()):
+        for outer_argument_index in range(atom.arity()):
             variable = atom.get_argument_variable(outer_argument_index)
             if variable is not None and variable not in self.m_bound_so_far:
                 for inner_argument_index in range(
-                    outer_argument_index + 1, atom.get_arity()
+                    outer_argument_index + 1, atom.arity()
                 ):
                     if variable == atom.get_argument(inner_argument_index):
                         self.m_workers.append(
@@ -1044,7 +1044,7 @@ class ConjunctionCompiler:
         self, retrieval: Retrieval, atom: Atom
     ) -> None:
         """Add workers that copy unbound variables from retrieval to values buffer."""
-        for argument_index in range(atom.get_arity()):
+        for argument_index in range(atom.arity()):
             variable = atom.get_argument_variable(argument_index)
             if variable is not None and variable not in self.m_bound_so_far:
                 try:
@@ -1142,7 +1142,7 @@ class _DLClauseCompiler(ConjunctionCompiler):
                 )
             elif self.m_head_dl_clauses[dl_clause_index].get_head_length() == 1:
                 atom = self.m_head_dl_clauses[dl_clause_index].get_head_atom(0)
-                arity = atom.get_arity()
+                arity = atom.arity()
                 if arity == 1:
                     variable = atom.get_argument_variable(0)
                     variable_index = self.m_variables.index(variable)
@@ -1192,7 +1192,7 @@ class _DLClauseCompiler(ConjunctionCompiler):
                 for head_index in range(head_length):
                     total_number_of_arguments += self.m_head_dl_clauses[
                         dl_clause_index
-                    ].get_head_atom(head_index).get_arity()
+                    ].get_head_atom(head_index).arity()
                 head_dl_predicates: list[DLPredicate] = [None] * head_length  # type: ignore[list-item]
                 copy_is_core = [0] * head_length
                 copy_values_to_arguments = [0] * total_number_of_arguments
@@ -1202,7 +1202,7 @@ class _DLClauseCompiler(ConjunctionCompiler):
                         head_index
                     )
                     head_dl_predicates[head_index] = head_atom.get_dl_predicate()
-                    for argument_index in range(head_atom.get_arity()):
+                    for argument_index in range(head_atom.arity()):
                         variable = head_atom.get_argument_variable(argument_index)
                         variable_index = self.m_variables.index(variable)
                         copy_values_to_arguments[index] = variable_index
@@ -1242,7 +1242,7 @@ def _get_head_variables(head_dl_clauses: list[DLClause]) -> list[Any]:
     for dl_clause in head_dl_clauses:
         for head_index in range(dl_clause.get_head_length()):
             atom = dl_clause.get_head_atom(head_index)
-            for argument_index in range(atom.get_arity()):
+            for argument_index in range(atom.arity()):
                 variable = atom.get_argument_variable(argument_index)
                 if variable is not None and variable not in result:
                     result.append(variable)

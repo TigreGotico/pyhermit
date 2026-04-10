@@ -377,7 +377,7 @@ class Reasoner:
         neg_concept = sup.get_negation()
         neg: set[Atom] = {Atom.create(neg_concept, fresh)}  # type: ignore[arg-type]
         return not self._get_tableau_with_facts(pos | neg).is_satisfiable(
-            True, False, None, None, None, None, None,
+            True, True, None, None, None, None, None,
             ReasoningTaskDescription.is_concept_subsumed_by(sub, sup),
         )
 
@@ -491,7 +491,7 @@ class Reasoner:
             # First check direct facts in ontology
             for fact in self._dl_ontology.get_positive_facts():
                 if (fact.predicate == forward_role and
-                    fact.predicate.get_arity() >= 2 and
+                    fact.predicate.arity() >= 2 and
                     fact.argument(0) == obj and
                     fact.argument(1) == subject):
                     return True
@@ -508,7 +508,7 @@ class Reasoner:
         # For normal roles, check direct facts first
         for fact in self._dl_ontology.get_positive_facts():
             if (fact.predicate == role and
-                fact.predicate.get_arity() >= 2 and
+                fact.predicate.arity() >= 2 and
                 fact.argument(0) == subject and
                 fact.argument(1) == obj):
                 return True

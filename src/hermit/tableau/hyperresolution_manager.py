@@ -95,7 +95,7 @@ class BodyAtomsSwapper:
             return -2000
         if isinstance(atom.get_dl_predicate(), NodeIDsAscendingOrEqual):
             number_of_unbound_variables = 0
-            for argument_index in range(atom.get_arity() - 1, -1, -1):
+            for argument_index in range(atom.arity() - 1, -1, -1):
                 term = atom.get_argument(argument_index)
                 from hermit.model import Variable
 
@@ -107,7 +107,7 @@ class BodyAtomsSwapper:
             return 5000
         number_of_bound_variables = 0
         number_of_unbound_variables = 0
-        for argument_index in range(atom.get_arity() - 1, -1, -1):
+        for argument_index in range(atom.arity() - 1, -1, -1):
             term = atom.get_argument(argument_index)
             from hermit.model import Variable
 

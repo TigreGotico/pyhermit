@@ -553,9 +553,6 @@ class AtomicConcept(LiteralConcept):
     def arity(self) -> int:
         return 1
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def get_negation(self) -> LiteralConcept:
         if self is self.THING:
@@ -619,9 +616,6 @@ class AtomicNegationConcept(LiteralConcept):
     def arity(self) -> int:
         return 1
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def get_negation(self) -> LiteralConcept:
         return self._negated
@@ -695,9 +689,6 @@ class AtomicRole(Role):
     def arity(self) -> int:
         return 2
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def get_inverse(self) -> Role:
         if self in (self.TOP_OBJECT_ROLE, self.BOTTOM_OBJECT_ROLE):
@@ -766,9 +757,6 @@ class InverseRole(Role):
     def arity(self) -> int:
         return 2
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def get_role_assertion(self, term0: Term, term1: Term) -> Atom:
         return Atom.create(self._inverse_of, term1, term0)
@@ -847,9 +835,6 @@ class Equality:
     def arity(self) -> int:
         return 2
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def __str__(self) -> str:
         return "=="
@@ -880,9 +865,6 @@ class Inequality:
     def arity(self) -> int:
         return 2
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def __str__(self) -> str:
         return "!="
@@ -936,9 +918,6 @@ class Atom:
     def arity(self) -> int:
         return len(self._arguments)
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def argument(self, index: int) -> Term:
         return self._arguments[index]
@@ -1495,9 +1474,6 @@ class AtLeast(ExistentialConcept):
     def arity(self) -> int:
         return 1
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def is_always_true(self) -> bool:
         return False
@@ -1637,9 +1613,6 @@ class ExistsDescriptionGraph(ExistentialConcept):
     def arity(self) -> int:
         return 1
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def is_always_true(self) -> bool:
         return False
@@ -1690,9 +1663,6 @@ class AnnotatedEquality:
     def arity(self) -> int:
         return 3
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def __str__(self) -> str:
         return f"==@atMost({self._cardinality} {self._on_role} {self._to_concept})"
@@ -1722,9 +1692,6 @@ class NodeIDLessEqualThan:
     def arity(self) -> int:
         return 2
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def __str__(self) -> str:
         return "<="
@@ -1760,9 +1727,6 @@ class NodeIDsAscendingOrEqual:
     def arity(self) -> int:
         return self._arity
 
-    def get_arity(self) -> int:
-        """Java-compatible alias for :meth:`arity`."""
-        return self.arity()
 
     def __str__(self) -> str:
         return "NodeIDsAscendingOrEqual"
