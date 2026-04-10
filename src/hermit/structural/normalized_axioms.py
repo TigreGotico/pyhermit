@@ -26,6 +26,7 @@ if TYPE_CHECKING:
         Atom,
         Constant,
         DataRange,
+        DLClause,
         Individual,
         Role,
     )
@@ -356,7 +357,7 @@ class NormalizedAxioms:
     """Temporary storage for negative axioms during normalization."""
 
     # -- Direct DL clauses (from ∀R.C expansion) --
-    direct_dl_clauses: list[object] = field(default_factory=list)
+    direct_dl_clauses: list[DLClause] = field(default_factory=list)
     """DL clauses emitted directly by normalization (e.g. for ∀R.C)."""
 
     # -- Conversion tracking (populated by _owl_expr_to_internal) --

@@ -175,10 +175,8 @@ class OWLClausification:
             )
 
         # -- Direct DL clauses (e.g. from ∀R.C normalization) --
-        from hermit.model import DLClause as _DLClause
-        for direct_clause in getattr(axioms, "direct_dl_clauses", []):
-            if isinstance(direct_clause, _DLClause):
-                dl_clauses.add(direct_clause.get_safe_version(AtomicConcept.THING))
+        for direct_clause in axioms.direct_dl_clauses:
+            dl_clauses.add(direct_clause.get_safe_version(AtomicConcept.THING))
 
         # -- Key clauses --
         for obj_key in axioms.object_property_keys:
