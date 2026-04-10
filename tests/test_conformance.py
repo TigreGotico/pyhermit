@@ -264,3 +264,91 @@ class TestPizzaPatterns:
             )
         finally:
             r.dispose()
+
+
+# ---------------------------------------------------------------------------
+# OWL file loading tests (require owlready2)
+# ---------------------------------------------------------------------------
+
+import os as _os
+_ONTOLOGIES = _os.path.join(_os.path.dirname(__file__), "ontologies")
+
+_owlready2 = pytest.importorskip("owlready2")
+
+
+class TestOwlFileLoading:
+    """Load real .owl files with owlready2 and verify reasoning."""
+
+    KOALA_IRI = "http://protege.stanford.edu/plugins/owl/owl-library/koala.owl"
+    PIZZA_IRI = "http://www.co-ode.org/ontologies/pizza/pizza.owl"
+
+    def test_koala_subclass_chain(self):
+        """KoalaWithPhD ⊑ Koala ⊑ Marsupial — transitive subclass chain.
+
+        Expected: is_sub_class_of(KoalaWithPhD, Marsupial) = True.
+        """
+        from hermit.parser import load_ontology
+        axioms = load_ontology(_os.path.join(_ONTOLOGIES, "koala.owl"))
+        r = _reasoner_from_axioms(axioms)
+        try:
+            phd = AtomicConcept.create(self.KOALA_IRI + "#KoalaWithPhD")
+            marsupial = AtomicConcept.create(self.KOALA_IRI + "#Marsupial")
+            assert r.is_sub_class_of(phd, marsupial) is True
+        finally:
+            r.dispose()
+
+    def test_koala_consistent(self):
+        """Koala ontology is globally consistent (no ABox contradictions).
+
+        Expected: is_consistent() = True.
+        """
+        from hermit.parser import load_ontology
+        axioms = load_ontology(_os.path.join(_ONTOLOGIES, "koala.owl"))
+        r = _reasoner_from_axioms(axioms)
+        try:
+            assert r.is_consistent() is True
+        finally:
+            r.dispose()
+
+    def test_koala_disjoint_koala_forest(self):
+        """Koala and Forest are declared disjoint — neither subsumes the other.
+
+        Expected: is_sub_class_of(Koala, Forest) = False.
+        """
+        from hermit.parser import load_ontology
+        axioms = load_ontology(_os.path.join(_ONTOLOGIES, "koala.owl"))
+        r = _reasoner_from_axioms(axioms)
+        try:
+            koala = AtomicConcept.create(self.KOALA_IRI + "#Koala")
+            forest = AtomicConcept.create(self.KOALA_IRI + "#Forest")
+            assert r.is_sub_class_of(koala, forest) is False
+        finally:
+            r.dispose()
+
+    def test_pizza_consistent(self):
+        """Pizza ontology is globally consistent.
+
+        Expected: is_consistent() = True.
+        """
+        from hermit.parser import load_ontology
+        axioms = load_ontology(_os.path.join(_ONTOLOGIES, "pizza.owl"))
+        r = _reasoner_from_axioms(axioms)
+        try:
+            assert r.is_consistent() is True
+        finally:
+            r.dispose()
+
+    def test_pizza_cheese_subclass_topping(self):
+        """CheeseTopping ⊑ PizzaTopping in the pizza ontology.
+
+        Expected: is_sub_class_of(CheeseTopping, PizzaTopping) = True.
+        """
+        from hermit.parser import load_ontology
+        axioms = load_ontology(_os.path.join(_ONTOLOGIES, "pizza.owl"))
+        r = _reasoner_from_axioms(axioms)
+        try:
+            cheese = AtomicConcept.create(self.PIZZA_IRI + "#CheeseTopping")
+            topping = AtomicConcept.create(self.PIZZA_IRI + "#PizzaTopping")
+            assert r.is_sub_class_of(cheese, topping) is True
+        finally:
+            r.dispose()
