@@ -125,7 +125,7 @@ class DatatypeManager:
                     )
             elif isinstance(data_range_object, AtomicNegationDataRange):
                 negation_data_range: AtomicNegationDataRange = data_range_object
-                negated_data_range = negation_data_range.get_negated_data_range()
+                negated_data_range = negation_data_range.negated
                 if isinstance(negated_data_range, DatatypeRestriction):
                     datatype_restriction = negated_data_range
                     if (
@@ -322,17 +322,17 @@ class DatatypeManager:
                 if variable.m_most_specific_restriction is None:
                     variable.m_most_specific_restriction = data_range
                 elif DatatypeRegistry.is_disjoint_with(
-                    variable.m_most_specific_restriction.get_datatype_uri(),
-                    data_range.get_datatype_uri(),
+                    variable.m_most_specific_restriction.datatype_iri,
+                    data_range.datatype_iri,
                 ):
                     self.m_union_dependency_set.clear_constituents()
                     self.m_union_dependency_set.add_constituent(
-                        self.m_extension_manager.get_assertion_dependency_set(
+                        self.m_extension_manager.get_assertion_dependency_set_unary(
                             variable.m_most_specific_restriction, variable.m_node
                         )
                     )
                     self.m_union_dependency_set.add_constituent(
-                        self.m_extension_manager.get_assertion_dependency_set(
+                        self.m_extension_manager.get_assertion_dependency_set_unary(
                             data_range, variable.m_node
                         )
                     )
@@ -348,14 +348,14 @@ class DatatypeManager:
                             [data_range, variable.m_node],
                         )
                 elif DatatypeRegistry.is_subset_of(
-                    data_range.get_datatype_uri(),
-                    variable.m_most_specific_restriction.get_datatype_uri(),
+                    data_range.datatype_iri,
+                    variable.m_most_specific_restriction.datatype_iri,
                 ):
                     variable.m_most_specific_restriction = data_range
         elif isinstance(data_range, ConstantEnumeration):
             variable.m_positive_constant_enumerations.append(data_range)
         elif isinstance(data_range, AtomicNegationDataRange):
-            negated_data_range = data_range.get_negated_data_range()
+            negated_data_range = data_range.negated
             if isinstance(negated_data_range, InternalDatatype):
                 pass  # Skip for same reasons as above.
             elif isinstance(negated_data_range, DatatypeRestriction):
@@ -371,7 +371,7 @@ class DatatypeManager:
                 variable.m_negative_constant_enumerations.append(negated_data_range)
                 for i in range(negated_data_range.get_number_of_constants() - 1, -1, -1):
                     variable.add_forbidden_data_value(
-                        negated_data_range.get_constant(i).get_data_value()
+                        negated_data_range.get_constant(i).data_value
                     )
             else:
                 raise RuntimeError("Internal error: invalid data range.")
@@ -394,7 +394,7 @@ class DatatypeManager:
         positive_constant_enumerations = variable.m_positive_constant_enumerations
         first_data_value_enumeration = positive_constant_enumerations[0]
         for index in range(first_data_value_enumeration.get_number_of_constants() - 1, -1, -1):
-            data_value = first_data_value_enumeration.get_constant(index).get_data_value()
+            data_value = first_data_value_enumeration.get_constant(index).data_value
             if (
                 data_value not in explicit_data_values
                 and data_value not in variable.m_forbidden_data_values
@@ -430,7 +430,7 @@ class DatatypeManager:
     ) -> bool:
         """Check if a constant enumeration contains a specific data value."""
         for i in range(constant_enumeration.get_number_of_constants() - 1, -1, -1):
-            if constant_enumeration.get_constant(i).get_data_value() == data_value:
+            if constant_enumeration.get_constant(i).data_value == data_value:
                 return True
         return False
 
@@ -451,7 +451,7 @@ class DatatypeManager:
         from hermit.datatypes.registry import DatatypeRegistry
 
         restriction = variable.m_most_specific_restriction
-        most_specific_datatype_uri = restriction.get_datatype_uri()
+        most_specific_datatype_uri = restriction.datatype_iri
         variable.m_value_space_subset = DatatypeRegistry.create_value_space_subset(
             most_specific_datatype_uri,
             restriction._facet_uris,
@@ -464,7 +464,7 @@ class DatatypeManager:
                 )
         for restriction in reversed(variable.m_negative_datatype_restrictions):
             if not DatatypeRegistry.is_disjoint_with(
-                most_specific_datatype_uri, restriction.get_datatype_uri()
+                most_specific_datatype_uri, restriction.datatype_iri
             ):
                 variable.m_value_space_subset = DatatypeRegistry.conjoin_with_dr_negation(
                     variable.m_value_space_subset, restriction
@@ -484,11 +484,11 @@ class DatatypeManager:
 
         for variable1 in list(self.m_conjunction.m_active_variables):
             if variable1.m_most_specific_restriction is not None:
-                datatype_uri1 = variable1.m_most_specific_restriction.get_datatype_uri()
+                datatype_uri1 = variable1.m_most_specific_restriction.datatype_iri
                 for variable2 in list(variable1.m_unequal_to_direct):
                     if variable2.m_most_specific_restriction is not None and DatatypeRegistry.is_disjoint_with(
                         datatype_uri1,
-                        variable2.m_most_specific_restriction.get_datatype_uri(),
+                        variable2.m_most_specific_restriction.datatype_iri,
                     ):
                         variable1.m_unequal_to.discard(variable2)
                         variable1.m_unequal_to_direct.discard(variable2)
@@ -611,7 +611,7 @@ class DatatypeManager:
         for variable in reversed(variables):
             self._load_assertion_dependency_sets(variable)
             for neighbor_variable in variable.m_unequal_to_direct:
-                dependency_set = self.m_extension_manager.get_assertion_dependency_set(
+                dependency_set = self.m_extension_manager.get_assertion_dependency_set_binary(
                     Inequality.INSTANCE, variable.m_node, neighbor_variable.m_node
                 )
                 self.m_union_dependency_set.add_constituent(dependency_set)
@@ -621,24 +621,24 @@ class DatatypeManager:
         """Load dependency sets for all assertions on a variable."""
         node = variable.m_node
         for data_range in reversed(variable.m_positive_datatype_restrictions):
-            dependency_set = self.m_extension_manager.get_assertion_dependency_set(
+            dependency_set = self.m_extension_manager.get_assertion_dependency_set_unary(
                 data_range, node
             )
             self.m_union_dependency_set.add_constituent(dependency_set)
         for data_range in reversed(variable.m_negative_datatype_restrictions):
             literal_data_range = data_range.get_negation()
-            dependency_set = self.m_extension_manager.get_assertion_dependency_set(
+            dependency_set = self.m_extension_manager.get_assertion_dependency_set_unary(
                 literal_data_range, node
             )
             self.m_union_dependency_set.add_constituent(dependency_set)
         for data_range in reversed(variable.m_positive_constant_enumerations):
-            dependency_set = self.m_extension_manager.get_assertion_dependency_set(
+            dependency_set = self.m_extension_manager.get_assertion_dependency_set_unary(
                 data_range, node
             )
             self.m_union_dependency_set.add_constituent(dependency_set)
         for data_range in reversed(variable.m_negative_constant_enumerations):
             literal_data_range = data_range.get_negation()
-            dependency_set = self.m_extension_manager.get_assertion_dependency_set(
+            dependency_set = self.m_extension_manager.get_assertion_dependency_set_unary(
                 literal_data_range, node
             )
             self.m_union_dependency_set.add_constituent(dependency_set)
@@ -888,11 +888,7 @@ class DVariable:
                 return False
         return True
 
-    def __str__(self, prefixes: Prefixes | None = None) -> str:
-        from hermit.model import Prefixes as Pfx
-
-        if prefixes is None:
-            prefixes = Pfx.SEMANTIC_WEB_PREFIXES
+    def __str__(self) -> str:
         parts = ["["]
         first = True
         for item in self.m_positive_constant_enumerations:
@@ -900,25 +896,25 @@ class DVariable:
                 first = False
             else:
                 parts.append(", ")
-            parts.append(item.to_string(prefixes))
+            parts.append(str(item))
         for item in self.m_negative_constant_enumerations:
             if first:
                 first = False
             else:
                 parts.append(", ")
-            parts.append(item.get_negation().to_string(prefixes))
+            parts.append(str(item.get_negation()))
         for item in self.m_positive_datatype_restrictions:
             if first:
                 first = False
             else:
                 parts.append(", ")
-            parts.append(item.to_string(prefixes))
+            parts.append(str(item))
         for item in self.m_negative_datatype_restrictions:
             if first:
                 first = False
             else:
                 parts.append(", ")
-            parts.append(item.get_negation().to_string(prefixes))
+            parts.append(str(item.get_negation()))
         parts.append("]")
         return "".join(parts)
 

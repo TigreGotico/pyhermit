@@ -193,7 +193,7 @@ class ExistentialExpansionManager:
                 )
                 if isinstance(at_least, AtLeastConcept):
                     self.m_extension_manager.add_concept_assertion(
-                        at_least.get_to_concept(),
+                        at_least.to_concept,
                         functionality_node,
                         self.m_binary_union_dependency_set,
                         True,
@@ -201,7 +201,7 @@ class ExistentialExpansionManager:
                 else:
                     assert isinstance(at_least, AtLeastDataRange)
                     self.m_extension_manager.add_data_range_assertion(
-                        at_least.get_to_data_range(),
+                        at_least.to_data_range,
                         functionality_node,
                         self.m_binary_union_dependency_set,
                         True,
@@ -246,7 +246,7 @@ class ExistentialExpansionManager:
                 else:
                     retrieval = self.m_ternary_extension_table_search02_bound
                     assert isinstance(relevant_role, InverseRole)
-                    retrieval.get_bindings_buffer()[0] = relevant_role.get_inverse_of()
+                    retrieval.get_bindings_buffer()[0] = relevant_role.inverse_of
                     retrieval.get_bindings_buffer()[2] = for_node
                     to_node_index = 1
                 retrieval.open()

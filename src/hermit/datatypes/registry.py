@@ -365,7 +365,7 @@ class DatatypeRegistry:
         Returns the intersection of the value space with the restriction.
         """
         # Extract facets from the datatype restriction
-        dr_iri = datatype_restriction.get_datatype_uri()
+        dr_iri = datatype_restriction.datatype_iri
 
         facet_uris = getattr(datatype_restriction, '_facet_uris', ())
         facet_values = getattr(datatype_restriction, '_facet_values', ())
@@ -387,7 +387,7 @@ class DatatypeRegistry:
         Returns the intersection of the value space with the complement of the restriction.
         """
         # Extract facets from the datatype restriction
-        dr_iri = datatype_restriction.get_datatype_uri()
+        dr_iri = datatype_restriction.datatype_iri
 
         facet_uris = getattr(datatype_restriction, '_facet_uris', ())
         facet_values = getattr(datatype_restriction, '_facet_values', ())

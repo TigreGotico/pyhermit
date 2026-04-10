@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hermit.model import DLPredicate
-    from hermit.model import Prefixes
+
 
 
 class DisjunctIndexWithBacktrackings:
@@ -53,7 +53,7 @@ class GroundDisjunctionHeader:
         arguments_size = 0
         for disjunct_index in range(len(self.m_dl_predicates)):
             self.m_disjunct_start[disjunct_index] = arguments_size
-            arguments_size += self.m_dl_predicates[disjunct_index].get_arity()
+            arguments_size += self.m_dl_predicates[disjunct_index].arity()
         self.m_hash_code = hash_code
         self.m_next_entry = next_entry
         self.m_disjunct_indexes_with_backtrackings: list[DisjunctIndexWithBacktrackings] = [
@@ -70,7 +70,7 @@ class GroundDisjunctionHeader:
         for dl_pred in self.m_dl_predicates:
             if isinstance(dl_pred, AtLeastConcept):
                 at_least: AtLeastConcept = dl_pred
-                if isinstance(at_least.get_to_concept(), AtomicNegationConcept):
+                if isinstance(at_least.to_concept, AtomicNegationConcept):
                     number_of_at_least_negative_disjuncts += 1
                 else:
                     number_of_at_least_positive_disjuncts += 1
@@ -90,7 +90,7 @@ class GroundDisjunctionHeader:
             dl_pred = self.m_dl_predicates[index]
             if isinstance(dl_pred, AtLeastConcept):
                 at_least = dl_pred
-                if isinstance(at_least.get_to_concept(), AtomicNegationConcept):
+                if isinstance(at_least.to_concept, AtomicNegationConcept):
                     self.m_disjunct_indexes_with_backtrackings[
                         next_at_least_negative_disjunct
                     ] = DisjunctIndexWithBacktrackings(index)
@@ -111,7 +111,7 @@ class GroundDisjunctionHeader:
         if len(self.m_dl_predicates) != len(dl_predicates):
             return False
         for i in range(len(self.m_dl_predicates) - 1, -1, -1):
-            if not self.m_dl_predicates[i].equals(dl_predicates[i]):
+            if self.m_dl_predicates[i] != dl_predicates[i]:
                 return False
         return True
 
@@ -153,17 +153,13 @@ class GroundDisjunctionHeader:
                     next_index += 1
                 break
 
-    def __str__(self, prefixes: Prefixes | None = None) -> str:
+    def __str__(self) -> str:
         """Return a string representation."""
-        from hermit.model import Prefixes as Pfx
-
-        if prefixes is None:
-            prefixes = Pfx.SEMANTIC_WEB_PREFIXES
         parts = []
         for disjunct_index in range(len(self.m_dl_predicates)):
             if disjunct_index > 0:
                 parts.append(" \\/ ")
-            parts.append(self.m_dl_predicates[disjunct_index].to_string(prefixes))
+            parts.append(str(self.m_dl_predicates[disjunct_index]))
             parts.append(" (")
             for entry in self.m_disjunct_indexes_with_backtrackings:
                 if entry.m_disjunct_index == disjunct_index:

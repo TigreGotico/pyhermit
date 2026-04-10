@@ -38,7 +38,7 @@ class DescriptionGraphManager:
             )
             description_graphs_by_index.append(description_graph)
             extension_table = self.m_extension_manager.get_extension_table(
-                description_graph.get_arity() + 1
+                description_graph.arity() + 1
             )
             extension_tables_by_index.append(extension_table)
             extension_tables_set.add(extension_table)
@@ -49,7 +49,7 @@ class DescriptionGraphManager:
         self.m_auxiliary_tuples1: list[list[object | None]] = []
         self.m_auxiliary_tuples2: list[list[object | None]] = []
         for dg in self.m_description_graphs_by_index:
-            size = dg.get_arity() + 1
+            size = dg.arity() + 1
             self.m_auxiliary_tuples1.append([None] * size)
             self.m_auxiliary_tuples2.append([None] * size)
         self.m_new_nodes: list[Node] = []
@@ -87,7 +87,7 @@ class DescriptionGraphManager:
         """Retrieve a description graph tuple by index."""
         description_graph = self.m_description_graphs_by_index[graph_index]
         extension_table = self.m_extension_tables_by_index[graph_index]
-        tup: list[object | None] = [None] * (description_graph.get_arity() + 1)
+        tup: list[object | None] = [None] * (description_graph.arity() + 1)
         extension_table.m_tuple_table.retrieve_tuple(tup, tuple_index)
         return tup
 
@@ -188,9 +188,9 @@ class DescriptionGraphManager:
     ) -> bool:
         """Check if an exists-description-graph is satisfied for a node."""
         graph_index = self.m_description_graph_indices[
-            exists_description_graph.get_description_graph()
+            exists_description_graph.description_graph
         ]
-        position_in_tuple = exists_description_graph.get_vertex() + 1
+        position_in_tuple = exists_description_graph.vertex + 1
         list_node = node.m_first_graph_occurrence_node
         while list_node != -1:
             if (
@@ -312,15 +312,15 @@ class DescriptionGraphManager:
                 exists_description_graph, for_node
             )
         self.m_new_nodes.clear()
-        description_graph = exists_description_graph.get_description_graph()
+        description_graph = exists_description_graph.description_graph
         dependency_set = self.m_extension_manager.get_concept_assertion_dependency_set(
             exists_description_graph, for_node
         )
         graph_index = self.m_description_graph_indices[description_graph]
         auxiliary_tuple = self.m_auxiliary_tuples1[graph_index]
         auxiliary_tuple[0] = description_graph
-        for vertex in range(description_graph.get_arity()):
-            if vertex == exists_description_graph.get_vertex():
+        for vertex in range(description_graph.arity()):
+            if vertex == exists_description_graph.vertex:
                 new_node = for_node
             else:
                 new_node = self.m_tableau.create_new_graph_node(
@@ -330,24 +330,24 @@ class DescriptionGraphManager:
             auxiliary_tuple[vertex + 1] = new_node
         self.m_extension_manager.add_tuple(auxiliary_tuple, dependency_set, True)
         # Replace all nodes with the canonical node because nodes might have been merged
-        for vertex in range(description_graph.get_arity()):
+        for vertex in range(description_graph.arity()):
             new_node = self.m_new_nodes[vertex]
             dependency_set = new_node.add_canonical_node_dependency_set(dependency_set)
             self.m_new_nodes[vertex] = new_node.get_canonical_node()
         # Add the graph layout
-        for vertex in range(description_graph.get_arity()):
+        for vertex in range(description_graph.arity()):
             self.m_extension_manager.add_concept_assertion(
-                description_graph.get_atomic_concept_for_vertex(vertex),
+                description_graph.atomic_concept_for_vertex(vertex),
                 self.m_new_nodes[vertex],
                 dependency_set,
                 True,
             )
-        for edge_index in range(description_graph.get_number_of_edges()):
-            edge = description_graph.get_edge(edge_index)
+        for edge_index in range(description_graph.number_of_edges()):
+            edge = description_graph.edge(edge_index)
             self.m_extension_manager.add_role_assertion(
-                edge.get_atomic_role(),
-                self.m_new_nodes[edge.get_from_vertex()],
-                self.m_new_nodes[edge.get_to_vertex()],
+                edge.atomic_role,
+                self.m_new_nodes[edge.from_vertex],
+                self.m_new_nodes[edge.to_vertex],
                 dependency_set,
                 True,
             )

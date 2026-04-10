@@ -211,12 +211,12 @@ class DLClauseInfo:
             if isinstance(predicate, AtomicConcept):
                 if var1 == x_variable:
                     x_concepts.add(predicate)
-                elif var1.get_name().startswith("Y"):
+                elif var1.name.startswith("Y"):
                     ys.add(var1)
                     if var1 not in y2concepts:
                         y2concepts[var1] = set()
                     y2concepts[var1].add(predicate)
-                elif var1.get_name().startswith("Z"):
+                elif var1.name.startswith("Z"):
                     if var1 not in z2concepts:
                         z2concepts[var1] = set()
                     z2concepts[var1].add(predicate)
@@ -225,13 +225,13 @@ class DLClauseInfo:
                 if var1 == x_variable:
                     if var2 == x_variable:
                         x2x_roles.add(predicate)
-                    elif var2.get_name().startswith("Y"):
+                    elif var2.name.startswith("Y"):
                         ys.add(var2)
                         if var2 not in x2y_roles:
                             x2y_roles[var2] = set()
                         x2y_roles[var2].add(predicate)
                 elif var2 == x_variable:
-                    if var1.get_name().startswith("Y"):
+                    if var1.name.startswith("Y"):
                         ys.add(var1)
                         if var1 not in y2x_roles:
                             y2x_roles[var1] = set()
@@ -321,23 +321,23 @@ class DLClauseInfo:
                 if var1 == x_variable or var2 == x_variable:
                     if var2 == x_variable:
                         var1, var2 = var2, var1
-                    assert var2.get_name().startswith("Z")
+                    assert var2.name.startswith("Z")
                     var2_index = self._get_index_for(self.m_z_variables, var2)
                     self.m_consequences_for_blocked_x[i] = _SimpleConsequenceAtom(
                         predicate, [_ArgumentType.XVAR, _ArgumentType.ZVAR], [0, var2_index]
                     )
                     self.m_consequences_for_nonblocked_x[i] = self.m_consequences_for_blocked_x[i]
-                elif var1.get_name().startswith("Z") or (var2 and var2.get_name().startswith("Z")):
-                    if var2 and var2.get_name().startswith("Y"):
+                elif var1.name.startswith("Z") or (var2 and var2.name.startswith("Z")):
+                    if var2 and var2.name.startswith("Y"):
                         var1, var2 = var2, var1
-                    assert var2.get_name().startswith("Z")
+                    assert var2.name.startswith("Z")
                     var2_index = self._get_index_for(self.m_z_variables, var2)
                     var1_index = self._get_index_for(self.m_y_variables, var1)
                     self.m_consequences_for_blocked_x[i] = _SimpleConsequenceAtom(
                         predicate, [_ArgumentType.YVAR, _ArgumentType.ZVAR], [var1_index, var2_index]
                     )
                     self.m_consequences_for_nonblocked_x[i] = self.m_consequences_for_blocked_x[i]
-                elif var1.get_name().startswith("Y") and var2 and var2.get_name().startswith("Y"):
+                elif var1.name.startswith("Y") and var2 and var2.name.startswith("Y"):
                     var1_index = self._get_index_for(self.m_y_variables, var1)
                     var2_index = self._get_index_for(self.m_y_variables, var2)
                     self.m_consequences_for_blocked_x[i] = _SimpleConsequenceAtom(

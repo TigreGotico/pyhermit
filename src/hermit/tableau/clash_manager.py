@@ -107,7 +107,7 @@ class ClashManager:
         is_negated_datatype = (
             isinstance(dl_predicate_object, AtomicNegationDataRange)
             and isinstance(
-                dl_predicate_object.get_negated_data_range(), InternalDatatype
+                dl_predicate_object.negated, InternalDatatype
             )
         )
         is_atomic_concept_with_negations = (

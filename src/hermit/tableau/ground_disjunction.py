@@ -113,7 +113,7 @@ class GroundDisjunction:
         extension_manager = tableau.m_extension_manager
         for disjunct_index in range(self.get_number_of_disjuncts()):
             dl_predicate = self.get_dl_predicate(disjunct_index)
-            arity = dl_predicate.get_arity()
+            arity = dl_predicate.arity()
             if arity == 1:
                 arg0 = self.get_argument(disjunct_index, 0)
                 # Handle case where argument might be a node or stored directly
@@ -168,7 +168,7 @@ class GroundDisjunction:
         from hermit.tableau.node import Node
 
         dl_predicate = self.get_dl_predicate(disjunct_index)
-        arity = dl_predicate.get_arity()
+        arity = dl_predicate.arity()
         if arity == 1:
             arg0 = self.get_argument(disjunct_index, 0)
             if not isinstance(arg0, Node):
@@ -236,7 +236,7 @@ class GroundDisjunction:
             if disjunct_index != 0:
                 parts.append(" v ")
             dl_predicate = self.get_dl_predicate(disjunct_index)
-            if Equality.INSTANCE.equals(dl_predicate):
+            if Equality.INSTANCE == dl_predicate:
                 arg0 = self.get_argument(disjunct_index, 0)
                 arg1 = self.get_argument(disjunct_index, 1)
                 parts.append(str(arg0.node_id if isinstance(arg0, Node) else arg0))
@@ -253,19 +253,19 @@ class GroundDisjunction:
                     parts.append(" == ")
                     parts.append(str(arg1.node_id if isinstance(arg1, Node) else arg1))
                     parts.append("]@atMost(")
-                    parts.append(str(dl_predicate.get_cardinality()))
+                    parts.append(str(dl_predicate.cardinality))
                     parts.append(" ")
-                    parts.append(dl_predicate.get_on_role().to_string(prefixes))
+                    parts.append(str(dl_predicate.on_role))
                     parts.append(" ")
-                    parts.append(dl_predicate.get_to_concept().to_string(prefixes))
+                    parts.append(str(dl_predicate.to_concept))
                     parts.append(")(")
                     arg2 = self.get_argument(disjunct_index, 2)
                     parts.append(str(arg2.node_id if isinstance(arg2, Node) else arg2))
                     parts.append(")")
                 else:
-                    parts.append(dl_predicate.to_string(prefixes))
+                    parts.append(str(dl_predicate))
                     parts.append("(")
-                    for argument_index in range(dl_predicate.get_arity()):
+                    for argument_index in range(dl_predicate.arity()):
                         if argument_index != 0:
                             parts.append(",")
                         arg = self.get_argument(disjunct_index, argument_index)

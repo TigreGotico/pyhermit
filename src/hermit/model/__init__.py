@@ -1852,6 +1852,10 @@ class DatatypeRestriction(AtomicDataRange):
                 return True
         return False
 
+    def get_negation(self) -> AtomicNegationDataRange:
+        """Return the negation of this datatype restriction."""
+        return AtomicNegationDataRange.create(self)
+
     @classmethod
     def create(  # type: ignore[override]
         cls, datatype_iri: str, facet_uris: tuple[str, ...],

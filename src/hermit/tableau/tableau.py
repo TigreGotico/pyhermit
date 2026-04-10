@@ -620,7 +620,7 @@ class Tableau:
             )
         elif isinstance(dl_predicate, DescriptionGraph):
             description_graph = dl_predicate
-            arity = description_graph.get_arity()
+            arity = description_graph.arity()
             tup: list[Any] = [None] * (arity + 1)
             tup[0] = description_graph
             for arg_idx in range(arity):

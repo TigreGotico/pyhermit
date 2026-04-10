@@ -200,6 +200,11 @@ class ExtensionTable(ABC):
     @abstractmethod
     def propagate_delta_new(self) -> bool: ...
 
+    def is_tuple_active(self, tuple_index: int) -> bool:
+        """Return True if the tuple at the given index is currently active."""
+        slot_size = self.m_tuple_arity + 1
+        return tuple_index * slot_size < self._after_extension_this_tuple_index * slot_size
+
     def create_retrieval(
         self,
         bound_mask_or_positions: list[bool] | list[int],
@@ -252,6 +257,15 @@ class Retrieval(ABC):
 
     @abstractmethod
     def is_core(self) -> bool: ...
+
+    @abstractmethod
+    def get_extension_table(self) -> ExtensionTable: ...
+
+    @abstractmethod
+    def get_current_tuple_index(self) -> int: ...
+
+    @abstractmethod
+    def get_binding_positions(self) -> list[int]: ...
 
 
 class _SimpleRetrieval(Retrieval):
@@ -358,6 +372,16 @@ class _SimpleRetrieval(Retrieval):
         idx = self._current_index - (self._extension_table.m_tuple_arity + 1)
         return self._extension_table.m_core_manager.is_core(idx)
 
+    def get_extension_table(self) -> ExtensionTable:
+        return self._extension_table
+
+    def get_current_tuple_index(self) -> int:
+        slot_size = self._extension_table.m_tuple_arity + 1
+        return (self._current_index - slot_size) // slot_size
+
+    def get_binding_positions(self) -> list[int]:
+        return [i for i, bound in enumerate(self._bound_mask) if bound]
+
 
 class _FullRetrieval(Retrieval):
     """Retrieval using explicit binding positions and external buffers.
@@ -447,6 +471,16 @@ class _FullRetrieval(Retrieval):
     def is_core(self) -> bool:
         idx = self._current_index - (self._arity + 1)
         return self._extension_table.m_core_manager.is_core(idx)
+
+    def get_extension_table(self) -> ExtensionTable:
+        return self._extension_table
+
+    def get_current_tuple_index(self) -> int:
+        slot_size = self._arity + 1
+        return (self._current_index - slot_size) // slot_size
+
+    def get_binding_positions(self) -> list[int]:
+        return [pos for pos in self._binding_positions if pos >= 0]
 
 
 class ExtensionTableWithTupleIndexes(ExtensionTable):
@@ -903,19 +937,30 @@ class ExtensionManager:
         self, role: Role, node_from: Node, node_to: Node
     ) -> bool:
         """Check whether *role*(*node_from*, *node_to*) is asserted."""
-        from hermit.model import AtomicRole
+        from hermit.model import AtomicRole, InverseRole
 
         if isinstance(role, AtomicRole):
             self.m_ternary_auxiliary_tuple_contains[0] = role
             self.m_ternary_auxiliary_tuple_contains[1] = node_from
             self.m_ternary_auxiliary_tuple_contains[2] = node_to
         else:
+            assert isinstance(role, InverseRole)
             self.m_ternary_auxiliary_tuple_contains[0] = role.inverse_of
             self.m_ternary_auxiliary_tuple_contains[1] = node_to
             self.m_ternary_auxiliary_tuple_contains[2] = node_from
         return self.m_ternary_extension_table.contains_tuple(
             self.m_ternary_auxiliary_tuple_contains
         )
+
+    def contains_assertion(self, dl_predicate: DLPredicate, *nodes: Node) -> bool:
+        """Dispatch to the appropriate contains_assertion_* based on node count."""
+        if len(nodes) == 1:
+            return self.contains_assertion_unary(dl_predicate, nodes[0])
+        elif len(nodes) == 2:
+            return self.contains_assertion_binary(dl_predicate, nodes[0], nodes[1])
+        elif len(nodes) == 3:
+            return self.contains_assertion_ternary(dl_predicate, nodes[0], nodes[1], nodes[2])
+        raise ValueError(f"Unsupported number of nodes: {len(nodes)}")
 
     def contains_assertion_unary(self, dl_predicate: DLPredicate, node: Node) -> bool:
         """Check a unary assertion."""
@@ -1027,13 +1072,14 @@ class ExtensionManager:
         self, role: Role, node_from: Node, node_to: Node
     ) -> DependencySet | None:
         """Return the dependency set for a role assertion."""
-        from hermit.model import AtomicRole
+        from hermit.model import AtomicRole, InverseRole
 
         if isinstance(role, AtomicRole):
             self.m_ternary_auxiliary_tuple_contains[0] = role
             self.m_ternary_auxiliary_tuple_contains[1] = node_from
             self.m_ternary_auxiliary_tuple_contains[2] = node_to
         else:
+            assert isinstance(role, InverseRole)
             self.m_ternary_auxiliary_tuple_contains[0] = role.inverse_of
             self.m_ternary_auxiliary_tuple_contains[1] = node_to
             self.m_ternary_auxiliary_tuple_contains[2] = node_from
@@ -1155,13 +1201,14 @@ class ExtensionManager:
         is_core: bool,
     ) -> bool:
         """Add a role assertion, handling inverse roles."""
-        from hermit.model import AtomicRole
+        from hermit.model import AtomicRole, InverseRole
 
         if isinstance(role, AtomicRole):
             return self.add_assertion_binary(
                 role, node_from, node_to, dependency_set, is_core
             )
         else:
+            assert isinstance(role, InverseRole)
             return self.add_assertion_binary(
                 role.inverse_of, node_to, node_from, dependency_set, is_core
             )

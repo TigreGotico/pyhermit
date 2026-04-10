@@ -859,7 +859,7 @@ class ConjunctionCompiler:
                 if variable is not None and variable not in seen_variables:
                     self.m_variables.append(variable)
                     seen_variables.add(variable)
-            if not atom.get_dl_predicate().equals(NodeIDLessEqualThan.INSTANCE) and not isinstance(
+            if atom.get_dl_predicate() != NodeIDLessEqualThan.INSTANCE and not isinstance(
                 atom.get_dl_predicate(), NodeIDsAscendingOrEqual
             ):
                 number_of_real_atoms += 1
@@ -924,9 +924,7 @@ class ConjunctionCompiler:
 
         if body_atom_index == len(self.m_body_atoms):
             self._compile_heads()
-        elif self.m_body_atoms[body_atom_index].get_dl_predicate().equals(
-            NodeIDLessEqualThan.INSTANCE
-        ):
+        elif self.m_body_atoms[body_atom_index].get_dl_predicate() == NodeIDLessEqualThan.INSTANCE:
             atom = self.m_body_atoms[body_atom_index]
             variable1_index = self.m_variables.index(atom.get_argument_variable(0))
             variable2_index = self.m_variables.index(atom.get_argument_variable(1))
@@ -971,7 +969,12 @@ class ConjunctionCompiler:
             after_loop = self._add_label()
             next_element = self._add_label()
             atom = self.m_body_atoms[body_atom_index]
-            binding_positions = [0] * (atom.get_arity() + 1)
+            # binding_positions has one slot per tuple element (predicate + args + dep_set)
+            # The extension table stores tuples as [predicate, arg0, ..., argN, dep_set]
+            # slot_size in the retrieval = m_tuple_arity + 1, so we need that many positions
+            ext_table = self.m_extension_manager.get_extension_table(atom.get_arity() + 1)
+            slot_size = ext_table.m_tuple_arity + 1
+            binding_positions = [-1] * slot_size
             binding_positions[0] = self.m_values_buffer_manager.m_body_dl_predicates_to_indexes[
                 atom.get_dl_predicate()
             ]
@@ -988,12 +991,12 @@ class ConjunctionCompiler:
                     binding_positions[argument_index + 1] = (
                         self.m_values_buffer_manager.m_body_nonvariable_terms_to_indexes[term]
                     )
-            retrieval = self.m_extension_manager.get_extension_table(
-                atom.get_arity() + 1
-            ).create_retrieval(
+            # Last slot is dependency set — always unbound (-1)
+            binding_positions[slot_size - 1] = -1
+            retrieval = ext_table.create_retrieval(
                 binding_positions,
                 self.m_values_buffer_manager.m_values_buffer,
-                self.m_buffer_supply.get_buffer(atom.get_arity() + 1),
+                self.m_buffer_supply.get_buffer(ext_table.m_tuple_arity),
                 False,
                 "EXTENSION_THIS",
             )
@@ -1114,7 +1117,7 @@ class _DLClauseCompiler(ConjunctionCompiler):
     def _compile_heads(self) -> None:
         """Compile the head atoms of the DL clause."""
         # Notify the expansion strategy about compilation
-        self.m_existential_expansion_strategy.dl_clause_body_compiled(  # type: ignore[union-attr]
+        self.m_existential_expansion_strategy.dl_clause_body_compiled(  # type: ignore[attr-defined]  # Java-ported duck typing: strategy may or may not have this method
             self.m_workers,
             self.m_body_dl_clause,
             self.m_variables,
@@ -1204,7 +1207,7 @@ class _DLClauseCompiler(ConjunctionCompiler):
                         variable_index = self.m_variables.index(variable)
                         copy_values_to_arguments[index] = variable_index
                         index += 1
-                    if head_dl_predicates[head_index].get_arity() == 1:
+                    if head_dl_predicates[head_index].arity() == 1:
                         variable = head_atom.get_argument_variable(0)
                         copy_is_core[head_index] = self.m_variables.index(variable)
                     else:

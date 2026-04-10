@@ -286,15 +286,15 @@ class MergingManager:
             ``True`` if *descendant* is within three levels of *ancestor*.
         """
         if descendant is not None:
-            parent = descendant._parent
+            parent = descendant.m_parent
             if parent is ancestor:
                 return True
             if parent is not None:
-                grandparent = parent._parent
+                grandparent = parent.m_parent
                 if grandparent is ancestor:
                     return True
                 if grandparent is not None:
-                    great_grandparent = grandparent._parent
+                    great_grandparent = grandparent.m_parent
                     if great_grandparent is ancestor:
                         return True
         return False

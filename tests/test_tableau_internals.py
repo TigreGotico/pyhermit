@@ -850,7 +850,7 @@ class TestDisjunctionBranchingPoint:
     def test_creation(self):
         t = self._make_tableau()
         gd = MagicMock()
-        gd.number_of_disjuncts = 3
+        gd.get_number_of_disjuncts.return_value = 3
         dbp = DisjunctionBranchingPoint(t, gd, [0, 1, 2])
         assert dbp.level == 1
         assert dbp._current_index == 0
@@ -858,7 +858,7 @@ class TestDisjunctionBranchingPoint:
     def test_start_next_choice_basic(self):
         t = self._make_tableau()
         gd = MagicMock()
-        gd.number_of_disjuncts = 3
+        gd.get_number_of_disjuncts.return_value = 3
         gd.get_dl_predicate.return_value = MagicMock()
         gd.add_disjunct_to_tableau.return_value = True
 
@@ -872,7 +872,7 @@ class TestDisjunctionBranchingPoint:
         t = self._make_tableau()
         t.m_use_disjunction_learning = True
         gd = MagicMock()
-        gd.number_of_disjuncts = 3
+        gd.get_number_of_disjuncts.return_value = 3
         gd.get_dl_predicate.return_value = MagicMock()
         gd.add_disjunct_to_tableau.return_value = True
 
@@ -883,7 +883,7 @@ class TestDisjunctionBranchingPoint:
     def test_start_next_choice_last_disjunct(self):
         t = self._make_tableau()
         gd = MagicMock()
-        gd.number_of_disjuncts = 2
+        gd.get_number_of_disjuncts.return_value = 2
         gd.get_dl_predicate.return_value = MagicMock()
         gd.add_disjunct_to_tableau.return_value = True
 
@@ -896,7 +896,7 @@ class TestDisjunctionBranchingPoint:
         from hermit.model import Equality
         t = self._make_tableau()
         gd = MagicMock()
-        gd.number_of_disjuncts = 3
+        gd.get_number_of_disjuncts.return_value = 3
         # First disjunct is Equality
         gd.get_dl_predicate.side_effect = lambda i: Equality.INSTANCE if i == 0 else MagicMock()
         gd.get_argument.return_value = MagicMock()
@@ -911,7 +911,7 @@ class TestDisjunctionBranchingPoint:
         from hermit.model import AtomicConcept
         t = self._make_tableau()
         gd = MagicMock()
-        gd.number_of_disjuncts = 3
+        gd.get_number_of_disjuncts.return_value = 3
         ac = AtomicConcept.create("http://example.org/A")
         gd.get_dl_predicate.side_effect = lambda i: ac if i == 0 else MagicMock()
         gd.get_argument.return_value = MagicMock()
@@ -925,7 +925,7 @@ class TestDisjunctionBranchingPoint:
         t = self._make_tableau()
         t.m_tableau_monitor = MagicMock()
         gd = MagicMock()
-        gd.number_of_disjuncts = 3
+        gd.get_number_of_disjuncts.return_value = 3
         gd.get_dl_predicate.return_value = MagicMock()
         gd.add_disjunct_to_tableau.return_value = True
 
@@ -954,6 +954,7 @@ class TestDisjunctIndexWithBacktrackings:
 class TestGroundDisjunctionHeader:
     def _make_pred(self, arity=1, is_at_least=False, neg_to=False):
         pred = MagicMock()
+        pred.arity.return_value = arity
         pred.get_arity.return_value = arity
 
         # Control isinstance checks
@@ -964,6 +965,7 @@ class TestGroundDisjunctionHeader:
             if neg_to:
                 from hermit.model import AtomicNegationConcept
                 to_concept.__class__ = AtomicNegationConcept
+            pred.to_concept = to_concept
             pred.get_to_concept.return_value = to_concept
         return pred
 
@@ -1027,19 +1029,12 @@ class TestGroundDisjunctionHeader:
         # After incrementing pred 0, it should swap with pred 1
 
     def test_str(self):
-        import sys
-        # hermit.prefixes doesn't exist; stub it so the lazy import works
-        pfx_mod = MagicMock()
-        pfx_mod.Prefixes.STANDARD_PREFIXES = MagicMock()
-        sys.modules["hermit.prefixes"] = pfx_mod
-        try:
-            p1 = self._make_pred(1)
-            p1.to_string = lambda pfx: "P"
-            header = GroundDisjunctionHeader([p1], 0, None)
-            s = str(header)
-            assert "P" in s
-        finally:
-            del sys.modules["hermit.prefixes"]
+        p1 = self._make_pred(1)
+        p1.__str__ = lambda: "P"
+        p1.configure_mock(**{"__str__": lambda self: "P"})
+        header = GroundDisjunctionHeader([p1], 0, None)
+        s = str(header)
+        assert "P" in s
 
     def test_repr(self):
         import sys
@@ -1167,6 +1162,7 @@ class TestGroundDisjunctionSatisfied:
         offset = 0
         for i, arity in enumerate(arities):
             pred = MagicMock()
+            pred.arity.return_value = arity
             pred.get_arity.return_value = arity
             if pred_classes and pred_classes[i]:
                 pred.__class__ = pred_classes[i]
@@ -1225,7 +1221,8 @@ class TestGroundDisjunctionSatisfied:
 
     def test_is_satisfied_arity4_raises(self):
         gd = self._make_gd_with_arity([1])
-        # Monkey-patch predicate to return arity 4
+        # Monkey-patch predicate to return arity 4 (both aliases)
+        gd.m_ground_disjunction_header.m_dl_predicates[0].arity.return_value = 4
         gd.m_ground_disjunction_header.m_dl_predicates[0].get_arity.return_value = 4
         tableau = MagicMock()
         with pytest.raises(RuntimeError, match="Invalid arity"):
@@ -1261,6 +1258,7 @@ class TestGroundDisjunctionSatisfied:
 
     def test_add_disjunct_arity4_raises(self):
         gd = self._make_gd_with_arity([1])
+        gd.m_ground_disjunction_header.m_dl_predicates[0].arity.return_value = 4
         gd.m_ground_disjunction_header.m_dl_predicates[0].get_arity.return_value = 4
         tableau = MagicMock()
         with pytest.raises(RuntimeError, match="Unsupported"):
@@ -1278,74 +1276,50 @@ class TestGroundDisjunctionSatisfied:
         sys.modules.pop("hermit.prefixes", None)
 
     def test_to_string_simple(self):
-        self._stub_prefixes()
-        try:
-            gd = self._make_gd_with_arity([1, 1])
-            from hermit.model import Equality
-            mock_eq = MagicMock()
-            mock_eq.equals.return_value = False
-            with patch.object(Equality, "INSTANCE", mock_eq):
-                for p in gd.m_ground_disjunction_header.m_dl_predicates:
-                    p.to_string.return_value = "Pred"
-                    p.get_arity.return_value = 1
-                s = gd.to_string()
-            assert "Pred" in s
-        finally:
-            self._unstub_prefixes()
+        gd = self._make_gd_with_arity([1, 1])
+        # Production code uses str(dl_predicate) — configure __str__ on mocks
+        for p in gd.m_ground_disjunction_header.m_dl_predicates:
+            p.configure_mock(**{"__str__": lambda self: "Pred"})
+        s = gd.to_string()
+        assert "Pred" in s
 
     def test_to_string_equality(self):
-        self._stub_prefixes()
-        try:
-            gd = self._make_gd_with_arity([2])
-            from hermit.model import Equality
-            pred = gd.m_ground_disjunction_header.m_dl_predicates[0]
-            pred.get_arity.return_value = 2
-            mock_eq = MagicMock()
-            mock_eq.equals.return_value = True
-            with patch.object(Equality, "INSTANCE", mock_eq):
-                s = gd.to_string()
-            assert "==" in s
-        finally:
-            self._unstub_prefixes()
+        from hermit.model import Equality, Individual
+        from hermit.tableau.node import Node
+        # Use actual Equality.INSTANCE as the predicate so the == check is True
+        gd = self._make_gd_with_arity([2])
+        gd.m_ground_disjunction_header.m_dl_predicates[0] = Equality.INSTANCE
+        # Arguments must be Node-like for node_id access
+        for i, arg in enumerate(gd.m_arguments):
+            arg.node_id = i
+        s = gd.to_string()
+        assert "==" in s
 
     def test_to_string_annotated_equality(self):
-        self._stub_prefixes()
-        try:
-            from hermit.model import AnnotatedEquality, Equality
-            gd = self._make_gd_with_arity([3], [AnnotatedEquality])
-            pred = gd.m_ground_disjunction_header.m_dl_predicates[0]
-            pred.get_arity.return_value = 3
-            pred.get_cardinality.return_value = 2
-            pred.get_on_role.return_value = MagicMock()
-            pred.get_on_role.return_value.to_string.return_value = "R"
-            pred.get_to_concept.return_value = MagicMock()
-            pred.get_to_concept.return_value.to_string.return_value = "C"
-            mock_eq = MagicMock()
-            mock_eq.equals.return_value = False
-            with patch.object(Equality, "INSTANCE", mock_eq):
-                s = gd.to_string()
-            assert "==" in s
-            assert "atMost" in s
-        finally:
-            self._unstub_prefixes()
+        from hermit.model import AnnotatedEquality, Equality
+        gd = self._make_gd_with_arity([3], [AnnotatedEquality])
+        pred = gd.m_ground_disjunction_header.m_dl_predicates[0]
+        # Production code now uses pred.cardinality, str(pred.on_role), str(pred.to_concept)
+        pred.cardinality = 2
+        pred.on_role = MagicMock()
+        pred.on_role.configure_mock(**{"__str__": lambda self: "R"})
+        pred.to_concept = MagicMock()
+        pred.to_concept.configure_mock(**{"__str__": lambda self: "C"})
+        for i, arg in enumerate(gd.m_arguments):
+            arg.node_id = i
+        s = gd.to_string()
+        assert "==" in s
+        assert "atMost" in s
 
     def test_to_string_multi_arg_predicate(self):
-        """Exercise the comma branch (line 234) for predicates with arity >= 2."""
-        self._stub_prefixes()
-        try:
-            gd = self._make_gd_with_arity([2])
-            from hermit.model import Equality
-            pred = gd.m_ground_disjunction_header.m_dl_predicates[0]
-            pred.to_string.return_value = "R"
-            pred.get_arity.return_value = 2
-            mock_eq = MagicMock()
-            mock_eq.equals.return_value = False
-            with patch.object(Equality, "INSTANCE", mock_eq):
-                s = gd.to_string()
-            assert "R(" in s
-            assert "," in s  # comma between args
-        finally:
-            self._unstub_prefixes()
+        """Exercise the comma branch for predicates with arity >= 2."""
+        gd = self._make_gd_with_arity([2])
+        pred = gd.m_ground_disjunction_header.m_dl_predicates[0]
+        # Production code uses str(dl_predicate)
+        pred.configure_mock(**{"__str__": lambda self: "R"})
+        s = gd.to_string()
+        assert "R(" in s
+        assert "," in s  # comma between args
 
     def test_str(self):
         self._stub_prefixes()
@@ -1368,24 +1342,19 @@ class TestGroundDisjunctionHeaderStr:
     """Test the __str__ with multiple disjuncts to hit line 165."""
 
     def test_str_multiple(self):
-        import sys
-        pfx_mod = MagicMock()
-        pfx_mod.Prefixes.STANDARD_PREFIXES = MagicMock()
-        sys.modules["hermit.prefixes"] = pfx_mod
-        try:
-            p1 = MagicMock()
-            p1.get_arity.return_value = 1
-            p1.to_string.return_value = "A"
-            p2 = MagicMock()
-            p2.get_arity.return_value = 1
-            p2.to_string.return_value = "B"
-            header = GroundDisjunctionHeader([p1, p2], 0, None)
-            s = str(header)
-            assert "A" in s
-            assert "B" in s
-            assert "\\/" in s
-        finally:
-            del sys.modules["hermit.prefixes"]
+        p1 = MagicMock()
+        p1.arity.return_value = 1
+        p1.get_arity.return_value = 1
+        p1.configure_mock(**{"__str__": lambda self: "A"})
+        p2 = MagicMock()
+        p2.arity.return_value = 1
+        p2.get_arity.return_value = 1
+        p2.configure_mock(**{"__str__": lambda self: "B"})
+        header = GroundDisjunctionHeader([p1, p2], 0, None)
+        s = str(header)
+        assert "A" in s
+        assert "B" in s
+        assert "\\/" in s
 
 
 class TestNodeWithTableau:

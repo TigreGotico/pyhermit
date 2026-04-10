@@ -157,7 +157,7 @@ class NominalIntroductionManager:
             return False
         if self.can_forget_annotation(annotated_equality, node0, node1, node2):
             return self.m_merging_manager.merge_nodes(node0, node1, dependency_set)
-        if annotated_equality.get_cardinality() == 1:
+        if annotated_equality.cardinality == 1:
             return self._apply_ni_rule(
                 annotated_equality, node0, node1, node2, dependency_set
             )
@@ -202,7 +202,7 @@ class NominalIntroductionManager:
             self.m_tableau.m_tableau_monitor.nominal_introduction_started(
                 node2, ni_target_node, annotated_equality, node0, node1
             )
-        if annotated_equality.get_cardinality() > 1:
+        if annotated_equality.cardinality > 1:
             branching_point: BranchingPoint = _NominalIntroductionBranchingPoint(
                 self.m_tableau,
                 node2,
@@ -210,7 +210,7 @@ class NominalIntroductionManager:
                 other_node,
                 annotated_equality,
             )
-            self.m_tableau.push_branching_point(branching_point)
+            self.m_tableau._push_branching_point(branching_point)
             dependency_set = self.m_tableau.m_dependency_set_factory.add_branching_point(
                 dependency_set, branching_point.level
             )
@@ -253,7 +253,7 @@ class NominalIntroductionManager:
             [0, 1, 2],
         )
         if tuple_index == -1:
-            new_root_node = self.m_tableau.create_new_ni_node(dependency_set)
+            new_root_node = self.m_tableau._create_new_ni_node(dependency_set)
             self.m_buffer_for_root_nodes[3] = new_root_node
             self.m_new_root_nodes_index.add_tuple(
                 self.m_buffer_for_root_nodes,  # type: ignore[arg-type]
@@ -292,9 +292,9 @@ class _NominalIntroductionBranchingPoint:
         self, tableau: Tableau, clash_dependency_set: DependencySet
     ) -> None:
         self.m_current_root_node += 1
-        assert self.m_current_root_node <= self.m_annotated_equality.get_cardinality()
+        assert self.m_current_root_node <= self.m_annotated_equality.cardinality
         dependency_set = clash_dependency_set
-        if self.m_current_root_node == self.m_annotated_equality.get_cardinality():
+        if self.m_current_root_node == self.m_annotated_equality.cardinality:
             dependency_set = tableau.m_dependency_set_factory.remove_branching_point(
                 dependency_set, self._bp.level
             )

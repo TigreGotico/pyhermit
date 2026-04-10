@@ -1388,29 +1388,22 @@ class TestDVariableStr:
 
     def test_str_first_item_is_neg_constant(self):
         """Hits line 906: first item comes from m_negative_constant_enumerations."""
-        import sys
-        from unittest.mock import MagicMock
-        mock_pfx_module = MagicMock()
-        mock_pfx_module.Prefixes.STANDARD_PREFIXES = None
-        sys.modules["hermit.prefixes"] = mock_pfx_module
-        try:
-            v = DVariable()
+        v = DVariable()
 
-            class FakeItem:
-                def to_string(self, p):
-                    return "item"
-                def get_negation(self):
-                    class N:
-                        def to_string(self, p):
-                            return "neg_item"
-                    return N()
+        class N:
+            def __str__(self):
+                return "neg_item"
 
-            v.m_positive_constant_enumerations = []  # empty
-            v.m_negative_constant_enumerations = [FakeItem()]  # first item → line 906
-            s = str(v)
-            assert "neg_item" in s
-        finally:
-            sys.modules.pop("hermit.prefixes", None)
+        class FakeItem:
+            def __str__(self):
+                return "item"
+            def get_negation(self):
+                return N()
+
+        v.m_positive_constant_enumerations = []  # empty
+        v.m_negative_constant_enumerations = [FakeItem()]  # first item → line 906
+        s = str(v)
+        assert "neg_item" in s
 
     def test_str_first_item_is_pos_restriction(self):
         """Hits line 912: first item comes from m_positive_datatype_restrictions."""
@@ -1441,62 +1434,48 @@ class TestDVariableStr:
 
     def test_str_first_item_is_neg_restriction(self):
         """Hits line 918: first item comes from m_negative_datatype_restrictions."""
-        import sys
-        from unittest.mock import MagicMock
-        mock_pfx_module = MagicMock()
-        mock_pfx_module.Prefixes.STANDARD_PREFIXES = None
-        sys.modules["hermit.prefixes"] = mock_pfx_module
-        try:
-            v = DVariable()
+        v = DVariable()
 
-            class FakeItem:
-                def to_string(self, p):
-                    return "neg_rest"
-                def get_negation(self):
-                    class N:
-                        def to_string(self, p):
-                            return "neg_rest_neg"
-                    return N()
+        class N:
+            def __str__(self):
+                return "neg_rest_neg"
 
-            v.m_positive_constant_enumerations = []
-            v.m_negative_constant_enumerations = []
-            v.m_positive_datatype_restrictions = []
-            v.m_negative_datatype_restrictions = [FakeItem()]  # first item → line 918
-            s = str(v)
-            assert "neg_rest_neg" in s
-        finally:
-            sys.modules.pop("hermit.prefixes", None)
+        class FakeItem:
+            def __str__(self):
+                return "neg_rest"
+            def get_negation(self):
+                return N()
+
+        v.m_positive_constant_enumerations = []
+        v.m_negative_constant_enumerations = []
+        v.m_positive_datatype_restrictions = []
+        v.m_negative_datatype_restrictions = [FakeItem()]  # first item → line 918
+        s = str(v)
+        assert "neg_rest_neg" in s
 
     def test_str_with_multiple_restrictions(self):
         """Test __str__ with multiple items — hits the 'else' comma-append branches."""
-        import sys
-        from unittest.mock import MagicMock
-        mock_pfx_module = MagicMock()
-        mock_pfx_module.Prefixes.STANDARD_PREFIXES = None
-        sys.modules["hermit.prefixes"] = mock_pfx_module
-        try:
-            v = DVariable()
+        v = DVariable()
 
-            class FakeItem:
-                def to_string(self, p):
-                    return "item"
-                def get_negation(self):
-                    class N:
-                        def to_string(self, p):
-                            return "neg_item"
-                    return N()
+        class N:
+            def __str__(self):
+                return "neg_item"
 
-            # Multiple items to trigger the 'else' (comma) branches
-            v.m_positive_constant_enumerations = [FakeItem(), FakeItem()]
-            v.m_negative_constant_enumerations = [FakeItem(), FakeItem()]
-            v.m_positive_datatype_restrictions = [FakeItem(), FakeItem()]
-            v.m_negative_datatype_restrictions = [FakeItem(), FakeItem()]
-            s = str(v)
-            assert "item" in s
-            assert "neg_item" in s
-            assert ", " in s  # comma from second items
-        finally:
-            sys.modules.pop("hermit.prefixes", None)
+        class FakeItem:
+            def __str__(self):
+                return "item"
+            def get_negation(self):
+                return N()
+
+        # Multiple items to trigger the 'else' (comma) branches
+        v.m_positive_constant_enumerations = [FakeItem(), FakeItem()]
+        v.m_negative_constant_enumerations = [FakeItem(), FakeItem()]
+        v.m_positive_datatype_restrictions = [FakeItem(), FakeItem()]
+        v.m_negative_datatype_restrictions = [FakeItem(), FakeItem()]
+        s = str(v)
+        assert "item" in s
+        assert "neg_item" in s
+        assert ", " in s  # comma from second items
 
 
 def _install_mock_datatype_registry():
@@ -1918,7 +1897,6 @@ class TestDatatypeManagerInit:
 
         # Use a mock restriction that has get_datatype_uri() and facet properties
         mock_dr = MagicMock()
-        mock_dr.get_datatype_uri = MagicMock(return_value=XSD + "integer")
         mock_dr.datatype_iri = XSD + "integer"
         mock_dr._facet_uris = ()
         mock_dr._facet_values = ()
@@ -1989,9 +1967,9 @@ class TestDatatypeManagerInit:
         v.m_positive_constant_enumerations = [mock_dr]
         v.m_negative_constant_enumerations = [mock_dr]
 
-        dm.m_extension_manager.get_assertion_dependency_set = MagicMock(return_value=MagicMock())
+        dm.m_extension_manager.get_assertion_dependency_set_unary = MagicMock(return_value=MagicMock())
         dm._load_assertion_dependency_sets(v)
-        assert dm.m_extension_manager.get_assertion_dependency_set.call_count == 4
+        assert dm.m_extension_manager.get_assertion_dependency_set_unary.call_count == 4
 
     def test_eliminate_trivial_inequalities_no_restrictions(self):
         """Test _eliminate_trivial_inequalities with no active vars (set is empty)."""
@@ -2034,12 +2012,12 @@ class TestDatatypeManagerInit:
         v1 = DVariable()
         v2 = DVariable()
         mock_dr1 = MagicMock()
-        mock_dr1.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr1.datatype_iri = XSD + "integer"
         v1.m_most_specific_restriction = mock_dr1
         v1.m_unequal_to_direct = {v2}
 
         mock_dr2 = MagicMock()
-        mock_dr2.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr2.datatype_iri = XSD + "string"
         v2.m_most_specific_restriction = mock_dr2
 
         # Use list for indexing (source bug with set)
@@ -2063,13 +2041,13 @@ class TestDatatypeManagerInit:
         v1 = DVariable()
         v2 = DVariable()
         mock_dr1 = MagicMock()
-        mock_dr1.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr1.datatype_iri = XSD + "integer"
         v1.m_most_specific_restriction = mock_dr1
         v1.m_unequal_to_direct = {v2}
         v1.m_unequal_to = {v2}
 
         mock_dr2 = MagicMock()
-        mock_dr2.get_datatype_uri = MagicMock(return_value=XSD + "string")
+        mock_dr2.datatype_iri = XSD + "string"
         v2.m_most_specific_restriction = mock_dr2
         v2.m_unequal_to = {v1}
         v2.m_unequal_to_direct = {v1}
@@ -2185,7 +2163,7 @@ class TestDatatypeManagerInit:
 
         mock_node = MagicMock()
         mock_dr = MagicMock(spec=DatatypeRestriction)
-        mock_dr.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr.datatype_iri = XSD + "integer"
 
         items = [[mock_dr, mock_node]]
         dm.m_assertions1_retrieval = _make_retrieval_iter(items)
@@ -2220,9 +2198,8 @@ class TestDatatypeManagerInit:
         mock_node = MagicMock()
         v.m_node = mock_node
 
-        # Use mock with get_datatype_uri (real DatatypeRestriction has datatype_iri not get_datatype_uri)
         mock_dr = MagicMock(spec=DatatypeRestriction)
-        mock_dr.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr.datatype_iri = XSD + "integer"
         dm._add_data_range(v, mock_dr)
         assert mock_dr in v.m_positive_datatype_restrictions
         assert v.m_most_specific_restriction is mock_dr
@@ -2240,9 +2217,9 @@ class TestDatatypeManagerInit:
 
         # Second restriction triggers is_disjoint_with and is_subset_of checks
         mock_dr1 = MagicMock(spec=DatatypeRestriction)
-        mock_dr1.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr1.datatype_iri = XSD + "integer"
         mock_dr2 = MagicMock(spec=DatatypeRestriction)
-        mock_dr2.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr2.datatype_iri = XSD + "integer"
         dm._add_data_range(v, mock_dr1)
         dm._add_data_range(v, mock_dr2)
         assert len(v.m_positive_datatype_restrictions) == 2
@@ -2265,11 +2242,11 @@ class TestDatatypeManagerInit:
             mock_registry.DatatypeRegistry.is_disjoint_with = MagicMock(return_value=True)
 
         mock_dr1 = MagicMock(spec=DatatypeRestriction)
-        mock_dr1.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr1.datatype_iri = XSD + "integer"
         mock_dr2 = MagicMock(spec=DatatypeRestriction)
-        mock_dr2.get_datatype_uri = MagicMock(return_value=XSD + "string")
+        mock_dr2.datatype_iri = XSD + "string"
 
-        dm.m_extension_manager.get_assertion_dependency_set = MagicMock(return_value=MagicMock())
+        dm.m_extension_manager.get_assertion_dependency_set_unary = MagicMock(return_value=MagicMock())
         dm._add_data_range(v, mock_dr1)
         dm._add_data_range(v, mock_dr2)
 
@@ -2295,9 +2272,9 @@ class TestDatatypeManagerInit:
             mock_registry.DatatypeRegistry.is_subset_of = MagicMock(return_value=True)
 
         mock_dr1 = MagicMock(spec=DatatypeRestriction)
-        mock_dr1.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr1.datatype_iri = XSD + "integer"
         mock_dr2 = MagicMock(spec=DatatypeRestriction)
-        mock_dr2.get_datatype_uri = MagicMock(return_value=XSD + "nonNegativeInteger")
+        mock_dr2.datatype_iri = XSD + "integer"
 
         dm._add_data_range(v, mock_dr1)
         dm._add_data_range(v, mock_dr2)
@@ -2319,10 +2296,10 @@ class TestDatatypeManagerInit:
         v.m_node = mock_node
 
         mock_dr = MagicMock(spec=DatatypeRestriction)
-        mock_dr.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr.datatype_iri = XSD + "integer"
 
         neg_dr = MagicMock(spec=AtomicNegationDataRange)
-        neg_dr.get_negated_data_range = MagicMock(return_value=mock_dr)
+        neg_dr.negated = mock_dr
 
         dm._add_data_range(v, neg_dr)
         assert mock_dr in v.m_negative_datatype_restrictions
@@ -2370,15 +2347,14 @@ class TestDatatypeManagerInit:
             from hermit.model import ConstantEnumeration as CE, Constant
 
             class FakeConst:
-                def get_data_value(self):
-                    return 42
+                data_value = 42
 
             ce = MagicMock(spec=CE)
             ce.get_number_of_constants = lambda: 1
             ce.get_constant = lambda i: FakeConst()
 
             neg = MagicMock(spec=AtomicNegationDataRange)
-            neg.get_negated_data_range = lambda: ce
+            neg.negated = ce
             # patch isinstance checks
             type(neg).__mro__ = (AtomicNegationDataRange,)
         except Exception:
@@ -2417,9 +2393,7 @@ class TestDatatypeManagerInit:
 
         class FakeConstant:
             def __init__(self, val):
-                self.val = val
-            def get_data_value(self):
-                return self.val
+                self.data_value = val
 
         class FakeEnum:
             def get_number_of_constants(self):
@@ -2445,9 +2419,7 @@ class TestDatatypeManagerInit:
 
         class FakeConstant:
             def __init__(self, val):
-                self.val = val
-            def get_data_value(self):
-                return self.val
+                self.data_value = val
 
         class FakeEnum1:
             def get_number_of_constants(self):
@@ -2479,8 +2451,7 @@ class TestDatatypeManagerInit:
         v.m_node = mock_node
 
         class FakeConstant:
-            def get_data_value(self):
-                return 42
+            data_value = 42
 
         class EmptyEnum:
             def get_number_of_constants(self):
@@ -2503,8 +2474,7 @@ class TestDatatypeManagerInit:
 
         # Create fake constant and enumeration
         class FakeConstant:
-            def get_data_value(self):
-                return 42
+            data_value = 42
 
         class FakeEnum:
             def get_number_of_constants(self):
@@ -2532,7 +2502,7 @@ class TestDatatypeManagerInit:
         v.m_node = mock_node
 
         mock_dr = MagicMock(spec=DatatypeRestriction)
-        mock_dr.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr.datatype_iri = XSD + "integer"
         mock_dr._facet_uris = ()
         mock_dr._facet_values = ()
         v.m_positive_datatype_restrictions = [mock_dr]
@@ -2560,7 +2530,7 @@ class TestDatatypeManagerInit:
         v.m_node = mock_node
 
         mock_dr = MagicMock(spec=DatatypeRestriction)
-        mock_dr.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr.datatype_iri = XSD + "integer"
         mock_dr._facet_uris = ()
         mock_dr._facet_values = ()
         v.m_positive_datatype_restrictions = [mock_dr]
@@ -2591,9 +2561,9 @@ class TestDatatypeManagerInit:
         v.m_node = mock_node
 
         mock_dr = MagicMock()
-        mock_dr.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_dr.datatype_iri = XSD + "integer"
         mock_neg_dr = MagicMock()
-        mock_neg_dr.get_datatype_uri = MagicMock(return_value=XSD + "integer")
+        mock_neg_dr.datatype_iri = XSD + "integer"
 
         v.m_positive_datatype_restrictions = [mock_dr]
         v.m_most_specific_restriction = mock_dr
@@ -2765,8 +2735,7 @@ class TestDatatypeManagerStatic:
     def test_contains_data_value(self):
         """Test _contains_data_value static method with mock."""
         class FakeConst:
-            def get_data_value(self):
-                return 10
+            data_value = 10
 
         class FakeEnum:
             def get_number_of_constants(self):

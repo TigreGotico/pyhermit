@@ -63,7 +63,7 @@ class DisjunctionBranchingPoint(BranchingPoint):
             )
 
         self._current_index += 1
-        assert self._current_index < self._ground_disjunction.number_of_disjuncts
+        assert self._current_index < self._ground_disjunction.get_number_of_disjuncts()
 
         current_disjunct_index = self._sorted_disjunct_indexes[self._current_index]
 
@@ -75,7 +75,7 @@ class DisjunctionBranchingPoint(BranchingPoint):
         dependency_set = tableau.dependency_set_factory.get_permanent(
             clash_dependency_set
         )
-        if self._current_index + 1 == self._ground_disjunction.number_of_disjuncts:
+        if self._current_index + 1 == self._ground_disjunction.get_number_of_disjuncts():
             dependency_set = tableau.dependency_set_factory.remove_branching_point(
                 dependency_set, self.level
             )

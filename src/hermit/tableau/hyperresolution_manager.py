@@ -86,10 +86,10 @@ class BodyAtomsSwapper:
         """Score an atom for reordering purposes."""
         from hermit.model import NodeIDLessEqualThan, NodeIDsAscendingOrEqual
 
-        if NodeIDLessEqualThan.INSTANCE.equals(atom.get_dl_predicate()):
+        if NodeIDLessEqualThan.INSTANCE == atom.get_dl_predicate():
             if (
-                self.m_bound_variables.contains(atom.get_argument_variable(0))
-                and self.m_bound_variables.contains(atom.get_argument_variable(1))
+                atom.get_argument_variable(0) in self.m_bound_variables
+                and atom.get_argument_variable(1) in self.m_bound_variables
             ):
                 return 1000
             return -2000
@@ -118,7 +118,7 @@ class BodyAtomsSwapper:
                     number_of_unbound_variables += 1
         goodness = number_of_bound_variables * 100 - number_of_unbound_variables * 10
         if (
-            atom.get_dl_predicate().get_arity() == 2
+            atom.get_dl_predicate().arity() == 2
             and number_of_unbound_variables == 1
             and self.m_node_id_comparison_atoms
         ):
@@ -229,7 +229,7 @@ class HyperresolutionManager:
                     )
                     delta_atom = swapped_dl_clause.get_body_atom(0)
                     delta_dl_predicate = delta_atom.get_dl_predicate()
-                    arity = delta_dl_predicate.get_arity() + 1
+                    arity = delta_dl_predicate.arity() + 1
                     first_table_retrieval = retrievals_by_arity.get(arity)
                     if first_table_retrieval is None:
                         extension_table = self.m_extension_manager.get_extension_table(
@@ -396,21 +396,14 @@ class HyperresolutionManager:
             delta_old_retrieval.open()
             delta_old_tuple_buffer = delta_old_retrieval.get_tuple_buffer()
             # Tuple arity: 2 for binary (concept assertions), 3 for ternary (role assertions)
-            # Access private _extension_table to get m_tuple_arity (distinguishes binary vs ternary)
             tuple_arity = delta_old_retrieval._extension_table.m_tuple_arity  # type: ignore[attr-defined]
-            # _SimpleRetrieval: open() sets position but next() populates the buffer.
-            # Use prev_index trick to detect when next() found a match.
-            _prev_idx = delta_old_retrieval._current_index  # type: ignore[attr-defined]
-            delta_old_retrieval.next()
-            while _prev_idx != delta_old_retrieval._current_index and not self.m_extension_manager.contains_clash():  # type: ignore[attr-defined]
+            while not delta_old_retrieval.after_last() and not self.m_extension_manager.contains_clash():
                 delta_old_predicate = delta_old_tuple_buffer[0]
                 unoptimized_compiled_dl_clause_info = (
                     self.m_tuple_consumers_by_delta_predicate.get(delta_old_predicate)
                 )
                 apply_unoptimized = True
                 # Dispatch on tuple arity: only role assertions (arity 3) use the optimization.
-                # Binary tuples (arity 2) contain [predicate, node, dep_set].
-                # Ternary tuples (arity 3) contain [predicate, node1, node2, dep_set].
                 from hermit.model import AtomicRole
                 is_role_assertion = isinstance(delta_old_predicate, AtomicRole) and tuple_arity == 3
                 if (
@@ -459,10 +452,8 @@ class HyperresolutionManager:
                                 binary_table_tuple_buffer = (
                                     self.m_binary_table_retrieval.get_tuple_buffer()
                                 )
-                                _bprev = self.m_binary_table_retrieval._current_index  # type: ignore[attr-defined]
-                                self.m_binary_table_retrieval.next()
                                 while (
-                                    _bprev != self.m_binary_table_retrieval._current_index  # type: ignore[attr-defined]
+                                    not self.m_binary_table_retrieval.after_last()
                                     and not self.m_extension_manager.contains_clash()
                                 ):
                                     atomic_concept_object = binary_table_tuple_buffer[0]
@@ -483,7 +474,6 @@ class HyperresolutionManager:
                                             optimized_compiled_dl_clause_info = (
                                                 optimized_compiled_dl_clause_info.m_next
                                             )
-                                    _bprev = self.m_binary_table_retrieval._current_index  # type: ignore[attr-defined]
                                     self.m_binary_table_retrieval.next()
                         if not self.m_extension_manager.contains_clash():
                             compiled_dl_clause_infos = (
@@ -499,10 +489,8 @@ class HyperresolutionManager:
                                 binary_table_tuple_buffer = (
                                     self.m_binary_table_retrieval.get_tuple_buffer()
                                 )
-                                _bprev2 = self.m_binary_table_retrieval._current_index  # type: ignore[attr-defined]
-                                self.m_binary_table_retrieval.next()
                                 while (
-                                    _bprev2 != self.m_binary_table_retrieval._current_index  # type: ignore[attr-defined]
+                                    not self.m_binary_table_retrieval.after_last()
                                     and not self.m_extension_manager.contains_clash()
                                 ):
                                     atomic_concept_object = binary_table_tuple_buffer[0]
@@ -523,7 +511,6 @@ class HyperresolutionManager:
                                             optimized_compiled_dl_clause_info = (
                                                 optimized_compiled_dl_clause_info.m_next
                                             )
-                                    _bprev2 = self.m_binary_table_retrieval._current_index  # type: ignore[attr-defined]
                                     self.m_binary_table_retrieval.next()
                 if apply_unoptimized:
                     while (
@@ -534,5 +521,4 @@ class HyperresolutionManager:
                         unoptimized_compiled_dl_clause_info = (
                             unoptimized_compiled_dl_clause_info.m_next
                         )
-                _prev_idx = delta_old_retrieval._current_index  # type: ignore[attr-defined]
                 delta_old_retrieval.next()
