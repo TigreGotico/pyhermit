@@ -20,7 +20,7 @@ if TYPE_CHECKING:
         DataRange,
         Variable,
     )
-    from hermit.tableau.dl_clause_evaluator import DLClauseEvaluator
+    from hermit.tableau.dl_clause_evaluator import DLClauseEvaluator, Worker as DLClauseWorker
     from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau
 
@@ -172,7 +172,7 @@ class ExistentialExpansionStrategy(ABC):
     @abstractmethod
     def dl_clause_body_compiled(
         self,
-        workers: list[DLClauseEvaluator.Worker],
+        workers: list[DLClauseWorker],
         dl_clause: DLClause,
         variables: list[Variable],
         values_buffer: list[object | None],

@@ -12,12 +12,14 @@ from hermit.hierarchy.hierarchy_node import HierarchyNode
 
 E = TypeVar("E")
 U = TypeVar("U")
+E_contra = TypeVar("E_contra", contravariant=True)
+U_contra = TypeVar("U_contra", contravariant=True)
 
 
-class Relation(Protocol[E]):
+class Relation(Protocol[E_contra]):
     """Protocol defining the subsumption relation used during hierarchy search."""
 
-    def does_subsume(self, parent: E, child: E) -> bool:
+    def does_subsume(self, parent: E_contra, child: E_contra) -> bool:
         """Return True if *parent* subsumes *child*."""
         ...
 

@@ -11,6 +11,9 @@ from decimal import Decimal
 from fractions import Fraction
 from typing import Any
 
+# Interval: (lower, upper, lower_inclusive, upper_inclusive)
+Interval = tuple["BigRational", "BigRational", bool, bool]
+
 from hermit.datatypes.registry import (
     DatatypeHandler,
     DatatypeRegistry,
@@ -122,9 +125,9 @@ class OWLRealValueSpaceSubset(ValueSpaceSubset):
     Represented as a list of intervals (lower, upper, lower_inclusive, upper_inclusive).
     """
 
-    def __init__(self, intervals: list[tuple] | None = None, empty: bool = False) -> None:
+    def __init__(self, intervals: list[Interval] | None = None, empty: bool = False) -> None:
         if empty:
-            self._intervals: list[tuple] = []
+            self._intervals: list[Interval] = []
         elif intervals is None:
             # Entire space: (-∞, +∞)
             neg_inf = BigRational.infinity(False)
@@ -146,14 +149,14 @@ class OWLRealValueSpaceSubset(ValueSpaceSubset):
 
     @staticmethod
     def _in_range(val: BigRational, lo: Any, hi: Any, lo_inc: bool, hi_inc: bool) -> bool:
-        lo_ok = (val > lo) if not lo_inc else (val >= lo)
-        hi_ok = (val < hi) if not hi_inc else (val <= hi)
+        lo_ok = bool((val > lo) if not lo_inc else (val >= lo))
+        hi_ok = bool((val < hi) if not hi_inc else (val <= hi))
         return lo_ok and hi_ok
 
     def intersect(self, other: ValueSpaceSubset) -> ValueSpaceSubset:
         if not isinstance(other, OWLRealValueSpaceSubset):
             return OWLRealValueSpaceSubset(empty=True)
-        result: list[tuple] = []
+        result: list[Interval] = []
         for a in self._intervals:
             for b in other._intervals:
                 inter = self._intersect_intervals(a, b)
@@ -163,8 +166,8 @@ class OWLRealValueSpaceSubset(ValueSpaceSubset):
 
     @staticmethod
     def _intersect_intervals(
-        a: tuple, b: tuple
-    ) -> tuple | None:
+        a: Interval, b: Interval
+    ) -> Interval | None:
         lo_a, hi_a, lo_a_inc, hi_a_inc = a
         lo_b, hi_b, lo_b_inc, hi_b_inc = b
 
@@ -191,8 +194,8 @@ class OWLRealValueSpaceSubset(ValueSpaceSubset):
     def complement(self) -> ValueSpaceSubset:
         neg_inf = BigRational.infinity(False)
         pos_inf = BigRational.infinity(True)
-        result: list[tuple] = []
-        prev_hi = neg_inf
+        result: list[Interval] = []
+        prev_hi: BigRational = neg_inf
         prev_hi_inc = True
 
         for lo, hi, lo_inc, hi_inc in sorted(self._intervals, key=lambda x: x[0]):
@@ -261,8 +264,8 @@ class OWLRealDatatypeHandler(DatatypeHandler):
         facet_values: tuple[Any, ...],
     ) -> ValueSpaceSubset:
         # Build interval from facet restrictions
-        lo = BigRational.infinity(False)
-        hi = BigRational.infinity(True)
+        lo: BigRational = BigRational.infinity(False)
+        hi: BigRational = BigRational.infinity(True)
         lo_inc = True
         hi_inc = True
 

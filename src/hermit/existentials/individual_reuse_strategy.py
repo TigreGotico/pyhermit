@@ -52,10 +52,10 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
         self.m_dont_reuse_concepts_ever.clear()
         object_val = tableau.m_parameters.get("IndividualReuseStrategy.reuseAlways")
         if isinstance(object_val, set):
-            self.m_do_reuse_concepts_always.update(object_val)  # type: ignore[arg-type]
+            self.m_do_reuse_concepts_always.update(object_val)
         object_val = tableau.m_parameters.get("IndividualReuseStrategy.reuseNever")
         if isinstance(object_val, set):
-            self.m_dont_reuse_concepts_ever.update(object_val)  # type: ignore[arg-type]
+            self.m_dont_reuse_concepts_ever.update(object_val)
 
     def clear(self) -> None:
         super().clear()
@@ -150,13 +150,13 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
                         IndividualReuseBranchingPoint,
                     )
 
-                    branching_point: BranchingPoint = IndividualReuseBranchingPoint(
+                    branching_point = IndividualReuseBranchingPoint(
                         self.m_tableau,  # type: ignore[arg-type]
                         at_least_concept,
                         node,
                         True,
                     )
-                    self.m_tableau._push_branching_point(branching_point)  # type: ignore[union-attr]
+                    self.m_tableau._push_branching_point(branching_point)  # type: ignore[union-attr, arg-type]
                     dependency_set = (
                         self.m_tableau.m_dependency_set_factory.add_branching_point(  # type: ignore[union-attr]
                             dependency_set, branching_point.level
@@ -166,7 +166,7 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
                     at_least_concept.on_role,
                     node,
                     parent,
-                    dependency_set,
+                    dependency_set,  # type: ignore[arg-type]
                     True,
                 )
                 return True
@@ -205,13 +205,13 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
                         IndividualReuseBranchingPoint,
                     )
 
-                    branching_point: BranchingPoint = IndividualReuseBranchingPoint(
+                    branching_point = IndividualReuseBranchingPoint(
                         self.m_tableau,  # type: ignore[arg-type]
                         at_least_concept,
                         node,
                         False,
                     )
-                    self.m_tableau._push_branching_point(branching_point)  # type: ignore[union-attr]
+                    self.m_tableau._push_branching_point(branching_point)  # type: ignore[union-attr, arg-type]
                     dependency_set = (
                         self.m_tableau.m_dependency_set_factory.add_branching_point(  # type: ignore[union-attr]
                             dependency_set, branching_point.level
@@ -219,7 +219,7 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
                     )
                 # Create a root node so that keys are not applicable
                 existential_node = self.m_tableau._create_new_ni_node(  # type: ignore[union-attr]
-                    dependency_set
+                    dependency_set  # type: ignore[arg-type]
                 )
                 reuse_info = NodeBranchingPointPair(
                     existential_node,
@@ -227,7 +227,7 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
                 )
                 self.m_reused_nodes[to_concept] = reuse_info
                 self.m_extension_manager.add_concept_assertion(  # type: ignore[union-attr]
-                    to_concept, existential_node, dependency_set, True
+                    to_concept, existential_node, dependency_set, True  # type: ignore[arg-type]
                 )
                 self.m_auxiliary_buffer[0] = to_concept
                 self.m_reuse_backtracking_table.add_tuple(
@@ -235,7 +235,7 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
                 )
             else:
                 dependency_set = reuse_info.m_node.add_canonical_node_dependency_set(
-                    dependency_set
+                    dependency_set  # type: ignore[arg-type]
                 )
                 existential_node = reuse_info.m_node.get_canonical_node()
                 if not self.m_is_deterministic:
@@ -248,7 +248,7 @@ class IndividualReuseStrategy(AbstractExpansionStrategy):
                 at_least_concept.on_role,
                 node,
                 existential_node,
-                dependency_set,
+                dependency_set,  # type: ignore[arg-type]
                 True,
             )
             if (

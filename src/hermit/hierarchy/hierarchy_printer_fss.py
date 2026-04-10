@@ -5,11 +5,11 @@ Faithful port of ``org.semanticweb.HermiT.hierarchy.HierarchyPrinterFSS``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TextIO, TypeVar
+from typing import TYPE_CHECKING, TextIO, TypeVar, cast
 
 from hermit.hierarchy.hierarchy import Hierarchy, HierarchyNodeVisitor, Transformer
 from hermit.hierarchy.hierarchy_node import HierarchyNode
-from hermit.model import AtomicConcept, AtomicRole, Prefixes, Role
+from hermit.model import AtomicConcept, AtomicRole, InverseRole, Prefixes, Role
 
 if TYPE_CHECKING:
     from collections.abc import Collection
@@ -111,7 +111,7 @@ class HierarchyPrinterFSS:
 
     @staticmethod
     def _is_valid_local_name(local_name: str) -> bool:
-        return Prefixes._is_valid_local_name(local_name)  # type: ignore[attr-defined]
+        return Prefixes._is_valid_local_name(local_name)
 
     def _abbreviate(self, iri: str) -> str:
         if self.m_prefixes is not None:
@@ -282,9 +282,9 @@ class _RolePrinter(HierarchyNodeVisitor[Role]):
         out = self._printer.m_out
         if isinstance(role, AtomicRole):
             out.write(self._printer._abbreviate(role.iri))
-        else:
+        elif isinstance(role, InverseRole):
             out.write("ObjectInverseOf( ")
-            self._print_role(role.inverse_of)  # type: ignore[arg-type]
+            self._print_role(role.inverse_of)
             out.write(" )")
 
     @staticmethod
@@ -309,12 +309,8 @@ class _RoleComparator:
         comparison = _RoleComparator._get_role_direction(role1) - _RoleComparator._get_role_direction(role2)
         if comparison != 0:
             return comparison
-        inner1 = (
-            role1 if isinstance(role1, AtomicRole) else role1.inverse_of  # type: ignore[union-attr]
-        )
-        inner2 = (
-            role2 if isinstance(role2, AtomicRole) else role2.inverse_of  # type: ignore[union-attr]
-        )
+        inner1: AtomicRole = role1 if isinstance(role1, AtomicRole) else cast(InverseRole, role1).inverse_of
+        inner2: AtomicRole = role2 if isinstance(role2, AtomicRole) else cast(InverseRole, role2).inverse_of
         return inner1.iri > inner2.iri and 1 or (inner1.iri < inner2.iri and -1 or 0)
 
     @staticmethod

@@ -1436,7 +1436,7 @@ class ConstantEnumeration(AtomicDataRange):
         return False
 
     @classmethod
-    def create(cls, constants: list[Constant] | tuple[Constant, ...]) -> ConstantEnumeration:
+    def create(cls, constants: list[Constant] | tuple[Constant, ...]) -> ConstantEnumeration:  # type: ignore[override]
         if isinstance(constants, list):
             constants = tuple(constants)
         return _interner.intern(cls(constants))
@@ -1567,13 +1567,13 @@ class AtMostConcept(Concept):
     def is_always_true(self) -> bool:
         return False
 
-    def accept(self, visitor: object) -> object:
+    def accept(self, visitor: Any) -> None:
         visit = getattr(visitor, "visit_at_most_concept", None)
         if visit is None:
             raise AttributeError(
                 f"{type(visitor).__name__} has no visit_at_most_concept()"
             )
-        return visit(self)
+        visit(self)
 
     def __str__(self) -> str:
         return f"atMost({self._number} {self._on_role} {self._to_concept})"
@@ -2175,7 +2175,7 @@ class DLOntology:
         """Check whether the ontology has unknown datatype restrictions."""
         return False
 
-    def get_all_unknown_datatype_restrictions(self) -> frozenset:
+    def get_all_unknown_datatype_restrictions(self) -> frozenset["DatatypeRestriction"]:
         """Return all unknown datatype restrictions (empty set by default)."""
         return frozenset()
 

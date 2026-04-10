@@ -1,6 +1,7 @@
 # vendored from owlapy 1.6.4 — MIT License
 
 """OWL Class"""
+import builtins
 from .class_expression import OWLClassExpression, OWLObjectComplementOf
 from ..owl_object import OWLEntity
 from typing import Final
@@ -37,11 +38,11 @@ class OWLClass(OWLClassExpression, OWLEntity):
         return self._iri
 
     @property
-    def str(self):
+    def str(self) -> builtins.str:
         return self._iri.as_str()
 
     @property
-    def remainder(self) -> str:
+    def remainder(self) -> builtins.str:
         """The remainder of the IRI """
         return self._iri.get_remainder()
 

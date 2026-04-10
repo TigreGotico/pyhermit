@@ -299,7 +299,7 @@ class OWLNormalization:
                 else:
                     new_operands.append(operand)
             if changed:
-                simplified = OWLObjectUnionOf(new_operands)  # type: ignore[arg-type]
+                simplified = OWLObjectUnionOf(new_operands)
 
         result.add_concept_inclusion(simplified)
 

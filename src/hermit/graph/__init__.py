@@ -56,7 +56,8 @@ class Graph(Generic[T]):
                 )
                 if element_on_path_successors is not None:
                     for successor in element_on_path_successors:
-                        if reachable.add(successor):
+                        if successor not in reachable:
+                            reachable.add(successor)
                             to_process.append(successor)
 
     def get_inverse(self) -> Graph[T]:
@@ -89,7 +90,8 @@ class Graph(Generic[T]):
             successors = self.get_successors(current)
             if to_node in successors:
                 return True
-            if result.add(current):
+            if current not in result:
+                result.add(current)
                 to_visit.extend(successors)
         return False
 

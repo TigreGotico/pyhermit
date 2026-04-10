@@ -171,7 +171,7 @@ class OWLClausification:
                 data_range.accept(data_range_clausifier)
             dl_clause = data_range_clausifier.get_dl_clause()
             dl_clauses.add(
-                dl_clause.get_safe_version(InternalDatatype.RDFS_LITERAL)  # type: ignore[arg-type]
+                dl_clause.get_safe_version(InternalDatatype.RDFS_LITERAL)
             )
 
         # -- Direct DL clauses (e.g. from ∀R.C normalization) --
@@ -280,7 +280,7 @@ class OWLClausification:
                 for j in range(i + 1, len(properties)):
                     atom_i = Atom.create(properties[i], X, Y)
                     atom_j = Atom.create(properties[j], X, Z)
-                    atom_ineq = Atom.create(Inequality.INSTANCE, Y, Z)  # type: ignore[arg-type]
+                    atom_ineq = Atom.create(Inequality.INSTANCE, Y, Z)
                     dl_clauses.add(DLClause.create((atom_ineq,), (atom_i, atom_j)))
 
     @staticmethod
@@ -324,7 +324,7 @@ class OWLClausification:
         x2 = Variable.create("X2")
 
         # Head: X1 == X2
-        head_atoms.append(Atom.create(Equality.INSTANCE, x1, x2))  # type: ignore[arg-type]
+        head_atoms.append(Atom.create(Equality.INSTANCE, x1, x2))
 
         # Body: both are named individuals
         body_atoms.append(Atom.create(AtomicConcept.INTERNAL_NAMED, x1))
@@ -357,7 +357,7 @@ class OWLClausification:
         x2 = Variable.create("X2")
 
         # Head: X1 == X2
-        head_atoms.append(Atom.create(Equality.INSTANCE, x1, x2))  # type: ignore[arg-type]
+        head_atoms.append(Atom.create(Equality.INSTANCE, x1, x2))
 
         # Body: both are named individuals
         body_atoms.append(Atom.create(AtomicConcept.INTERNAL_NAMED, x1))
@@ -380,7 +380,7 @@ class OWLClausification:
             y_index += 1
             body_atoms.append(Atom.create(prop, x2, y2_var))
 
-            head_atoms.append(Atom.create(Inequality.INSTANCE, y_var, y2_var))  # type: ignore[arg-type]
+            head_atoms.append(Atom.create(Inequality.INSTANCE, y_var, y2_var))
 
         return DLClause.create(tuple(head_atoms), tuple(body_atoms))
 
@@ -555,7 +555,7 @@ class NormalizedAxiomClausifier:
                         Atom.create(role, X, y_vars[j]),  # type: ignore[arg-type]
                         Atom.create(filler, y_vars[j]),  # type: ignore[arg-type]
                     )
-                    head = (Atom.create(Equality.INSTANCE, y_vars[i], y_vars[j]),)  # type: ignore[arg-type]
+                    head = (Atom.create(Equality.INSTANCE, y_vars[i], y_vars[j]),)
                     self._extra_clauses.append(DLClause.create(head, body))
 
         # No head atoms from this visit — the clauses are in _extra_clauses
@@ -798,11 +798,11 @@ class FactClausifier:
         """Process all facts from the normalized axioms."""
         # Same individual facts: i == j
         for ind1, ind2 in axioms.same_individual_facts:
-            self._positive_facts.add(Atom.create(Equality.INSTANCE, ind1, ind2))  # type: ignore[arg-type]
+            self._positive_facts.add(Atom.create(Equality.INSTANCE, ind1, ind2))
 
         # Different individuals facts: i != j
         for ind1, ind2 in axioms.different_individuals_facts:
-            self._positive_facts.add(Atom.create(Inequality.INSTANCE, ind1, ind2))  # type: ignore[arg-type]
+            self._positive_facts.add(Atom.create(Inequality.INSTANCE, ind1, ind2))
 
         # Positive concept facts: A(i)
         for individual, concept in axioms.positive_concept_facts:

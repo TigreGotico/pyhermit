@@ -18,6 +18,7 @@ from hermit.model import (
     AtLeastConcept,
     AtLeastDataRange,
     AtomicRole,
+    ExistentialConcept,
     Inequality,
     InverseRole,
     Role,
@@ -26,9 +27,12 @@ from hermit.model import (
 if TYPE_CHECKING:
     from hermit.blocking.blocking_strategy import BlockingStrategy
     from hermit.model import Concept, DLClause, DataRange, Variable
-    from hermit.monitor.tableau_monitor import TableauMonitor
-    from hermit.tableau.dl_clause_evaluator import DLClauseEvaluator
-    from hermit.tableau.extension_manager import Retrieval as ExtRetrieval
+    from hermit.monitor.tableau_monitor import TableauMonitor  # type: ignore[import-untyped]
+    from hermit.tableau.dl_clause_evaluator import DLClauseEvaluator, Worker as DLClauseWorker
+    from hermit.tableau.extension_manager import ExtensionManager, Retrieval as ExtRetrieval
+    from hermit.tableau.interrupt_flag import InterruptFlag
+    from hermit.tableau.existential_expansion_manager import ExistentialExpansionManager
+    from hermit.tableau.description_graph_manager import DescriptionGraphManager
     from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau
 
@@ -53,16 +57,16 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
     ) -> None:
         self.m_blocking_strategy = blocking_strategy
         self.m_expand_node_at_a_time = expand_node_at_a_time
-        self.m_processed_existentials: list[AtLeast] = []
+        self.m_processed_existentials: list[ExistentialConcept] = []
         self.m_auxiliary_nodes1: list[Node] = []
         self.m_auxiliary_nodes2: list[Node] = []
         self.m_tableau: Tableau | None = None
-        self.m_interrupt_flag = None
-        self.m_extension_manager = None
+        self.m_interrupt_flag: InterruptFlag | None = None
+        self.m_extension_manager: ExtensionManager | None = None
         self.m_ternary_extension_table_search01_bound: ExtRetrieval | None = None
         self.m_ternary_extension_table_search02_bound: ExtRetrieval | None = None
-        self.m_existential_expansion_manager = None
-        self.m_description_graph_manager = None
+        self.m_existential_expansion_manager: ExistentialExpansionManager | None = None
+        self.m_description_graph_manager: DescriptionGraphManager | None = None
 
     def initialize(self, tableau: Tableau) -> None:
         self.m_tableau = tableau
@@ -94,6 +98,9 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
             self.m_ternary_extension_table_search02_bound.clear()
 
     def expand_existentials(self, final_chance: bool) -> bool:
+        assert self.m_existential_expansion_manager is not None
+        assert self.m_interrupt_flag is not None
+        assert self.m_extension_manager is not None
         monitor: TableauMonitor | None = (
             self.m_tableau.m_tableau_monitor if self.m_tableau else None
         )
@@ -136,6 +143,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
                             exists_description_graph: ExistsDescriptionGraph = (
                                 existential_concept
                             )
+                            assert self.m_description_graph_manager is not None
                             if not self.m_description_graph_manager.is_satisfied(
                                 exists_description_graph, node
                             ):
@@ -161,15 +169,15 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
     def assertion_added_concept(
         self, concept: Concept, node: Node, is_core: bool
     ) -> None:
-        self.m_blocking_strategy.assertion_added(concept, node, is_core)
+        self.m_blocking_strategy.assertion_added(concept, node, is_core)  # type: ignore[arg-type]
 
     def assertion_core_set_concept(self, concept: Concept, node: Node) -> None:
-        self.m_blocking_strategy.assertion_core_set(concept, node)
+        self.m_blocking_strategy.assertion_core_set(concept, node)  # type: ignore[arg-type]
 
     def assertion_removed_concept(
         self, concept: Concept, node: Node, is_core: bool
     ) -> None:
-        self.m_blocking_strategy.assertion_removed(concept, node, is_core)
+        self.m_blocking_strategy.assertion_removed(concept, node, is_core)  # type: ignore[arg-type]
 
     def assertion_added_data_range(
         self, data_range: DataRange, node: Node, is_core: bool
@@ -228,7 +236,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
 
     def dl_clause_body_compiled(
         self,
-        workers: list[DLClauseEvaluator.Worker],
+        workers: list[DLClauseWorker],
         dl_clause: DLClause,
         variables: list[Variable],
         values_buffer: list[object | None],
@@ -263,7 +271,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
             retrieval.open()
             tuple_buffer = retrieval.get_tuple_buffer()
             while not retrieval.after_last():
-                to_node: Node = tuple_buffer[to_node_index]  # type: ignore[assignment]
+                to_node: Node = tuple_buffer[to_node_index]
                 if to_node is None:
                     retrieval.next()
                     continue
@@ -275,7 +283,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
                     ):
                         is_perm = self._is_permanent_satisfier(for_node, to_node)
                         is_perm_assert = (
-                            self.m_blocking_strategy.is_permanent_assertion(  # type: ignore[union-attr]
+                            self.m_blocking_strategy.is_permanent_assertion(
                                 to_data_range, to_node
                             )
                         )
@@ -286,14 +294,14 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
                     at_least_c: AtLeastConcept = at_least  # type: ignore[assignment]
                     to_concept = at_least_c.to_concept
                     if (
-                        not to_node.is_blocked or for_node.is_parent_of(to_node)
+                        not to_node.is_blocked() or for_node.is_parent_of(to_node)
                     ) and self.m_extension_manager.contains_concept_assertion(  # type: ignore[union-attr]
                         to_concept, to_node
                     ):
                         is_perm = self._is_permanent_satisfier(for_node, to_node)
                         is_perm_assert = (
-                            self.m_blocking_strategy.is_permanent_assertion(  # type: ignore[union-attr]
-                                to_concept, to_node
+                            self.m_blocking_strategy.is_permanent_assertion(
+                                to_concept, to_node  # type: ignore[arg-type]
                             )
                         )
                         if is_perm and is_perm_assert:
@@ -307,7 +315,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
             tuple_buffer = retrieval.get_tuple_buffer()
             all_satisfiers_are_permanent = True
             while not retrieval.after_last():
-                to_node = tuple_buffer[to_node_index]  # type: ignore[assignment]
+                to_node = tuple_buffer[to_node_index]
                 if isinstance(at_least, AtLeastDataRange):
                     at_least_dr = at_least
                     to_data_range = at_least_dr.to_data_range
@@ -316,7 +324,7 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
                     ):
                         if (
                             not self._is_permanent_satisfier(for_node, to_node)
-                            or not self.m_blocking_strategy.is_permanent_assertion(  # type: ignore[union-attr]
+                            or not self.m_blocking_strategy.is_permanent_assertion(
                                 to_data_range, to_node
                             )
                         ):
@@ -326,14 +334,14 @@ class AbstractExpansionStrategy(ExistentialExpansionStrategy):
                     at_least_c = at_least  # type: ignore[assignment]
                     to_concept = at_least_c.to_concept
                     if (
-                        not to_node.is_blocked or for_node.is_parent_of(to_node)
+                        not to_node.is_blocked() or for_node.is_parent_of(to_node)
                     ) and self.m_extension_manager.contains_concept_assertion(  # type: ignore[union-attr]
                         to_concept, to_node
                     ):
                         if (
                             not self._is_permanent_satisfier(for_node, to_node)
-                            or not self.m_blocking_strategy.is_permanent_assertion(  # type: ignore[union-attr]
-                                to_concept, to_node
+                            or not self.m_blocking_strategy.is_permanent_assertion(
+                                to_concept, to_node  # type: ignore[arg-type]
                             )
                         ):
                             all_satisfiers_are_permanent = False

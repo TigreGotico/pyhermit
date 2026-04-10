@@ -413,12 +413,14 @@ class OWLObjectOneOf(OWLAnonymousClassExpression, HasOperands[OWLIndividual]):
     def __init__(self, values: OWLIndividual | Iterable[OWLIndividual]):
         #assert isinstance(values, OWLIndividual) | isinstance(values, set)
         #    f"The input of OWLObjectOneOf must be either an OWLIndividual or a set of OWLIndividual. Currently, {type(values)}!"
+        _v: frozenset[OWLIndividual] | tuple[OWLIndividual, ...]
         if isinstance(values, OWLIndividual):
-            self._values = values,
+            _v = (values,)
         else:
             for _ in values:
                 assert isinstance(_, OWLIndividual)
-            self._values = frozenset(values)
+            _v = frozenset(values)
+        self._values = _v
 
     def individuals(self) -> Iterable[OWLIndividual]:
         """Gets the individuals that are in the oneOf. These individuals represent the exact instances (extension)
@@ -847,7 +849,7 @@ class OWLFacetRestriction(OWLObject):
         if isinstance(literal, OWLLiteral):
             self._literal = literal
         else:
-            self._literal = OWLLiteral(literal)
+            self._literal = OWLLiteral(literal)  # type: ignore[abstract]
 
     def get_facet(self) -> OWLFacet:
         return self._facet

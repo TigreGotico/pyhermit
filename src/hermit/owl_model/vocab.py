@@ -1,6 +1,7 @@
 # vendored from owlapy 1.6.4 — MIT License
 
 """Enumerations."""
+import builtins
 from abc import ABCMeta
 from enum import Enum, EnumMeta
 from typing import Final, TypeVar
@@ -31,10 +32,10 @@ class _Vocabulary(HasIRI):
         return self._iri
 
     @property
-    def str(self) -> str:
+    def str(self) -> builtins.str:
         return self._iri.as_str()
 
-    def as_str(self) -> str:
+    def as_str(self) -> builtins.str:
         return self._iri.as_str()
 
     def __repr__(self):

@@ -1,6 +1,7 @@
 # vendored from owlapy 1.6.4 — MIT License
 
 """OWL IRI"""
+import builtins
 import weakref
 from abc import ABCMeta
 from typing import Final
@@ -16,7 +17,7 @@ class _WeakCached(type):
 
     def __init__(cls, what, bases, dct):
         super().__init__(what, bases, dct)
-        cls._cache = WeakKeyDictionary()
+        cls._cache: WeakKeyDictionary[object, weakref.ref[object]] = WeakKeyDictionary()
 
     def __call__(cls, *args, **kwargs):
         _temp = super().__call__(*args, **kwargs)
@@ -54,7 +55,7 @@ class IRI(OWLAnnotationSubject, OWLAnnotationValue, metaclass=_meta_IRI):
         self._remainder = remainder
 
     @staticmethod
-    def create(iri:str | Namespaces, remainder:str=None, is_file_path=False) -> 'IRI':
+    def create(iri:str | Namespaces, remainder: builtins.str | None=None, is_file_path=False) -> 'IRI':
         assert isinstance(iri, str) | isinstance(iri, Namespaces), f"Input must be a string or an instance of Namespaces. Currently, {type(iri)}"
         if is_file_path and iri != "":
             return IRI(iri, "", is_file_path)
@@ -83,23 +84,23 @@ class IRI(OWLAnnotationSubject, OWLAnnotationValue, metaclass=_meta_IRI):
     def __hash__(self):
         return hash(("IRI", self._namespace, self._remainder))
 
-    def is_nothing(self):
+    def is_nothing(self) -> bool:
         """Determines if this IRI is equal to the IRI that owl:Nothing is named with.
 
         Returns:
             :True if this IRI is equal to <http://www.w3.org/2002/07/owl#Nothing> and otherwise False.
         """
         from hermit.owl_model.vocab import OWLRDFVocabulary
-        return self == OWLRDFVocabulary.OWL_NOTHING.iri
+        return bool(self == OWLRDFVocabulary.OWL_NOTHING.iri)
 
-    def is_thing(self):
+    def is_thing(self) -> bool:
         """Determines if this IRI is equal to the IRI that owl:Thing is named with.
 
         Returns:
             :True if this IRI is equal to <http://www.w3.org/2002/07/owl#Thing> and otherwise False.
         """
         from hermit.owl_model.vocab import OWLRDFVocabulary
-        return self == OWLRDFVocabulary.OWL_THING.iri
+        return bool(self == OWLRDFVocabulary.OWL_THING.iri)
 
     def is_reserved_vocabulary(self) -> bool:
         """Determines if this IRI is in the reserved vocabulary. An IRI is in the reserved vocabulary if it starts with
@@ -125,7 +126,7 @@ class IRI(OWLAnnotationSubject, OWLAnnotationValue, metaclass=_meta_IRI):
         return self._namespace + self._remainder
 
     @property
-    def str(self) -> str:
+    def str(self) -> builtins.str:
         """
 
         Returns:
@@ -134,7 +135,7 @@ class IRI(OWLAnnotationSubject, OWLAnnotationValue, metaclass=_meta_IRI):
         return self.as_str()
 
     @property
-    def remainder(self) -> str:
+    def remainder(self) -> builtins.str:
         """
 
         Returns:
@@ -142,14 +143,14 @@ class IRI(OWLAnnotationSubject, OWLAnnotationValue, metaclass=_meta_IRI):
         """
         return self._remainder
 
-    def get_namespace(self) -> str:
+    def get_namespace(self) -> builtins.str:
         """
         Returns:
             The namespace as string.
         """
         return self._namespace
 
-    def get_remainder(self) -> str:
+    def get_remainder(self) -> builtins.str:
         """
         Returns:
             The remainder (coincident with NCName usually) for this IRI.

@@ -32,13 +32,13 @@ class XMLLiteralDatatypeHandler(DatatypeHandler):
     def parse_literal(self, lexical_form: str, datatype_iri: str) -> Any:
         return lexical_form
 
-    def create_value_space_subset(self, datatype_iri, facet_uris, facet_values):
+    def create_value_space_subset(self, datatype_iri: str, facet_uris: Any, facet_values: Any) -> XMLLiteralValueSpaceSubset:
         return XMLLiteralValueSpaceSubset()
 
-    def entire_space(self, datatype_iri):
+    def entire_space(self, datatype_iri: str) -> XMLLiteralValueSpaceSubset:
         return XMLLiteralValueSpaceSubset()
 
-    def empty_space(self, datatype_iri):
+    def empty_space(self, datatype_iri: str) -> XMLLiteralValueSpaceSubset:
         return XMLLiteralValueSpaceSubset(empty=True)
 
 DatatypeRegistry.register(XMLLiteralDatatypeHandler())

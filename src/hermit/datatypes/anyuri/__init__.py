@@ -32,13 +32,13 @@ class AnyURIDatatypeHandler(DatatypeHandler):
     def parse_literal(self, lexical_form: str, datatype_iri: str) -> Any:
         return lexical_form  # URI is just the string
 
-    def create_value_space_subset(self, datatype_iri, facet_uris, facet_values):
+    def create_value_space_subset(self, datatype_iri: str, facet_uris: Any, facet_values: Any) -> AnyURIValueSpaceSubset:
         return AnyURIValueSpaceSubset()
 
-    def entire_space(self, datatype_iri):
+    def entire_space(self, datatype_iri: str) -> AnyURIValueSpaceSubset:
         return AnyURIValueSpaceSubset()
 
-    def empty_space(self, datatype_iri):
+    def empty_space(self, datatype_iri: str) -> AnyURIValueSpaceSubset:
         return AnyURIValueSpaceSubset(empty=True)
 
 DatatypeRegistry.register(AnyURIDatatypeHandler())

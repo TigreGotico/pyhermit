@@ -6,7 +6,7 @@ Faithful port of ``org.semanticweb.HermiT.hierarchy.QuasiOrderClassification``.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from hermit.graph import Graph
 from hermit.hierarchy.deterministic_classification import (
@@ -103,6 +103,7 @@ class QuasiOrderClassification:
             if not unclassified_elements:
                 break
 
+            assert unclassified_element is not None
             unknown_possible_subsumers = self.m_possible_subsumptions.get_successors(
                 unclassified_element
             )
@@ -229,7 +230,7 @@ class QuasiOrderClassification:
             None,
             None,
             None,
-            checked_node,
+            cast(dict[Any, Any], checked_node),
             self._get_sat_test_description(concept),
         ):
             return checked_node[fresh_individual]
@@ -447,7 +448,7 @@ class QuasiOrderClassification:
                 None,
                 None,
                 superconcept_assertions,
-                checked_node,
+                cast(dict[Any, Any], checked_node),
                 self._get_subsumed_by_list_test_description(
                     picked_element, [a.predicate for a in superconcept_assertions]
                 ),
@@ -555,7 +556,7 @@ class _ClassificationRelation(Relation[AtomicConcept]):
             None,
             {AtomCls.create(parent, fresh_individual)},
             None,
-            checked_node,
+            cast(dict[Any, Any], checked_node),
             self._qoc._get_subsumption_test_description(child, parent),
         )
         if not is_subsumed_by:

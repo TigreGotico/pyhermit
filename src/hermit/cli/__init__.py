@@ -177,7 +177,9 @@ def _dl_ontology_to_json(ontology: DLOntology) -> dict[str, Any]:
         if isinstance(p, AtomicConcept):
             return {"type": "concept", "iri": p.iri}
         if isinstance(p, InverseRole):
-            return {"type": "inv_role", "iri": p.get_inverse().iri}
+            inv = p.get_inverse()
+            assert isinstance(inv, AtomicRole)
+            return {"type": "inv_role", "iri": inv.iri}
         if isinstance(p, AtomicRole):
             return {"type": "role", "iri": p.iri}
         if p is Equality.INSTANCE:

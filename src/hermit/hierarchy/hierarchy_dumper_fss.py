@@ -5,9 +5,9 @@ Faithful port of ``org.semanticweb.HermiT.hierarchy.HierarchyDumperFSS``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TextIO
+from typing import TYPE_CHECKING, TextIO, cast
 
-from hermit.model import AtomicConcept, AtomicRole, Role
+from hermit.model import AtomicConcept, AtomicRole, InverseRole, Role
 
 if TYPE_CHECKING:
     from hermit.hierarchy.hierarchy import Hierarchy
@@ -121,15 +121,15 @@ class HierarchyDumperFSS:
     def _print_role(self, role: Role) -> None:
         if isinstance(role, AtomicRole):
             self.m_out.write(f"<{role.iri}>")
-        else:
+        elif isinstance(role, InverseRole):
             self.m_out.write("ObjectInverseOf( ")
-            self.m_out.write(f"<{role.inverse_of.iri}>")  # type: ignore[union-attr]
+            self.m_out.write(f"<{role.inverse_of.iri}>")
             self.m_out.write(" )")
 
     def _role_sort_key(self, role: Role) -> tuple[int, int, str]:
         role_class = self._get_role_class(role)
         role_direction = 0 if isinstance(role, AtomicRole) else 1
-        inner: AtomicRole = role if isinstance(role, AtomicRole) else role.inverse_of  # type: ignore[assignment]
+        inner: AtomicRole = role if isinstance(role, AtomicRole) else cast(InverseRole, role).inverse_of
         return (role_class, role_direction, inner.iri)
 
     @staticmethod

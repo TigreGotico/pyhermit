@@ -8,7 +8,8 @@ from typing import TypeVar, Generic
 from collections.abc import Iterable, Sequence
 from .owl_property import OWLDataPropertyExpression, OWLObjectPropertyExpression
 from .owl_object import OWLObject, OWLEntity
-from .owl_datatype import OWLDatatype, OWLDataRange
+from .owl_datatype import OWLDatatype
+from .owl_data_ranges import OWLDataRange, OWLPropertyRange
 from .meta_classes import HasOperands
 from .owl_property import OWLPropertyExpression, OWLProperty
 from .class_expression import OWLClassExpression, OWLClass, OWLNothing, OWLThing, OWLObjectUnionOf
@@ -19,7 +20,7 @@ from .owl_literal import OWLLiteral
 
 _C = TypeVar('_C', bound='OWLObject')  # noqa: F821
 _P = TypeVar('_P', bound='OWLPropertyExpression')  # noqa: F821
-_R = TypeVar('_R', bound='OWLPropertyRange')  # noqa: F821
+_R = TypeVar('_R', bound='OWLPropertyRange')
 
 
 class OWLAxiom(OWLObject, metaclass=ABCMeta):
@@ -295,10 +296,10 @@ class OWLEquivalentClassesAxiom(OWLNaryClassAxiom):
         return any(isinstance(ce, OWLClass) for ce in self._class_expressions)
 
     def contains_owl_nothing(self) -> bool:
-        return any(isinstance(ce, OWLNothing) for ce in self._class_expressions)
+        return any(isinstance(ce, OWLNothing) for ce in self._class_expressions)  # type: ignore[arg-type]
 
     def contains_owl_thing(self) -> bool:
-        return any(isinstance(ce, OWLThing) for ce in self._class_expressions)
+        return any(isinstance(ce, OWLThing) for ce in self._class_expressions)  # type: ignore[arg-type]
 
     def named_classes(self) -> Iterable[OWLClass]:
         yield from (ce for ce in self._class_expressions if isinstance(ce, OWLClass))
@@ -406,7 +407,7 @@ class OWLNaryPropertyAxiom(Generic[_P], OWLPropertyAxiom, OWLNaryAxiom[_P], meta
         """
         yield from self._properties
 
-    def as_pairwise_axioms(self) -> Iterable['OWLNaryPropertyAxiom']:
+    def as_pairwise_axioms(self) -> Iterable['OWLNaryPropertyAxiom[_P]']:
         if len(self._properties) < 3:
             yield self
         else:
@@ -1393,11 +1394,10 @@ class OWLSubPropertyChainAxiom(OWLObjectPropertyAxiom):
         self._super_property = super_property
 
 
-    def get_super_property(self) -> _P:
+    def get_super_property(self) -> OWLObjectPropertyExpression:
         return self._super_property
 
-
-    def get_property_chain(self) -> Sequence[OWLObjectPropertyExpression]:
+    def get_property_chain(self) -> Iterable[OWLObjectPropertyExpression]:
         yield from self._property_chain
 
     def __eq__(self, other):

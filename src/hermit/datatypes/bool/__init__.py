@@ -41,13 +41,13 @@ class BooleanDatatypeHandler(DatatypeHandler):
             return False
         raise MalformedLiteralException(f"Invalid boolean: {lexical_form!r}")
 
-    def create_value_space_subset(self, datatype_iri, facet_uris, facet_values):
+    def create_value_space_subset(self, datatype_iri: str, facet_uris: Any, facet_values: Any) -> BooleanValueSpaceSubset:
         return BooleanValueSpaceSubset()
 
-    def entire_space(self, datatype_iri):
+    def entire_space(self, datatype_iri: str) -> BooleanValueSpaceSubset:
         return BooleanValueSpaceSubset()
 
-    def empty_space(self, datatype_iri):
+    def empty_space(self, datatype_iri: str) -> BooleanValueSpaceSubset:
         return BooleanValueSpaceSubset(frozenset())
 
 DatatypeRegistry.register(BooleanDatatypeHandler())

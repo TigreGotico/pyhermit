@@ -51,13 +51,13 @@ class FloatDatatypeHandler(DatatypeHandler):
         except ValueError:
             raise MalformedLiteralException(f"Invalid float: {lexical_form!r}") from None
 
-    def create_value_space_subset(self, datatype_iri, facet_uris, facet_values):
+    def create_value_space_subset(self, datatype_iri: str, facet_uris: Any, facet_values: Any) -> FloatValueSpaceSubset:
         return FloatValueSpaceSubset(entire=True)
 
-    def entire_space(self, datatype_iri):
+    def entire_space(self, datatype_iri: str) -> FloatValueSpaceSubset:
         return FloatValueSpaceSubset(entire=True)
 
-    def empty_space(self, datatype_iri):
+    def empty_space(self, datatype_iri: str) -> FloatValueSpaceSubset:
         return FloatValueSpaceSubset(empty=True)
 
 DatatypeRegistry.register(FloatDatatypeHandler())

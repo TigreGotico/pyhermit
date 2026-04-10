@@ -65,99 +65,12 @@ disallow_untyped_defs = true
 disallow_incomplete_defs = true
 warn_unused_ignores = false
 
-# ---------------------------------------------------------------------------
-# mypy per-module overrides — pre-existing type debt outside tableau/blocking
-# ---------------------------------------------------------------------------
 
 [[tool.mypy.overrides]]
-module = [
-    "hermit.datatypes.anyuri",
-    "hermit.datatypes.binarydata",
-    "hermit.datatypes.bool",
-    "hermit.datatypes.datetime",
-    "hermit.datatypes.doublenum",
-    "hermit.datatypes.floatnum",
-    "hermit.datatypes.owlreal",
-    "hermit.datatypes.rdfplainliteral",
-    "hermit.datatypes.xmlliteral",
-]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = [
-    "hermit.existentials.abstract_expansion_strategy",
-    "hermit.existentials.creation_order_strategy",
-    "hermit.existentials.existential_expansion_strategy",
-    "hermit.existentials.individual_reuse_strategy",
-]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = [
-    "hermit.graph",
-]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = [
-    "hermit.hierarchy.hierarchy_dumper_fss",
-    "hermit.hierarchy.hierarchy_printer_fss",
-    "hermit.hierarchy.hierarchy",
-    "hermit.hierarchy.hierarchy_search",
-    "hermit.hierarchy.instance_manager",
-    "hermit.hierarchy.quasi_order_classification",
-    "hermit.hierarchy.deterministic_classification",
-]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = [
-    "hermit.model",
-]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = [
-    "hermit.owl_model.class_expression.class_expression",
-    "hermit.owl_model.class_expression",
-    "hermit.owl_model.class_expression.nary_boolean_expression",
-    "hermit.owl_model.class_expression.owl_class",
-    "hermit.owl_model.class_expression.restriction",
-    "hermit.owl_model.iri",
-    "hermit.owl_model.meta_classes",
-    "hermit.owl_model.namespaces",
-    "hermit.owl_model.owl_annotation",
-    "hermit.owl_model.owl_axiom",
-    "hermit.owl_model.owl_data_ranges",
-    "hermit.owl_model.owl_individual",
-    "hermit.owl_model.owl_literal",
-    "hermit.owl_model.owl_object",
-    "hermit.owl_model.owl_property",
-    "hermit.owl_model.vocab",
-]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = [
-    "hermit.reasoner",
-]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = [
-    "hermit.structural.owl_axioms_expressivity",
-    "hermit.structural.owl_clausification",
-    "hermit.structural.owl_normalization",
-]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = [
-    "hermit.cli",
-]
-ignore_errors = true
-
-
+module = ["hermit.owl_model.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
 
 [tool.ruff]
 target-version = "py310"

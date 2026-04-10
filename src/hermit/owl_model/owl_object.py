@@ -3,9 +3,10 @@
 """OWL Base classes"""
 from abc import abstractmethod, ABCMeta
 from .meta_classes import HasIRI
-from typing import TypeVar
+from typing import TYPE_CHECKING, Any
 
-_I = TypeVar('_I', bound='IRI')  # noqa: F821
+if TYPE_CHECKING:
+    from .iri import IRI
 
 class OWLObject(metaclass=ABCMeta):
     """Base interface for OWL objects"""
@@ -72,7 +73,7 @@ class OWLNamedObject(OWLObject, HasIRI, metaclass=ABCMeta):
      IRI as its name."""
     __slots__ = ()
 
-    _iri: _I
+    _iri: "IRI"
 
     def __eq__(self, other):
         if type(other) is type(self):

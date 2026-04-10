@@ -6,7 +6,7 @@ from abc import ABCMeta, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from .owl_annotation import OWLAnnotationValue
-from typing import Final, Union
+from typing import Any, Final, Union
 from .owl_datatype import OWLDatatype
 from datetime import datetime
 from datetime import timedelta, date, time
@@ -119,6 +119,8 @@ class OWLLiteral(OWLAnnotationValue, metaclass=ABCMeta):
     __slots__ = ()
 
     type_index: Final = 4008
+
+    _v: Any  # defined in subclasses; declared here for base class method access
 
     def __new__(cls, value, type_: OWLDatatype | None = None):
         """Convenience method that obtains a literal.
@@ -335,7 +337,7 @@ class OWLLiteral(OWLAnnotationValue, metaclass=ABCMeta):
         """Whether this literal is typed as gYearMonth."""
         return False
 
-    def parse_gyearmonth(self) -> tuple:
+    def parse_gyearmonth(self) -> tuple[Any, ...]:
         """Parses the lexical value of this literal into gYearMonth.
 
         Returns:
@@ -347,7 +349,7 @@ class OWLLiteral(OWLAnnotationValue, metaclass=ABCMeta):
         """Whether this literal is typed as gMonthDay."""
         return False
 
-    def parse_gmonthday(self) -> tuple:
+    def parse_gmonthday(self) -> tuple[Any, ...]:
         """Parses the lexical value of this literal into gMonthDay.
 
         Returns:
@@ -359,7 +361,7 @@ class OWLLiteral(OWLAnnotationValue, metaclass=ABCMeta):
         """Whether this literal is typed as gYear."""
         return False
 
-    def parse_gyear(self) -> tuple:
+    def parse_gyear(self) -> tuple[Any, ...]:
         """Parses the lexical value of this literal into gYear.
 
         Returns:
@@ -371,7 +373,7 @@ class OWLLiteral(OWLAnnotationValue, metaclass=ABCMeta):
         """Whether this literal is typed as gMonth."""
         return False
 
-    def parse_gmonth(self) -> tuple:
+    def parse_gmonth(self) -> tuple[Any, ...]:
         """Parses the lexical value of this literal into gMonth.
 
         Returns:
@@ -383,7 +385,7 @@ class OWLLiteral(OWLAnnotationValue, metaclass=ABCMeta):
         """Whether this literal is typed as gDay."""
         return False
 
-    def parse_gday(self) -> tuple:
+    def parse_gday(self) -> tuple[Any, ...]:
         """Parses the lexical value of this literal into gDay.
 
         Returns:
@@ -407,7 +409,7 @@ class OWLLiteral(OWLAnnotationValue, metaclass=ABCMeta):
         return self
 
     def to_python(self) -> Literals:
-        return self._v
+        return self._v  # type: ignore[no-any-return]
 
     @abstractmethod
     def get_datatype(self) -> OWLDatatype:
@@ -459,22 +461,22 @@ class _OWLNumericLiteralInterface(OWLLiteral):
 
     def __lt__(self, other):
         if type(other) is type(self) and not isinstance(self._v, FloatSpecialValue):
-            return self._v < other._v
+            return self._v < other._v  # type: ignore[operator]
         return False
 
     def __gt__(self, other):
         if type(other) is type(self) and not isinstance(self._v, FloatSpecialValue):
-            return self._v > other._v
+            return self._v > other._v  # type: ignore[operator]
         return False
 
     def __le__(self, other):
         if type(other) is type(self) and not isinstance(self._v, FloatSpecialValue):
-            return self._v <= other._v
+            return self._v <= other._v  # type: ignore[operator]
         return False
 
     def __ge__(self, other):
         if type(other) is type(self) and not isinstance(self._v, FloatSpecialValue):
-            return self._v >= other._v
+            return self._v >= other._v  # type: ignore[operator]
         return False
 
     def __hash__(self):
@@ -496,7 +498,7 @@ class _OWLIntegerLiteralInterface(_OWLNumericLiteralInterface):
         return True
 
     def parse_int(self) -> int:
-        return self._v
+        return self._v  # type: ignore[return-value]
 
 
 @total_ordering
@@ -509,8 +511,8 @@ class _OWLLiteralImplFloat(_OWLNumericLiteralInterface):
     def is_float(self):
         return True
 
-    def parse_float(self) -> float | FloatSpecialValue:
-        return self._v
+    def parse_float(self) -> float | FloatSpecialValue:  # type: ignore[override]
+        return self._v  # type: ignore[return-value]
 
     def has_float_special_value(self):
         if isinstance(self._v, FloatSpecialValue):
@@ -527,8 +529,8 @@ class _OWLLiteralImplDouble(_OWLNumericLiteralInterface):
     def is_double(self):
         return True
 
-    def parse_double(self) -> float | FloatSpecialValue:
-        return self._v
+    def parse_double(self) -> float | FloatSpecialValue:  # type: ignore[override]
+        return self._v  # type: ignore[return-value]
 
     def has_float_special_value(self):
         if isinstance(self._v, FloatSpecialValue):
@@ -547,7 +549,7 @@ class _OWLLiteralImplDecimal(_OWLNumericLiteralInterface):
         return True
 
     def parse_decimal(self) -> Decimal:
-        return self._v
+        return self._v  # type: ignore[return-value]
 
 
 @total_ordering
@@ -703,7 +705,7 @@ class _OWLLiteralImplString(OWLLiteral):
 
 class _OWLLiteralBasicsInterface(OWLLiteral):
     __slots__ = '_v', '_type'
-    _v: datetime | date | time | timedelta | tuple | int
+    _v: datetime | date | time | timedelta | tuple[Any, ...] | int
     _type: OWLDatatype
 
     def __eq__(self, other):
@@ -713,22 +715,22 @@ class _OWLLiteralBasicsInterface(OWLLiteral):
 
     def __lt__(self, other):
         if type(other) is type(self):
-            return self._v < other._v
+            return self._v < other._v  # type: ignore[operator]
         return False
 
     def __gt__(self, other):
         if type(other) is type(self):
-            return self._v > other._v
+            return self._v > other._v  # type: ignore[operator]
         return False
 
     def __le__(self, other):
         if type(other) is type(self):
-            return self._v <= other._v
+            return self._v <= other._v  # type: ignore[operator]
         return False
 
     def __ge__(self, other):
         if type(other) is type(self):
-            return self._v >= other._v
+            return self._v >= other._v  # type: ignore[operator]
         return False
 
 
@@ -766,7 +768,7 @@ class _OWLDateAndTimeLiteralInterface(_OWLLiteralBasicsInterface):
                     value = value[:-1]  # Remove Z from time (times don't support timezone in all Python versions)
                 value = time.fromisoformat(value)
         if isinstance(value, timedelta) or type_ == DurationOWLDatatype:
-            value = timedelta(value) if isinstance(value, str) else value
+            value = timedelta(value) if isinstance(value, str) else value  # type: ignore[arg-type]
         assert type(value) in [datetime, date, time, timedelta]
         self._v = value
         self._type = type_
@@ -793,7 +795,7 @@ class _OWLLiteralImplDate(_OWLDateAndTimeLiteralInterface):
         return True
 
     def parse_date(self) -> date:
-        return self._v
+        return self._v  # type: ignore[return-value]
 
 
 @total_ordering
@@ -806,7 +808,7 @@ class _OWLLiteralImplDateTime(_OWLDateAndTimeLiteralInterface):
         return True
 
     def parse_datetime(self) -> datetime:
-        return self._v
+        return self._v  # type: ignore[return-value]
 
 
 @total_ordering
@@ -815,7 +817,7 @@ class _OWLLiteralImplDuration(_OWLDateAndTimeLiteralInterface):
         super().__init__(value, type_)
 
     def get_literal(self) -> str:
-        total_seconds = int(self._v.total_seconds())
+        total_seconds = int(self._v.total_seconds())  # type: ignore[union-attr]
         days, remainder = divmod(abs(total_seconds), 86400)
         hours, remainder = divmod(remainder, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -839,7 +841,7 @@ class _OWLLiteralImplDuration(_OWLDateAndTimeLiteralInterface):
         return True
 
     def parse_duration(self) -> timedelta:
-        return self._v
+        return self._v  # type: ignore[return-value]
 
 
 @total_ordering
@@ -851,8 +853,8 @@ class _OWLLiteralImplTime(_OWLDateAndTimeLiteralInterface):
     def is_time(self) -> bool:
         return True
 
-    def parse_time(self) -> datetime:
-        return self._v
+    def parse_time(self) -> datetime:  # type: ignore[override]
+        return self._v  # type: ignore[return-value]
 
 # ================================================== GDate Types ==================================================
 
@@ -860,7 +862,7 @@ class _OWLLiteralImplTime(_OWLDateAndTimeLiteralInterface):
 class _OWLGDatesInterface(_OWLLiteralBasicsInterface):
     __slots__ = '_v', '_type'
     # represent dual values as tuple of integers and single values as integers
-    _v: tuple | int
+    _v: tuple[Any, ...] | int
     _type: OWLDatatype
 
     def __init__(self, value, type_=None):
@@ -877,7 +879,9 @@ class _OWLGDatesInterface(_OWLLiteralBasicsInterface):
         if isinstance(value, str) and type_ in [GYearOWLDatatype, GMonthOWLDatatype, GDayOWLDatatype]:
             # expected string input examples: "2025", "-2001", "--05", "---01", "---31"
             first_numerical_value = r'^\d+'
-            value = int(re.match(first_numerical_value, value.lstrip("-")).group())
+            m = re.match(first_numerical_value, value.lstrip("-"))
+            assert m is not None
+            value = int(m.group())
 
         assert type(value) in [tuple, int]
         self._v = value
@@ -903,8 +907,8 @@ class _OWLLiteralImplGYearMonth(_OWLGDatesInterface):
     def is_gyearmonth(self) -> bool:
         return True
 
-    def parse_gyearmonth(self) -> tuple:
-        return self._v
+    def parse_gyearmonth(self) -> tuple[Any, ...]:
+        return self._v  # type: ignore[return-value]
 
 
 @total_ordering
@@ -915,8 +919,8 @@ class _OWLLiteralImplGMonthDay(_OWLGDatesInterface):
     def is_gmonthday(self) -> bool:
         return True
 
-    def parse_gmonthday(self) -> tuple:
-        return self._v
+    def parse_gmonthday(self) -> tuple[Any, ...]:
+        return self._v  # type: ignore[return-value]
 
 
 @total_ordering
@@ -927,8 +931,8 @@ class _OWLLiteralImplGYear(_OWLGDatesInterface):
     def is_gyear(self) -> bool:
         return True
 
-    def parse_gyear(self) -> int:
-        return self._v
+    def parse_gyear(self) -> int:  # type: ignore[override]
+        return self._v  # type: ignore[return-value]
 
 
 @total_ordering
@@ -939,8 +943,8 @@ class _OWLLiteralImplGMonth(_OWLGDatesInterface):
     def is_gmonth(self) -> bool:
         return True
 
-    def parse_gmonth(self) -> int:
-        return self._v
+    def parse_gmonth(self) -> int:  # type: ignore[override]
+        return self._v  # type: ignore[return-value]
 
 
 @total_ordering
@@ -951,8 +955,8 @@ class _OWLLiteralImplGDay(_OWLGDatesInterface):
     def is_gday(self) -> bool:
         return True
 
-    def parse_gday(self) -> int:
-        return self._v
+    def parse_gday(self) -> int:  # type: ignore[override]
+        return self._v  # type: ignore[return-value]
 
 
 class _OWLLiteralImpl(OWLLiteral):

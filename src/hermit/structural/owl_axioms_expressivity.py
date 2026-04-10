@@ -67,22 +67,22 @@ class OWLAxiomsExpressivity:
                 self._visit_concept(concept)
 
         # Scan data range inclusions
-        for inclusion in axioms.data_range_inclusions:
-            for dr in inclusion:
+        for dr_inclusion in axioms.data_range_inclusions:
+            for dr in dr_inclusion:
                 self._visit_data_range(dr)
 
         # Scan complex property inclusions
-        for inc in axioms.complex_object_property_inclusions:
-            self._visit_complex_inclusion(inc)
+        for complex_inc in axioms.complex_object_property_inclusions:
+            self._visit_complex_inclusion(complex_inc)
 
         # Scan simple property inclusions
-        for inc in axioms.simple_object_property_inclusions:
-            for role in inc:
+        for simple_inc in axioms.simple_object_property_inclusions:
+            for role in simple_inc:
                 self._visit_role(role)
 
         # Scan data property inclusions
-        for inc in axioms.data_property_inclusions:
-            for role in inc:
+        for data_inc in axioms.data_property_inclusions:
+            for role in data_inc:
                 self._visit_role(role)
 
         # Scan facts

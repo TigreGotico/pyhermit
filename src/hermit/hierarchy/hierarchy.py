@@ -13,6 +13,8 @@ from hermit.hierarchy.hierarchy_node import HierarchyNode
 
 E = TypeVar("E")
 T = TypeVar("T")
+E_contra = TypeVar("E_contra", contravariant=True)
+T_proto = TypeVar("T_proto")
 
 
 class HierarchyNodeVisitor(Protocol[E]):
@@ -41,16 +43,16 @@ class HierarchyNodeVisitor(Protocol[E]):
         ...
 
 
-class Transformer(Protocol[E, T]):
+class Transformer(Protocol[E_contra, T_proto]):
     """Transforms elements from one type to another during hierarchy copying."""
 
-    def transform(self, element: E) -> T:
+    def transform(self, element: E_contra) -> T_proto:
         """Transform a single element."""
         ...
 
     def determine_representative(
-        self, old_representative: E, new_equivalent_elements: set[T]
-    ) -> T:
+        self, old_representative: E_contra, new_equivalent_elements: set[T_proto]
+    ) -> T_proto:
         """Choose the representative for a newly created node."""
         ...
 
@@ -177,7 +179,7 @@ class Hierarchy(Generic[E]):
         redirect_buffer[1] = parent_node
         if visitor.redirect(redirect_buffer):  # type: ignore[arg-type]
             node = redirect_buffer[0]  # type: ignore[assignment]
-            parent_node = redirect_buffer[1]  # type: ignore[assignment]
+            parent_node = redirect_buffer[1]
             first_visit = node not in visited
             if first_visit:
                 visited.add(node)
@@ -235,6 +237,7 @@ class Hierarchy(Generic[E]):
                                 buffer.write(str(element))
                         buffer.write("]")
                     if print_sub_class_of:
+                        assert parent_node is not None
                         buffer.write(" -> ")
                         buffer.write(str(parent_node.get_representative()))
                     buffer.write("\n")
@@ -301,6 +304,14 @@ class _HierarchyNodeComparator(Generic[E]):
         self, n1: HierarchyNode[E], n2: HierarchyNode[E]
     ) -> int:
         from functools import cmp_to_key
+        from typing import Callable, Any
 
-        cmp = cmp_to_key(self.m_element_comparator)
-        return cmp(n1.m_representative) - cmp(n2.m_representative)
+        comparator: Callable[[Any, Any], int] = self.m_element_comparator  # type: ignore[assignment]
+        cmp = cmp_to_key(comparator)
+        k1 = cmp(n1.m_representative)
+        k2 = cmp(n2.m_representative)
+        if k1 < k2:
+            return -1
+        elif k1 > k2:
+            return 1
+        return 0

@@ -51,13 +51,13 @@ class BinaryDataDatatypeHandler(DatatypeHandler):
                 raise MalformedLiteralException(f"Invalid hexBinary: {lexical_form!r}") from None
         return lexical_form
 
-    def create_value_space_subset(self, datatype_iri, facet_uris, facet_values):
+    def create_value_space_subset(self, datatype_iri: str, facet_uris: Any, facet_values: Any) -> BinaryDataValueSpaceSubset:
         return BinaryDataValueSpaceSubset()
 
-    def entire_space(self, datatype_iri):
+    def entire_space(self, datatype_iri: str) -> BinaryDataValueSpaceSubset:
         return BinaryDataValueSpaceSubset()
 
-    def empty_space(self, datatype_iri):
+    def empty_space(self, datatype_iri: str) -> BinaryDataValueSpaceSubset:
         return BinaryDataValueSpaceSubset(empty=True)
 
 DatatypeRegistry.register(BinaryDataDatatypeHandler())

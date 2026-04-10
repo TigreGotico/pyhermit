@@ -660,7 +660,7 @@ class Reasoner:
             # Also collect from body atoms
             for atom in clause.body_atoms:
                 if isinstance(atom.predicate, AtomicRole):
-                    role: Role = atom.predicate
+                    role = atom.predicate
                     if role not in (
                         AtomicRole.TOP_OBJECT_ROLE,
                         AtomicRole.BOTTOM_OBJECT_ROLE,
@@ -691,7 +691,7 @@ class Reasoner:
         roles_for_concepts[AtomicConcept.NOTHING] = AtomicRole.BOTTOM_OBJECT_ROLE
 
         if not self.is_consistent():
-            all_roles: set[Role] = set(roles_for_concepts.keys())
+            all_roles: set[Role] = set(roles_for_concepts.values())
             top_node_r: HierarchyNode[Role] = HierarchyNode(AtomicRole.TOP_OBJECT_ROLE)
             top_node_r.m_equivalent_elements = {AtomicRole.TOP_OBJECT_ROLE}
             bot_node_r: HierarchyNode[Role] = HierarchyNode(AtomicRole.BOTTOM_OBJECT_ROLE)
@@ -716,7 +716,7 @@ class Reasoner:
             progress,
             AtomicConcept.THING,
             AtomicConcept.NOTHING,
-            set(roles_for_concepts.keys()),
+            set(roles_for_concepts.values()),
             self._dl_ontology.has_inverse_roles(),
             concepts_for_roles,
             roles_for_concepts,

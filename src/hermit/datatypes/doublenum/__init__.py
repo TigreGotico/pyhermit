@@ -58,7 +58,7 @@ class DoubleDatatypeHandler(DatatypeHandler):
             raise MalformedLiteralException(f"Invalid double: {lexical_form!r}") from None
 
     def create_value_space_subset(
-        self, datatype_iri: str, facet_uris: tuple, facet_values: tuple
+        self, datatype_iri: str, facet_uris: tuple[str, ...], facet_values: tuple[object, ...]
     ) -> ValueSpaceSubset:
         return DoubleValueSpaceSubset(entire=True)
 

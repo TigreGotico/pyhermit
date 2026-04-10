@@ -18,13 +18,14 @@ from .class_expression import OWLClassExpression, OWLAnonymousClassExpression, O
     OWLObjectComplementOf
 from .owl_class import OWLClass
 from .nary_boolean_expression import OWLNaryBooleanClassExpression, OWLObjectUnionOf, OWLObjectIntersectionOf
+from ..vocab import OWLFacet
 from .restriction import (OWLRestriction, OWLQuantifiedRestriction, OWLQuantifiedObjectRestriction,
                           OWLObjectRestriction,
                           OWLHasValueRestriction, OWLDataRestriction, OWLCardinalityRestriction,
                           OWLObjectCardinalityRestriction, OWLObjectHasSelf,
                           OWLDataOneOf, OWLQuantifiedDataRestriction, OWLDataCardinalityRestriction,
                           OWLObjectSomeValuesFrom, OWLObjectAllValuesFrom, OWLObjectHasValue,
-                          OWLDatatypeRestriction, OWLFacet, OWLFacetRestriction,
+                          OWLDatatypeRestriction, OWLFacetRestriction,
                           OWLObjectMinCardinality,
                           OWLObjectMaxCardinality,
                           OWLObjectExactCardinality,

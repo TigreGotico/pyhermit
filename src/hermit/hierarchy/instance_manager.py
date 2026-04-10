@@ -59,6 +59,7 @@ class InstanceManager:
             self.m_tableau_monitor = self.m_reasoner.get_tableau().get_tableau_monitor()
             self.m_classes_initialised = False
             self.m_current_concept_hierarchy: Hierarchy[AtomicConcept] | None = None
+            self.m_current_role_hierarchy: Hierarchy[RoleElement] | None = None
             dlo = self.m_reasoner.get_dl_ontology()
             self.m_individuals = list(dlo.get_all_individuals())
             self.m_complex_roles: set[AtomicRole] = set()
@@ -298,6 +299,7 @@ class InstanceManager:
                         head_concept = head_predicate
                         body_concept = body_predicate
                         if concepts is not None and head_concept in concepts and body_concept in concepts:
+                            assert known_concept_subsumptions is not None
                             self._add_known_concept_subsumption(
                                 known_concept_subsumptions,
                                 body_concept,
@@ -311,6 +313,7 @@ class InstanceManager:
                         head_role = head_predicate
                         body_role = body_predicate
                         if roles is not None and head_role in roles and body_role in roles:
+                            assert known_role_subsumptions is not None
                             if (
                                 dl_clause.body_atom(0).argument(0)
                                 != dl_clause.head_atom(0).argument(0)
@@ -333,8 +336,9 @@ class InstanceManager:
     def _build_transitively_reduced_concept_hierarchy(
         self, known_subsumptions: Graph[AtomicConcept] | None
     ) -> Hierarchy[AtomicConcept]:
+        assert known_subsumptions is not None
         all_subsumers: dict[AtomicConcept, GraphNode[AtomicConcept]] = {}
-        for element in known_subsumptions.get_elements():  # type: ignore[union-attr]
+        for element in known_subsumptions.get_elements():
             all_subsumers[element] = GraphNode(
                 element, known_subsumptions.get_successors(element)
             )
@@ -410,8 +414,9 @@ class InstanceManager:
     def _build_transitively_reduced_role_hierarchy(
         self, known_subsumptions: Graph[Role] | None
     ) -> Hierarchy[RoleElement]:
+        assert known_subsumptions is not None
         all_subsumers: dict[Role, GraphNode[Role]] = {}
-        for role in known_subsumptions.get_elements():  # type: ignore[union-attr]
+        for role in known_subsumptions.get_elements():
             all_subsumers[role] = GraphNode(
                 role, known_subsumptions.get_successors(role)
             )
@@ -669,6 +674,7 @@ class InstanceManager:
                 if (
                     atomic_concept != self.m_top_concept
                     and not Prefixes.is_internal_iri(atomic_concept.iri)
+                    and self.m_current_concept_hierarchy is not None
                 ):
                     node = self.m_current_concept_hierarchy.get_node_for_element(
                         atomic_concept
@@ -854,9 +860,7 @@ class InstanceManager:
             self.m_interrupt_flag.check_interrupt()
 
     def _initialize_same_as(self) -> None:
-        self.m_individual_to_possible_equivalence_class: dict[
-            set[Individual], set[set[Individual]]
-        ] = {}
+        self.m_individual_to_possible_equivalence_class = {}
         for node in self.m_individuals_for_nodes:
             merged_into = node.get_merged_into()
             if merged_into is not None:
@@ -872,7 +876,7 @@ class InstanceManager:
                 )
                 if individual1_equivalences is None or individual2_equivalences is None:
                     continue
-                if node.get_merged_into_dependency_set() is None:
+                if node.merged_into_dependency_set is None:
                     individual1_equivalences.update(individual2_equivalences)
                     self.m_individual_to_equivalence_class[
                         individual2
@@ -892,6 +896,7 @@ class InstanceManager:
             self.m_interrupt_flag.check_interrupt()
 
     def _read_off_property_instances(self, node_for_individual: Node) -> None:
+        assert self.m_current_role_hierarchy is not None
         self.m_ternary_retrieval_1_bound.get_bindings_buffer()[1] = (
             node_for_individual
         )
@@ -1031,6 +1036,7 @@ class InstanceManager:
         completed_steps: int,
         steps: int,
     ) -> int:
+        assert self.m_current_role_hierarchy is not None
         ind_iri = ind.iri
         for atomic_role in self.m_complex_roles:
             concept_for_role = AtomicConcept.create(
@@ -1116,6 +1122,7 @@ class InstanceManager:
         individual1: Individual,
         individual2: Individual,
     ) -> None:
+        assert self.m_current_role_hierarchy is not None
         if element != self.m_top_role_element:
             current_node = self.m_current_role_hierarchy.get_node_for_element(
                 element
@@ -1141,6 +1148,7 @@ class InstanceManager:
         individual1: Individual,
         individual2: Individual,
     ) -> None:
+        assert self.m_current_role_hierarchy is not None
         if element != self.m_top_role_element:
             current_node = self.m_current_role_hierarchy.get_node_for_element(
                 element
@@ -1172,8 +1180,8 @@ class InstanceManager:
         self.m_role_realization_completed = True
         self.m_uses_classified_concept_hierarchy = True
         self.m_uses_classified_object_role_hierarchy = True
-        self.m_current_concept_hierarchy = None  # type: ignore[assignment]
-        self.m_current_role_hierarchy = None  # type: ignore[assignment]
+        self.m_current_concept_hierarchy = None
+        self.m_current_role_hierarchy = None
 
     # ------------------------------------------------------------------
     # Realisation
@@ -1189,6 +1197,7 @@ class InstanceManager:
                 monitor.reasoner_task_started(
                     "Computing instances for all classes"
                 )
+            assert self.m_current_concept_hierarchy is not None
             num_hierarchy_nodes = len(
                 self.m_current_concept_hierarchy.m_nodes_by_elements.values()
             )
@@ -1256,6 +1265,7 @@ class InstanceManager:
                 monitor.reasoner_task_started(
                     "Computing instances for all object properties..."
                 )
+            assert self.m_current_role_hierarchy is not None
             num_hierarchy_nodes = len(
                 self.m_current_role_hierarchy.m_nodes_by_elements.values()
             )
@@ -1497,6 +1507,7 @@ class InstanceManager:
         individual1: Individual,
         individual2: Individual,
     ) -> bool:
+        assert self.m_current_role_hierarchy is not None
         element = self.m_role_element_manager.get_role_element(role)
         current_node = self.m_current_role_hierarchy.get_node_for_element(element)
         if current_node is None:
@@ -1724,6 +1735,7 @@ class InstanceManager:
             else None
         )
         if possibly_same_equivalence_classes is not None:
+            assert self.m_individual_to_possible_equivalence_class is not None
             while possibly_same_equivalence_classes:
                 possibly_equivalent_class = next(
                     iter(possibly_same_equivalence_classes)
@@ -1738,7 +1750,7 @@ class InstanceManager:
                 possibly_equivalent_individual = next(
                     iter(possibly_equivalent_class)
                 )
-                if self._is_same_individual(
+                if self.is_same_individual(
                     next(iter(equivalence_class)), possibly_equivalent_individual
                 ):
                     equivalence_class.update(possibly_equivalent_class)
@@ -1778,7 +1790,7 @@ class InstanceManager:
                         other_equivalence_class, set()
                     ).__contains__(equivalence_class)
                 ):
-                    if self._is_same_individual(
+                    if self.is_same_individual(
                         next(iter(equivalence_class)),
                         next(iter(other_equivalence_class)),
                     ):
@@ -1804,7 +1816,7 @@ class InstanceManager:
         return not self.m_reasoner.get_tableau().is_satisfiable(
             True,
             False,
-            {Inequality.INSTANCE},  # type: ignore[arg-type]
+            {Inequality.INSTANCE},
             None,
             None,
             None,
@@ -1869,7 +1881,7 @@ class InstanceManager:
         actual_role = role
         if isinstance(role, InverseRole):
             ind1, ind2 = ind2, ind1
-            actual_role = role.m_inverted_role
+            actual_role = role.inverse_of
 
         # Get the tableau and extension manager
         tableau = self.m_reasoner.get_tableau()
@@ -1882,9 +1894,9 @@ class InstanceManager:
 
         # If we can get the actual nodes, check the extension manager
         if ind1_node is not None and ind2_node is not None:
-            result = extension_manager.contains_assertion_binary(
+            result = bool(extension_manager.contains_assertion_binary(
                 actual_role, ind1_node, ind2_node
-            )
+            ))
             if self.m_tableau_monitor is not None:
                 if result:
                     self.m_tableau_monitor.possible_instance_is_instance()
@@ -1894,7 +1906,7 @@ class InstanceManager:
 
         # Fallback: run a satisfiability test with the role assertion as a negative fact
         # to check if the role holds (if its negation causes contradiction)
-        role_atom = AtomCls.create(actual_role, ind1, ind2)
+        role_atom = AtomCls.create(actual_role, ind1, ind2)  # type: ignore[arg-type]
         result = not tableau.is_satisfiable(
             True,
             True,
