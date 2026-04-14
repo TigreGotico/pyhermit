@@ -178,7 +178,17 @@ class OWLNormalization:
                     (_AtomicRole.create(sub_iri), _AtomicRole.create(sup_iri))
                 )
         elif isinstance(axiom, OWLEquivalentDataPropertiesAxiom):
-            result.positive_facts.append(axiom)
+            from hermit.model import AtomicRole as _AtomicRole
+            props = list(axiom.properties())
+            iris = [_iri_str(p) for p in props]
+            valid_iris = [iri for iri in iris if iri is not None]
+            # Expand P ≡ Q ≡ … into pairwise inclusions (Pi ⊑ Pj) and (Pj ⊑ Pi)
+            for i in range(len(valid_iris)):
+                for j in range(i + 1, len(valid_iris)):
+                    r_i = _AtomicRole.create(valid_iris[i])
+                    r_j = _AtomicRole.create(valid_iris[j])
+                    result.data_property_inclusions.append((r_i, r_j))
+                    result.data_property_inclusions.append((r_j, r_i))
         elif isinstance(axiom, OWLDisjointDataPropertiesAxiom):
             from hermit.model import AtomicRole as _AtomicRole
             roles = [_iri_str(p) for p in axiom.properties()]
@@ -228,9 +238,11 @@ class OWLNormalization:
             role = _owl_prop_to_role(axiom.get_property())
             if role is not None:
                 if isinstance(role, AtomicRole):
-                    inv = InverseRole.create(role)
+                    inv: InverseRole | AtomicRole = InverseRole.create(role)
                 else:
-                    inv = role.get_named_role() if hasattr(role, "get_named_role") else role
+                    # role is InverseRole(R); its inverse is R itself
+                    assert isinstance(role, InverseRole)
+                    inv = role.inverse_of  # the underlying AtomicRole
                 result.simple_object_property_inclusions.append((role, inv))
         elif isinstance(axiom, OWLAsymmetricObjectPropertyAxiom):
             role = _owl_prop_to_role(axiom.get_property())

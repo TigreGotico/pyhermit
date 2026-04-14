@@ -159,6 +159,187 @@ class TestNormalizerFixes:
 
 
 # ---------------------------------------------------------------------------
+# Acceptance Criteria 1–6: End-to-end reasoner entailment tests
+# ---------------------------------------------------------------------------
+
+def _reasoner_from_owl_axioms(axioms: list, abox_axioms: list | None = None):
+    """Build a Reasoner from OWL axioms through the full normalization pipeline."""
+    from hermit.structural.owl_normalization import OWLNormalization
+    from hermit.structural.owl_clausification import OWLClausification
+    from hermit.reasoner import Reasoner
+
+    norm = OWLNormalization()
+    all_axioms = list(axioms) + (abox_axioms or [])
+    normalized = norm.process_ontology(all_axioms)
+    claus = OWLClausification()
+    dl_onto = claus.clausify(normalized, ontology_iri="urn:test:e2e")
+    return Reasoner(dl_onto)
+
+
+class TestEndToEndReasonerEntailments:
+    """End-to-end tests: OWL axioms → reasoner → entailment / inconsistency."""
+
+    def test_ac1_functional_property_causes_node_merge(self):
+        """AC1: R functional + R(a,b) + R(a,c) → ontology with ≤1R is consistent (b=c)."""
+        from hermit.owl_model.owl_axiom import (
+            OWLFunctionalObjectPropertyAxiom,
+            OWLObjectPropertyAssertionAxiom,
+        )
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+        from hermit.owl_model.iri import IRI
+
+        R = _make_owl_prop(R_IRI)
+        a = OWLNamedIndividual(IRI.create("http://example.org/a"))
+        b = OWLNamedIndividual(IRI.create("http://example.org/b"))
+        c = OWLNamedIndividual(IRI.create("http://example.org/c"))
+
+        axioms = [OWLFunctionalObjectPropertyAxiom(R)]
+        abox = [
+            OWLObjectPropertyAssertionAxiom(a, R, b),
+            OWLObjectPropertyAssertionAxiom(a, R, c),
+        ]
+        reasoner = _reasoner_from_owl_axioms(axioms, abox)
+        try:
+            # Functional property forces b=c — ontology should be consistent
+            assert reasoner.is_consistent()
+        finally:
+            reasoner.dispose()
+
+    def test_ac2_symmetric_property_entails_inverse(self):
+        """AC2: SymmetricProperty(R) + R(a,b) + DisjointProperties(R,S) + S(b,a) → inconsistent.
+
+        If R is symmetric, R(a,b) entails R(b,a). Combined with S(b,a) and
+        DisjointObjectProperties(R,S), this creates an inconsistency, proving
+        that the symmetric inclusion was correctly clausified.
+        """
+        from hermit.owl_model.owl_axiom import (
+            OWLSymmetricObjectPropertyAxiom,
+            OWLDisjointObjectPropertiesAxiom,
+            OWLObjectPropertyAssertionAxiom,
+        )
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+        from hermit.owl_model.iri import IRI
+
+        R = _make_owl_prop(R_IRI)
+        S = _make_owl_prop(S_IRI)
+        a_owl = OWLNamedIndividual(IRI.create("http://example.org/a"))
+        b_owl = OWLNamedIndividual(IRI.create("http://example.org/b"))
+
+        axioms = [
+            OWLSymmetricObjectPropertyAxiom(R),
+            OWLDisjointObjectPropertiesAxiom([R, S]),
+        ]
+        abox = [
+            OWLObjectPropertyAssertionAxiom(a_owl, R, b_owl),
+            OWLObjectPropertyAssertionAxiom(b_owl, S, a_owl),
+        ]
+        reasoner = _reasoner_from_owl_axioms(axioms, abox)
+        try:
+            # If R is symmetric: R(a,b) → R(b,a). But Disjoint(R,S) + R(b,a) + S(b,a) → ⊥
+            assert not reasoner.is_consistent()
+        finally:
+            reasoner.dispose()
+
+    def test_ac3_asymmetric_property_detects_inconsistency(self):
+        """AC3: AsymmetricProperty(R) + R(a,b) + R(b,a) → inconsistent."""
+        from hermit.owl_model.owl_axiom import (
+            OWLAsymmetricObjectPropertyAxiom,
+            OWLObjectPropertyAssertionAxiom,
+        )
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+        from hermit.owl_model.iri import IRI
+
+        R = _make_owl_prop(R_IRI)
+        a_owl = OWLNamedIndividual(IRI.create("http://example.org/a"))
+        b_owl = OWLNamedIndividual(IRI.create("http://example.org/b"))
+
+        axioms = [OWLAsymmetricObjectPropertyAxiom(R)]
+        abox = [
+            OWLObjectPropertyAssertionAxiom(a_owl, R, b_owl),
+            OWLObjectPropertyAssertionAxiom(b_owl, R, a_owl),
+        ]
+        reasoner = _reasoner_from_owl_axioms(axioms, abox)
+        try:
+            assert not reasoner.is_consistent()
+        finally:
+            reasoner.dispose()
+
+    def test_ac4_reflexive_property_entails_self_loop(self):
+        """AC4: ReflexiveProperty(R) + IrreflexiveProperty(R) + individual → inconsistent.
+
+        If R is reflexive, R(a,a) holds for any individual a. Combined with
+        IrreflexiveProperty(R) (which clausifies to R(x,x) → ⊥), any individual
+        triggers inconsistency, proving the reflexive clause was generated.
+        """
+        from hermit.owl_model.owl_axiom import (
+            OWLReflexiveObjectPropertyAxiom,
+            OWLIrreflexiveObjectPropertyAxiom,
+            OWLClassAssertionAxiom,
+        )
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+        from hermit.owl_model.class_expression.owl_class import OWLClass
+        from hermit.owl_model.iri import IRI
+
+        R = _make_owl_prop(R_IRI)
+        a_owl = OWLNamedIndividual(IRI.create("http://example.org/a"))
+        thing = OWLClass(IRI.create("http://www.w3.org/2002/07/owl#Thing"))
+
+        axioms = [OWLReflexiveObjectPropertyAxiom(R), OWLIrreflexiveObjectPropertyAxiom(R)]
+        abox = [OWLClassAssertionAxiom(a_owl, thing)]
+        reasoner = _reasoner_from_owl_axioms(axioms, abox)
+        try:
+            # Reflexive(R) generates R(a,a); Irreflexive(R) makes R(x,x) → ⊥ → inconsistent
+            assert not reasoner.is_consistent()
+        finally:
+            reasoner.dispose()
+
+    def test_ac5_irreflexive_property_detects_self_loop_inconsistency(self):
+        """AC5: IrreflexiveProperty(R) + R(a,a) → inconsistent."""
+        from hermit.owl_model.owl_axiom import (
+            OWLIrreflexiveObjectPropertyAxiom,
+            OWLObjectPropertyAssertionAxiom,
+        )
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+        from hermit.owl_model.iri import IRI
+
+        R = _make_owl_prop(R_IRI)
+        a_owl = OWLNamedIndividual(IRI.create("http://example.org/a"))
+
+        axioms = [OWLIrreflexiveObjectPropertyAxiom(R)]
+        abox = [OWLObjectPropertyAssertionAxiom(a_owl, R, a_owl)]
+        reasoner = _reasoner_from_owl_axioms(axioms, abox)
+        try:
+            assert not reasoner.is_consistent()
+        finally:
+            reasoner.dispose()
+
+    def test_ac6_disjoint_properties_detects_inconsistency(self):
+        """AC6: DisjointObjectProperties(R,S) + R(a,b) + S(a,b) → inconsistent."""
+        from hermit.owl_model.owl_axiom import (
+            OWLDisjointObjectPropertiesAxiom,
+            OWLObjectPropertyAssertionAxiom,
+        )
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+        from hermit.owl_model.iri import IRI
+
+        R = _make_owl_prop(R_IRI)
+        S = _make_owl_prop(S_IRI)
+        a_owl = OWLNamedIndividual(IRI.create("http://example.org/a"))
+        b_owl = OWLNamedIndividual(IRI.create("http://example.org/b"))
+
+        axioms = [OWLDisjointObjectPropertiesAxiom([R, S])]
+        abox = [
+            OWLObjectPropertyAssertionAxiom(a_owl, R, b_owl),
+            OWLObjectPropertyAssertionAxiom(a_owl, S, b_owl),
+        ]
+        reasoner = _reasoner_from_owl_axioms(axioms, abox)
+        try:
+            assert not reasoner.is_consistent()
+        finally:
+            reasoner.dispose()
+
+
+# ---------------------------------------------------------------------------
 # Acceptance Criterion 7: DLOntology.has_nominals()
 # ---------------------------------------------------------------------------
 

@@ -1318,12 +1318,12 @@ class TestOWLNormalization:
             OWLFunctionalDataPropertyAxiom(p),
         ]
         result = norm.process_ontology(axioms)
-        # sub-data-property -> data_property_inclusions (1)
-        assert len(result.data_property_inclusions) == 1
+        # sub-data-property -> data_property_inclusions (1); equivalent -> 2 more inclusions
+        assert len(result.data_property_inclusions) == 3
         # disjoint-data-properties -> disjoint_data_properties (1)
         assert len(result.disjoint_data_properties) == 1
-        # equivalent, range, functional -> positive_facts (3 still go through)
-        assert len(result.positive_facts) == 3
+        # range and functional -> positive_facts (2 still go through)
+        assert len(result.positive_facts) == 2
 
 
     def test_process_object_property_domain_range(self):

@@ -371,7 +371,8 @@ class TestOwlNormalizationUnusedPaths:
         from hermit.owl_model.owl_axiom import OWLEquivalentDataPropertiesAxiom
         axiom = OWLEquivalentDataPropertiesAxiom([_mk_data_prop("D1"), _mk_data_prop("D2")])
         na = _run_normalization([axiom])
-        assert len(na.positive_facts) >= 1
+        # P ≡ Q expands to (P ⊑ Q) and (Q ⊑ P) in data_property_inclusions
+        assert len(na.data_property_inclusions) == 2
 
     def test_disjoint_data_properties(self) -> None:
         from hermit.owl_model.owl_axiom import OWLDisjointDataPropertiesAxiom
