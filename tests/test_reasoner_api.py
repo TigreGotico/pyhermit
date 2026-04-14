@@ -1965,12 +1965,12 @@ class TestDatalog:
             def process_result(self, query, result):
                 results.append(result)
 
-        # Query with atoms — just verify it runs without errors
-        atom = Atom.create(dog, fido)
-        query = ConjunctiveQuery(engine, [atom], [fido])
+        # Query with atoms — use a variable to scan all Dog individuals
+        atom = Atom.create(dog, X)
+        query = ConjunctiveQuery(engine, [atom], [X])
         query.evaluate(Collector())
-        # With atoms, no results are returned by the simple impl
-        assert len(results) == 0
+        # fido is a Dog, so at least one result should be returned
+        assert len(results) >= 1
 
     def test_conjunctive_query_accessors(self):
         from hermit.datalog import DatalogEngine, ConjunctiveQuery

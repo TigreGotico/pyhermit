@@ -15,10 +15,12 @@ class DoubleValueSpaceSubset(ValueSpaceSubset):
         values: frozenset[float] | None = None,
         empty: bool = False,
         entire: bool = False,
+        _negated: bool = False,
     ):
-        self._empty = empty or (values is not None and len(values) == 0)
+        self._empty = empty or (values is not None and len(values) == 0 and not _negated)
         self._entire = entire and not self._empty
         self._values = values if values is not None else frozenset()
+        self._negated = _negated and not self._entire and not self._empty
 
     def is_empty(self) -> bool:
         return self._empty
@@ -26,6 +28,10 @@ class DoubleValueSpaceSubset(ValueSpaceSubset):
     def contains(self, value: Any) -> bool:
         if self._entire:
             return isinstance(value, float)
+        if self._empty:
+            return False
+        if self._negated:
+            return isinstance(value, float) and value not in self._values
         return value in self._values
 
     def intersect(self, other: ValueSpaceSubset) -> ValueSpaceSubset:
@@ -34,6 +40,17 @@ class DoubleValueSpaceSubset(ValueSpaceSubset):
                 return other
             if other._entire:
                 return self
+            if self._empty or other._empty:
+                return DoubleValueSpaceSubset(empty=True)
+            if self._negated and other._negated:
+                # complement(A) ∩ complement(B) = complement(A ∪ B)
+                return DoubleValueSpaceSubset(values=self._values | other._values, _negated=True)
+            if self._negated:
+                # complement(A) ∩ B = B - A
+                return DoubleValueSpaceSubset(values=other._values - self._values)
+            if other._negated:
+                # A ∩ complement(B) = A - B
+                return DoubleValueSpaceSubset(values=self._values - other._values)
             return DoubleValueSpaceSubset(values=self._values & other._values)
         return DoubleValueSpaceSubset(empty=True)
 
@@ -42,7 +59,11 @@ class DoubleValueSpaceSubset(ValueSpaceSubset):
             return DoubleValueSpaceSubset(empty=True)
         if self._empty:
             return DoubleValueSpaceSubset(entire=True)
-        return DoubleValueSpaceSubset(values=frozenset())  # simplified
+        if self._negated:
+            # complement of complement(A) = A
+            return DoubleValueSpaceSubset(values=self._values)
+        # complement of finite set = negated finite set
+        return DoubleValueSpaceSubset(values=self._values, _negated=True)
 
 
 class DoubleDatatypeHandler(DatatypeHandler):

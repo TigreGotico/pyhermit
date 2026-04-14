@@ -9,6 +9,18 @@ from collections import deque
 from typing import TYPE_CHECKING, Any
 
 from hermit.graph import Graph
+
+
+class _IdentitySet(set):  # type: ignore[type-arg]
+    """A set whose hash and equality are identity-based (like Java IdentityHashMap keys)."""
+
+    def __hash__(self) -> int:  # type: ignore[override]
+        return id(self)
+
+    def __eq__(self, other: object) -> bool:
+        return self is other
+
+
 from hermit.hierarchy.atomic_concept_element import AtomicConceptElement
 from hermit.hierarchy.deterministic_classification import (
     DeterministicClassification,
@@ -58,6 +70,7 @@ class InstanceManager:
             self.m_reasoner = reasoner
             self.m_tableau_monitor = self.m_reasoner.get_tableau().get_tableau_monitor()
             self.m_classes_initialised = False
+            self.m_properties_initialised = False
             self.m_current_concept_hierarchy: Hierarchy[AtomicConcept] | None = None
             self.m_current_role_hierarchy: Hierarchy[RoleElement] | None = None
             dlo = self.m_reasoner.get_dl_ontology()
@@ -69,7 +82,7 @@ class InstanceManager:
             self.m_nodes_for_individuals: dict[Individual, Node | None] = {}
             for individual in self.m_individuals:
                 self.m_nodes_for_individuals[individual] = None
-                equivalent_individuals: set[Individual] = {individual}
+                equivalent_individuals: _IdentitySet = _IdentitySet({individual})
                 self.m_individual_to_equivalence_class[
                     individual
                 ] = equivalent_individuals

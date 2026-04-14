@@ -81,9 +81,9 @@ class DatalogEngine:
                 parameters={},
             )
 
-            # Materialize: run tableau to fixpoint
+            # Materialize: run tableau to fixpoint, loading permanent ABox
             is_consistent = tableau.is_satisfiable(
-                False,  # load_permanent_abox (positional arg)
+                True,  # load_permanent_abox
             )
 
             if is_consistent:
@@ -175,13 +175,138 @@ class ConjunctiveQuery:
         Args:
             collector: Callback to process each result
         """
-        # For now, simplified implementation
-        # A full implementation would use DLClauseEvaluator workers
-        # to systematically search for all satisfying bindings
-
-        # Simple case: if no query atoms, return empty binding
         if not self.query_atoms:
             collector.process_result(self, self.result_buffer)
+            return
+
+        if self.datalog_engine.extension_manager is None:
+            return
+
+        self._evaluate_recursive(0, {}, collector)
+
+    def _evaluate_recursive(
+        self,
+        atom_index: int,
+        bindings: dict[Any, Any],
+        collector: QueryResultCollector,
+    ) -> None:
+        """Recursively bind variables and collect matching results."""
+        from hermit.model import Variable, AtomicConcept, AtomicRole, InverseRole
+
+        if atom_index == len(self.query_atoms):
+            # All atoms matched — fill result buffer and collect.
+            result = list(self.answer_terms)
+            for i, term in enumerate(self.answer_terms):
+                if isinstance(term, Variable):
+                    result[i] = bindings.get(term, term)
+            collector.process_result(self, result)
+            return
+
+        atom = self.query_atoms[atom_index]
+        predicate = atom.predicate
+        ext_manager = self.datalog_engine.extension_manager
+
+        if atom.arity() == 1:
+            # Unary atom: concept assertion C(x)
+            arg = atom.argument(0)
+            is_bound = isinstance(arg, Variable) and arg in bindings
+            if is_bound or not isinstance(arg, Variable):
+                # Check directly
+                node = bindings.get(arg, arg) if isinstance(arg, Variable) else arg
+                retrieval = ext_manager.get_binary_extension_table().create_retrieval(
+                    [True, True], "TOTAL"
+                )
+                buf = retrieval.get_bindings_buffer()
+                buf[0] = predicate
+                buf[1] = node
+                retrieval.open()
+                if not retrieval.after_last():
+                    self._evaluate_recursive(atom_index + 1, bindings, collector)
+            else:
+                # Scan all nodes with this concept
+                retrieval = ext_manager.get_binary_extension_table().create_retrieval(
+                    [True, False], "TOTAL"
+                )
+                retrieval.get_bindings_buffer()[0] = predicate
+                retrieval.open()
+                tup = retrieval.get_tuple_buffer()
+                while not retrieval.after_last():
+                    node = tup[1]
+                    new_bindings = dict(bindings)
+                    new_bindings[arg] = node
+                    self._evaluate_recursive(atom_index + 1, new_bindings, collector)
+                    retrieval.next()
+
+        elif atom.arity() == 2:
+            # Binary atom: role assertion R(x, y)
+            arg0 = atom.argument(0)
+            arg1 = atom.argument(1)
+            bound0 = not isinstance(arg0, Variable) or arg0 in bindings
+            bound1 = not isinstance(arg1, Variable) or arg1 in bindings
+
+            val0 = bindings.get(arg0, arg0) if isinstance(arg0, Variable) else arg0
+            val1 = bindings.get(arg1, arg1) if isinstance(arg1, Variable) else arg1
+
+            if bound0 and bound1:
+                retrieval = ext_manager.get_ternary_extension_table().create_retrieval(
+                    [True, True, True], "TOTAL"
+                )
+                buf = retrieval.get_bindings_buffer()
+                buf[0] = predicate
+                buf[1] = val0
+                buf[2] = val1
+                retrieval.open()
+                if not retrieval.after_last():
+                    self._evaluate_recursive(atom_index + 1, bindings, collector)
+            elif bound0:
+                retrieval = ext_manager.get_ternary_extension_table().create_retrieval(
+                    [True, True, False], "TOTAL"
+                )
+                buf = retrieval.get_bindings_buffer()
+                buf[0] = predicate
+                buf[1] = val0
+                retrieval.open()
+                tup = retrieval.get_tuple_buffer()
+                while not retrieval.after_last():
+                    node1 = tup[2]
+                    new_bindings = dict(bindings)
+                    if isinstance(arg1, Variable):
+                        new_bindings[arg1] = node1
+                    self._evaluate_recursive(atom_index + 1, new_bindings, collector)
+                    retrieval.next()
+            elif bound1:
+                retrieval = ext_manager.get_ternary_extension_table().create_retrieval(
+                    [True, False, True], "TOTAL"
+                )
+                buf = retrieval.get_bindings_buffer()
+                buf[0] = predicate
+                buf[2] = val1
+                retrieval.open()
+                tup = retrieval.get_tuple_buffer()
+                while not retrieval.after_last():
+                    node0 = tup[1]
+                    new_bindings = dict(bindings)
+                    if isinstance(arg0, Variable):
+                        new_bindings[arg0] = node0
+                    self._evaluate_recursive(atom_index + 1, new_bindings, collector)
+                    retrieval.next()
+            else:
+                retrieval = ext_manager.get_ternary_extension_table().create_retrieval(
+                    [True, False, False], "TOTAL"
+                )
+                retrieval.get_bindings_buffer()[0] = predicate
+                retrieval.open()
+                tup = retrieval.get_tuple_buffer()
+                while not retrieval.after_last():
+                    node0 = tup[1]
+                    node1 = tup[2]
+                    new_bindings = dict(bindings)
+                    if isinstance(arg0, Variable):
+                        new_bindings[arg0] = node0
+                    if isinstance(arg1, Variable):
+                        new_bindings[arg1] = node1
+                    self._evaluate_recursive(atom_index + 1, new_bindings, collector)
+                    retrieval.next()
 
     def get_query_atom_count(self) -> int:
         """Get the number of atoms in the query."""

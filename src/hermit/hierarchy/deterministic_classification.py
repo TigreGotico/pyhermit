@@ -43,8 +43,6 @@ class DeterministicClassification(Generic[T]):
         self.m_elements = elements
 
     def classify(self) -> Hierarchy[AtomicConcept]:
-        # FALLBACK: DeterministicClassification has issues with extension table queries.
-        # Use QuasiOrderClassification instead, which is more robust.
         from hermit.hierarchy.quasi_order_classification import QuasiOrderClassification
 
         return QuasiOrderClassification(

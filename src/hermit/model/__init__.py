@@ -2002,7 +2002,7 @@ class DLOntology:
         self._has_datatypes = self._check_datatypes(dl_clauses)
         self._is_horn = all(c.head_length() <= 1 for c in dl_clauses)
         self._has_at_most = False
-        self._has_nominals = False
+        self._has_nominals = self._check_nominals(dl_clauses, positive_facts)
         self._all_desc_graphs = self._collect_graphs(dl_clauses)
         self._data_prop_assertions: dict[AtomicRole, dict[Individual, set[Constant]]] = {}
 
@@ -2122,7 +2122,26 @@ class DLOntology:
         for atom in DLOntology._atoms_from_clauses(clauses):
             if isinstance(atom.predicate, AtomicRole):
                 obj.add(atom.predicate)
+        for atom in pos:
+            if isinstance(atom.predicate, AtomicRole) and atom.predicate.arity() == 2:
+                obj.add(atom.predicate)
+        for atom in neg:
+            if isinstance(atom.predicate, AtomicRole) and atom.predicate.arity() == 2:
+                obj.add(atom.predicate)
         return frozenset(obj), frozenset(data)
+
+    @staticmethod
+    def _check_nominals(
+        clauses: frozenset[DLClause],
+        pos: frozenset[Atom],
+    ) -> bool:
+        for atom in DLOntology._atoms_from_clauses(clauses):
+            if isinstance(atom.predicate, AtomicConcept) and atom.predicate.iri.startswith("internal:nom#"):
+                return True
+        for atom in pos:
+            if isinstance(atom.predicate, AtomicConcept) and atom.predicate.iri.startswith("internal:nom#"):
+                return True
+        return False
 
     @staticmethod
     def _check_inverses(

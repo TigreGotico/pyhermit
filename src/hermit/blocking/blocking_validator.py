@@ -15,14 +15,14 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from hermit.model import AnnotatedEquality, Equality
+
 if TYPE_CHECKING:
     from hermit.model import (
-        AnnotatedEquality,
         AtLeastConcept,
         AtomicConcept,
         AtomicRole,
         DLClause,
-        Equality,
         Variable,
     )
     from hermit.tableau import ExtensionManager, Node, Tableau
@@ -268,16 +268,18 @@ class DLClauseInfo:
             yx_roles = y2x_roles.get(y_var)
 
             if xy_roles is not None:
-                x2y_retrievals.append(
-                    extension_manager.get_ternary_extension_table().create_retrieval([True, True, False], "TOTAL")
-                )
-                x2y_role_list.append(next(iter(xy_roles)))
-                num_xy_roles += 1
+                for role in xy_roles:
+                    x2y_retrievals.append(
+                        extension_manager.get_ternary_extension_table().create_retrieval([True, True, False], "TOTAL")
+                    )
+                    x2y_role_list.append(role)
+                    num_xy_roles += 1
             if yx_roles is not None:
-                y2x_retrievals.append(
-                    extension_manager.get_ternary_extension_table().create_retrieval([True, False, True], "TOTAL")
-                )
-                y2x_role_list.append(next(iter(yx_roles)))
+                for role in yx_roles:
+                    y2x_retrievals.append(
+                        extension_manager.get_ternary_extension_table().create_retrieval([True, False, True], "TOTAL")
+                    )
+                    y2x_role_list.append(role)
 
             self.m_y_constraints.append(
                 _YConstraint(y_concepts_list, list(xy_roles) if xy_roles else [], list(yx_roles) if yx_roles else [])
@@ -897,6 +899,7 @@ class BlockingValidator:
                 retrieval = dl_clause_info.m_x2y_retrievals[to_match_index_x_to_y]
                 retrieval.get_bindings_buffer()[0] = dl_clause_info.m_x2y_roles[to_match_index_x_to_y]
                 retrieval.get_bindings_buffer()[1] = nonblocked_x
+                y_node_index = 2
             else:
                 y_to_x_increment = 1
                 retrieval = dl_clause_info.m_y2x_retrievals[to_match_index_y_to_x]
