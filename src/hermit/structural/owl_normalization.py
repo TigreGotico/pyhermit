@@ -161,18 +161,30 @@ class OWLNormalization:
         elif isinstance(axiom, OWLEquivalentObjectPropertiesAxiom):
             self._process_equivalent_object_properties(axiom, result)
         elif isinstance(axiom, OWLDisjointObjectPropertiesAxiom):
-            # Disjoint properties: store in result
-            result.positive_facts.append(axiom)
+            roles = [_owl_prop_to_role(p) for p in axiom.properties()]
+            valid_roles = [r for r in roles if r is not None]
+            if len(valid_roles) >= 2:
+                result.disjoint_object_properties.append(tuple(valid_roles))
         elif isinstance(axiom, OWLObjectPropertyDomainAxiom):
             self._process_object_property_domain(axiom, result)
         elif isinstance(axiom, OWLObjectPropertyRangeAxiom):
             self._process_object_property_range(axiom, result)
         elif isinstance(axiom, OWLSubDataPropertyOfAxiom):
-            result.positive_facts.append(axiom)
+            from hermit.model import AtomicRole as _AtomicRole
+            sub_iri = _iri_str(axiom.get_sub_property())
+            sup_iri = _iri_str(axiom.get_super_property())
+            if sub_iri is not None and sup_iri is not None:
+                result.data_property_inclusions.append(
+                    (_AtomicRole.create(sub_iri), _AtomicRole.create(sup_iri))
+                )
         elif isinstance(axiom, OWLEquivalentDataPropertiesAxiom):
             result.positive_facts.append(axiom)
         elif isinstance(axiom, OWLDisjointDataPropertiesAxiom):
-            result.positive_facts.append(axiom)
+            from hermit.model import AtomicRole as _AtomicRole
+            roles = [_iri_str(p) for p in axiom.properties()]
+            valid_roles = [_AtomicRole.create(iri) for iri in roles if iri is not None]
+            if len(valid_roles) >= 2:
+                result.disjoint_data_properties.append(tuple(valid_roles))
         elif isinstance(axiom, OWLDataPropertyDomainAxiom):
             self._process_data_property_domain(axiom, result)
         elif isinstance(axiom, OWLDataPropertyRangeAxiom):
@@ -190,14 +202,40 @@ class OWLNormalization:
         elif isinstance(axiom, OWLNegativeDataPropertyAssertionAxiom):
             result.negative_facts.append(axiom)
         elif isinstance(axiom, OWLFunctionalObjectPropertyAxiom):
-            # ∃R.Self ⊓ ∃R⁻.Self ⊑ ⊥ (added via property constraints)
-            result.positive_facts.append(axiom)
+            from hermit.model import Atom, DLClause, Variable, Equality
+            role = _owl_prop_to_role(axiom.get_property())
+            if role is not None:
+                xv = Variable.create("X")
+                yv = Variable.create("Y")
+                zv = Variable.create("Z")
+                from hermit.structural.owl_clausification import _role_atom  # type: ignore[attr-defined]
+                head = (Atom.create(Equality.INSTANCE, yv, zv),)
+                body = (_role_atom(role, xv, yv), _role_atom(role, xv, zv))
+                result.direct_dl_clauses.append(DLClause.create(head, body))
         elif isinstance(axiom, OWLInverseFunctionalObjectPropertyAxiom):
-            result.positive_facts.append(axiom)
+            from hermit.model import Atom, DLClause, Variable, Equality
+            role = _owl_prop_to_role(axiom.get_property())
+            if role is not None:
+                xv = Variable.create("X")
+                yv = Variable.create("Y")
+                zv = Variable.create("Z")
+                from hermit.structural.owl_clausification import _role_atom  # type: ignore[attr-defined]
+                head = (Atom.create(Equality.INSTANCE, xv, yv),)
+                body = (_role_atom(role, xv, zv), _role_atom(role, yv, zv))
+                result.direct_dl_clauses.append(DLClause.create(head, body))
         elif isinstance(axiom, OWLSymmetricObjectPropertyAxiom):
-            result.positive_facts.append(axiom)
+            from hermit.model import InverseRole, AtomicRole
+            role = _owl_prop_to_role(axiom.get_property())
+            if role is not None:
+                if isinstance(role, AtomicRole):
+                    inv = InverseRole.create(role)
+                else:
+                    inv = role.get_named_role() if hasattr(role, "get_named_role") else role
+                result.simple_object_property_inclusions.append((role, inv))
         elif isinstance(axiom, OWLAsymmetricObjectPropertyAxiom):
-            result.positive_facts.append(axiom)
+            role = _owl_prop_to_role(axiom.get_property())
+            if role is not None:
+                result.asymmetric_object_properties.add(role)
         elif isinstance(axiom, OWLTransitiveObjectPropertyAxiom):
             # Transitivity: R ∘ R ⊑ R  →  complex property inclusion
             from hermit.structural.normalized_axioms import ComplexObjectPropertyInclusion
@@ -206,11 +244,14 @@ class OWLNormalization:
                 result.complex_object_property_inclusions.append(
                     ComplexObjectPropertyInclusion.transitivity(role)
                 )
-            result.positive_facts.append(axiom)
         elif isinstance(axiom, OWLReflexiveObjectPropertyAxiom):
-            result.positive_facts.append(axiom)
+            role = _owl_prop_to_role(axiom.get_property())
+            if role is not None:
+                result.reflexive_object_properties.add(role)
         elif isinstance(axiom, OWLIrreflexiveObjectPropertyAxiom):
-            result.positive_facts.append(axiom)
+            role = _owl_prop_to_role(axiom.get_property())
+            if role is not None:
+                result.irreflexive_object_properties.add(role)
         elif isinstance(axiom, OWLFunctionalDataPropertyAxiom):
             result.positive_facts.append(axiom)
         elif isinstance(axiom, OWLInverseObjectPropertiesAxiom):

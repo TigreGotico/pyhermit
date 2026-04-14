@@ -1212,7 +1212,20 @@ class TestOWLNormalization:
             OWLInverseFunctionalObjectPropertyAxiom(r),
         ]
         result = norm.process_ontology(axioms)
-        assert len(result.positive_facts) == 7
+        # functional and inverse-functional -> direct_dl_clauses (2 clauses)
+        assert len(result.direct_dl_clauses) == 2
+        # symmetric -> simple_object_property_inclusions (1 inclusion)
+        assert len(result.simple_object_property_inclusions) >= 1
+        # asymmetric -> asymmetric_object_properties
+        assert len(result.asymmetric_object_properties) == 1
+        # reflexive -> reflexive_object_properties
+        assert len(result.reflexive_object_properties) == 1
+        # irreflexive -> irreflexive_object_properties
+        assert len(result.irreflexive_object_properties) == 1
+        # transitive -> complex_object_property_inclusions
+        assert len(result.complex_object_property_inclusions) == 1
+        # nothing falls through to positive_facts
+        assert len(result.positive_facts) == 0
 
 
     def test_process_individual_axioms(self):
@@ -1305,7 +1318,12 @@ class TestOWLNormalization:
             OWLFunctionalDataPropertyAxiom(p),
         ]
         result = norm.process_ontology(axioms)
-        assert len(result.positive_facts) == 5
+        # sub-data-property -> data_property_inclusions (1)
+        assert len(result.data_property_inclusions) == 1
+        # disjoint-data-properties -> disjoint_data_properties (1)
+        assert len(result.disjoint_data_properties) == 1
+        # equivalent, range, functional -> positive_facts (3 still go through)
+        assert len(result.positive_facts) == 3
 
 
     def test_process_object_property_domain_range(self):
@@ -1342,7 +1360,7 @@ class TestOWLNormalization:
         s = OWLObjectProperty(IRI.create("http://ex.org#s"))
         axiom = OWLDisjointObjectPropertiesAxiom((r, s))
         result = norm.process_ontology([axiom])
-        assert len(result.positive_facts) == 1
+        assert len(result.disjoint_object_properties) == 1
 
 
 # ===========================================================================
