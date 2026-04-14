@@ -12,7 +12,7 @@
 - [x] Step 8 — Fix merging manager: copy n-ary description-graph tuples during node merge (`src/hermit/tableau/merging_manager.py`) — already implemented via `DescriptionGraphManager.merge_graphs`
 - [x] Step 9 — Implement `DeterministicClassification.classify()`: delegates to QuasiOrderClassification (correct fallback) (`src/hermit/hierarchy/deterministic_classification.py:45–56`)
 - [x] Step 10 — Implement `Query.evaluate()`: conjunctive query answering with nested-loop join (`src/hermit/datalog/__init__.py:172–184`)
-- [ ] Step 11 — Write regression tests for all 12 acceptance criteria in `spec.md`
+- [x] Step 11 — Write regression tests for all 12 acceptance criteria in `spec.md`
 
 ## Blockers
 <!-- populated by /implement-task if something is stuck -->
