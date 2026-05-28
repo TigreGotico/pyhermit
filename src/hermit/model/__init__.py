@@ -1988,6 +1988,8 @@ class DLOntology:
         dl_clauses: frozenset[DLClause] = frozenset(),
         positive_facts: frozenset[Atom] = frozenset(),
         negative_facts: frozenset[Atom] = frozenset(),
+        has_inverse_roles: bool | None = None,
+        has_nominals: bool | None = None,
     ) -> None:
         self._ontology_iri = ontology_iri
         self._dl_clauses = dl_clauses
@@ -1998,11 +2000,18 @@ class DLOntology:
         self._all_concepts = self._collect_concepts(dl_clauses, positive_facts, negative_facts)
         self._all_individuals = self._collect_individuals(dl_clauses, positive_facts, negative_facts)
         self._all_obj_roles, self._all_data_roles = self._collect_roles(dl_clauses, positive_facts, negative_facts)
+        # Detect expressivity from the clausal form; OR in caller-supplied flags
+        # (the clausifier sees inverses/nominals at the axiom level, before they may
+        # be normalised away in the clauses, so its detection can only add coverage).
         self._has_inverse_roles = self._check_inverses(dl_clauses, positive_facts, negative_facts)
+        if has_inverse_roles is not None:
+            self._has_inverse_roles = self._has_inverse_roles or has_inverse_roles
         self._has_datatypes = self._check_datatypes(dl_clauses)
         self._is_horn = all(c.head_length() <= 1 for c in dl_clauses)
         self._has_at_most = False
         self._has_nominals = self._check_nominals(dl_clauses, positive_facts)
+        if has_nominals is not None:
+            self._has_nominals = self._has_nominals or has_nominals
         self._all_desc_graphs = self._collect_graphs(dl_clauses)
         self._data_prop_assertions: dict[AtomicRole, dict[Individual, set[Constant]]] = {}
 
@@ -2194,7 +2203,7 @@ class DLOntology:
         """Check whether the ontology has unknown datatype restrictions."""
         return False
 
-    def get_all_unknown_datatype_restrictions(self) -> frozenset["DatatypeRestriction"]:
+    def get_all_unknown_datatype_restrictions(self) -> frozenset[DatatypeRestriction]:
         """Return all unknown datatype restrictions (empty set by default)."""
         return frozenset()
 

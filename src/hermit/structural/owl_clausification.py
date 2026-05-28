@@ -205,9 +205,11 @@ class OWLClausification:
                 )
 
         # -- Expressivity flags --
-        # (These are computed but not passed to DLOntology in the current model)
-        self._has_inverses(axioms)
-        self._has_nominals_check(axioms)
+        # Detected at the axiom level (before inverse roles may be normalised into
+        # swapped atomic atoms during clausification) and passed to DLOntology so the
+        # tableau loads the permanent ABox for nominal/inverse ontologies.
+        has_inverses = self._has_inverses(axioms)
+        has_nominals = self._has_nominals_check(axioms)
 
         # -- SWRL rule clausification --
         if axioms.rules:
@@ -223,6 +225,8 @@ class OWLClausification:
             dl_clauses=frozenset(dl_clauses),
             positive_facts=frozenset(positive_facts),
             negative_facts=frozenset(negative_facts),
+            has_inverse_roles=has_inverses,
+            has_nominals=has_nominals,
         )
 
     # -- Helpers ----------------------------------------------------------------

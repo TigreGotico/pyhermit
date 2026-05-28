@@ -552,3 +552,37 @@ class TestConjunctiveQueryEvaluate:
         query = ConjunctiveQuery(engine, [Atom.create(animal, X)], [X])
         query.evaluate(Collector())
         assert len(results) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Acceptance Criterion 12: clausifier wires expressivity flags into DLOntology
+# (has_inverse_roles / has_nominals must reflect the source axioms so the tableau
+# loads the permanent ABox for inverse/nominal ontologies — FAITHFULNESS_AUDIT Bug 4).
+# ---------------------------------------------------------------------------
+
+class TestExpressivityFlagWiring:
+    def test_override_can_only_add_inverse_detection(self):
+        """A caller-supplied has_inverse_roles=True is honoured even with no InverseRole clauses."""
+        ont = DLOntology(dl_clauses=frozenset(), positive_facts=frozenset(), has_inverse_roles=True)
+        assert ont.has_inverse_roles() is True
+
+    def test_override_false_does_not_suppress_self_detection(self):
+        """OR semantics: a self-detected nominal stays True even if caller passes has_nominals=False."""
+        nom = AtomicConcept.create("internal:nom#X")
+        fact = Atom.create(nom, Individual.create("http://example.org/a"))
+        ont = DLOntology(dl_clauses=frozenset(), positive_facts=frozenset([fact]), has_nominals=False)
+        assert ont.has_nominals() is True
+
+    def test_inverse_role_inclusion_sets_flag_through_clausifier(self):
+        """R ⊑ S⁻ is flagged as having inverse roles even after clausification."""
+        from hermit.model import AtomicRole as _AtomicRole, InverseRole
+        from hermit.structural.normalized_axioms import NormalizedAxioms
+        from hermit.structural.owl_clausification import OWLClausification
+
+        axioms = NormalizedAxioms()
+        r = _AtomicRole.create(R_IRI)
+        s_inv = InverseRole.create(_AtomicRole.create(S_IRI))
+        axioms.simple_object_property_inclusions.append((r, s_inv))
+
+        ont = OWLClausification().clausify(axioms, ontology_iri="urn:test:inv")
+        assert ont.has_inverse_roles() is True

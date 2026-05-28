@@ -191,10 +191,10 @@ class OWLNormalization:
                     result.data_property_inclusions.append((r_j, r_i))
         elif isinstance(axiom, OWLDisjointDataPropertiesAxiom):
             from hermit.model import AtomicRole as _AtomicRole
-            roles = [_iri_str(p) for p in axiom.properties()]
-            valid_roles = [_AtomicRole.create(iri) for iri in roles if iri is not None]
-            if len(valid_roles) >= 2:
-                result.disjoint_data_properties.append(tuple(valid_roles))
+            data_iris = [_iri_str(p) for p in axiom.properties()]
+            data_roles = [_AtomicRole.create(iri) for iri in data_iris if iri is not None]
+            if len(data_roles) >= 2:
+                result.disjoint_data_properties.append(tuple(data_roles))
         elif isinstance(axiom, OWLDataPropertyDomainAxiom):
             self._process_data_property_domain(axiom, result)
         elif isinstance(axiom, OWLDataPropertyRangeAxiom):
@@ -218,7 +218,7 @@ class OWLNormalization:
                 xv = Variable.create("X")
                 yv = Variable.create("Y")
                 zv = Variable.create("Z")
-                from hermit.structural.owl_clausification import _role_atom  # type: ignore[attr-defined]
+                from hermit.structural.owl_clausification import _role_atom
                 head = (Atom.create(Equality.INSTANCE, yv, zv),)
                 body = (_role_atom(role, xv, yv), _role_atom(role, xv, zv))
                 result.direct_dl_clauses.append(DLClause.create(head, body))
@@ -229,7 +229,7 @@ class OWLNormalization:
                 xv = Variable.create("X")
                 yv = Variable.create("Y")
                 zv = Variable.create("Z")
-                from hermit.structural.owl_clausification import _role_atom  # type: ignore[attr-defined]
+                from hermit.structural.owl_clausification import _role_atom
                 head = (Atom.create(Equality.INSTANCE, xv, yv),)
                 body = (_role_atom(role, xv, zv), _role_atom(role, yv, zv))
                 result.direct_dl_clauses.append(DLClause.create(head, body))
