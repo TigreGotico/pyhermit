@@ -72,7 +72,6 @@ class QuasiOrderClassificationForRoles(QuasiOrderClassification):
                     ):
                         # r -> s^- and r^- -> s
                         body_inv_role = body_role.get_inverse()
-                        assert isinstance(body_inv_role, AtomicRole)
                         concept_for_body_inv_role = self.m_concepts_for_roles.get(
                             body_inv_role
                         )

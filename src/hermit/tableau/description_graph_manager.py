@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from hermit.model import DescriptionGraph, ExistsDescriptionGraph
 from hermit.tableau.union_dependency_set import UnionDependencySet
 
 if TYPE_CHECKING:
-    from hermit.model import DescriptionGraph, ExistsDescriptionGraph
     from hermit.tableau.extension_manager import ExtensionTable, Retrieval
     from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau
@@ -104,7 +104,8 @@ class DescriptionGraphManager:
             extension_table = retrieval.get_extension_table()
             retrieval.open()
             tuple_buffer = retrieval.get_tuple_buffer()
-            arity = len(tuple_buffer)
+            # tuple_buffer has arity+1 slots (last is dependency set); use table arity
+            arity = extension_table.m_tuple_arity
             while not retrieval.after_last() and not self.m_extension_manager.contains_clash():
                 if isinstance(tuple_buffer[0], DescriptionGraph):
                     this_graph_index = self.m_description_graph_indices[tuple_buffer[0]]

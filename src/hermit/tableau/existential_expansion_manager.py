@@ -13,6 +13,7 @@ from hermit.model import (
     AtLeast,
     AtLeastConcept,
     AtLeastDataRange,
+    AtomicRole,
     Inequality,
     InverseRole,
     Role,
@@ -22,7 +23,7 @@ from hermit.tableau.tuple_table import TupleTable
 from hermit.tableau.union_dependency_set import UnionDependencySet
 
 if TYPE_CHECKING:
-    from hermit.model import AtomicRole, ExistentialConcept
+    from hermit.model import ExistentialConcept
     from hermit.tableau.extension_manager import Retrieval
     from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau

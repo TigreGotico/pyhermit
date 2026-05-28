@@ -211,9 +211,9 @@ class ExtensionTable(ABC):
         return self.m_core_manager.is_core(tuple_index)
 
     def is_tuple_active(self, tuple_index: int) -> bool:
-        """Return True if the tuple at the given index is currently active."""
+        """Return True if the tuple at the given flat-array index is currently active."""
         slot_size = self.m_tuple_arity + 1
-        return tuple_index * slot_size < self._after_extension_this_tuple_index * slot_size
+        return tuple_index < self._after_extension_this_tuple_index * slot_size
 
     @abstractmethod
     def create_retrieval(
@@ -388,7 +388,7 @@ class _SimpleRetrieval(Retrieval):
 
     def get_current_tuple_index(self) -> int:
         slot_size = self._extension_table.m_tuple_arity + 1
-        return (self._current_index - slot_size) // slot_size
+        return self._current_index - slot_size
 
     def get_binding_positions(self) -> list[int]:
         return [i for i, bound in enumerate(self._bound_mask) if bound]
@@ -488,7 +488,7 @@ class _FullRetrieval(Retrieval):
 
     def get_current_tuple_index(self) -> int:
         slot_size = self._arity + 1
-        return (self._current_index - slot_size) // slot_size
+        return self._current_index - slot_size
 
     def get_binding_positions(self) -> list[int]:
         return [pos for pos in self._binding_positions if pos >= 0]
@@ -591,7 +591,7 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
             node = tuple_data[1]
             node.m_number_of_negated_role_assertions += 1
         elif isinstance(dl_predicate, DescriptionGraph):
-            pass  # Description graph handling
+            self.m_tableau.m_description_graph_manager.description_graph_tuple_added(tuple_index, tuple_data)
 
         # Notify clash manager
         self.m_tableau.m_clash_manager.tuple_added(self, tuple_data, dependency_set, is_core)

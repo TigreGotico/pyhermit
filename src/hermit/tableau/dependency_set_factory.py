@@ -335,7 +335,7 @@ class DependencySetFactory:
 
     def _remove_from_entries(self, dependency_set: PermanentDependencySet) -> None:
         """Remove *dependency_set* from the hash table."""
-        index = dependency_set._hash() & (len(self._entries) - 1)
+        index = dependency_set._rest._hash() & (len(self._entries) - 1)  # type: ignore[union-attr]
         last_entry: PermanentDependencySet | None = None
         entry: PermanentDependencySet | None = self._entries[index]
         while entry is not None:
