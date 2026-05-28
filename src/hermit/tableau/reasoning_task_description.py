@@ -6,7 +6,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from hermit.model import Concept, DLPredicate, Role, Term
+    pass
 
 
 class StandardTestType(Enum):

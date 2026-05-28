@@ -6,7 +6,8 @@ predicates applied to specific tableau nodes.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Mapping, cast
+from typing import TYPE_CHECKING, cast
+from collections.abc import Mapping
 
 if TYPE_CHECKING:
     from hermit.model import Concept, DLPredicate, Role
@@ -223,7 +224,7 @@ class GroundDisjunction:
             raise RuntimeError("Unsupported predicate arity.")
         raise RuntimeError("Unsupported predicate arity.")
 
-    def to_string(self, prefixes: "Mapping[str, str] | Prefixes | None" = None) -> str:
+    def to_string(self, prefixes: Mapping[str, str] | Prefixes | None = None) -> str:
         """Return a string representation."""
         from hermit.model import Equality
         from hermit.model import Prefixes as Pfx

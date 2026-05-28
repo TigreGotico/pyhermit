@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hermit.model import AtomicConcept, AtomicRole, DLClause, DataRange, Variable
-    from hermit.tableau import DLClauseEvaluator, Node, Tableau, Worker
+    from hermit.tableau import Node, Tableau, Worker
 
 
 class BlockingStrategy(ABC):

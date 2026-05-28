@@ -191,7 +191,7 @@ class ConjunctiveQuery:
         collector: QueryResultCollector,
     ) -> None:
         """Recursively bind variables and collect matching results."""
-        from hermit.model import Variable, AtomicConcept, AtomicRole, InverseRole
+        from hermit.model import Variable
 
         if atom_index == len(self.query_atoms):
             # All atoms matched — fill result buffer and collect.
@@ -205,6 +205,7 @@ class ConjunctiveQuery:
         atom = self.query_atoms[atom_index]
         predicate = atom.predicate
         ext_manager = self.datalog_engine.extension_manager
+        assert ext_manager is not None, "datalog engine has no extension manager"
 
         if atom.arity() == 1:
             # Unary atom: concept assertion C(x)

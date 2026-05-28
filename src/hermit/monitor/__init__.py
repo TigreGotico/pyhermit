@@ -39,7 +39,8 @@ __all__ = [
 
 import sys
 import time
-from typing import Any, Sequence, TextIO, TypeAlias
+from typing import Any, TextIO, TypeAlias
+from collections.abc import Sequence
 
 # Forward-reference types not yet ported -- all resolved to Any at runtime.
 _Tableau: TypeAlias = Any

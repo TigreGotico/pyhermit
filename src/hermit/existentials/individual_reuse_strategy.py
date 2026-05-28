@@ -16,7 +16,6 @@ from hermit.tableau.tuple_table import TupleTable
 if TYPE_CHECKING:
     from hermit.blocking.blocking_strategy import BlockingStrategy
     from hermit.model import AtLeast, AtLeastConcept
-    from hermit.tableau.branching_point import BranchingPoint
     from hermit.tableau.dependency_set import DependencySet
     from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau

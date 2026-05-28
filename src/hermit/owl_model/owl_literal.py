@@ -461,22 +461,22 @@ class _OWLNumericLiteralInterface(OWLLiteral):
 
     def __lt__(self, other):
         if type(other) is type(self) and not isinstance(self._v, FloatSpecialValue):
-            return self._v < other._v  # type: ignore[operator]
+            return self._v < other._v
         return False
 
     def __gt__(self, other):
         if type(other) is type(self) and not isinstance(self._v, FloatSpecialValue):
-            return self._v > other._v  # type: ignore[operator]
+            return self._v > other._v
         return False
 
     def __le__(self, other):
         if type(other) is type(self) and not isinstance(self._v, FloatSpecialValue):
-            return self._v <= other._v  # type: ignore[operator]
+            return self._v <= other._v
         return False
 
     def __ge__(self, other):
         if type(other) is type(self) and not isinstance(self._v, FloatSpecialValue):
-            return self._v >= other._v  # type: ignore[operator]
+            return self._v >= other._v
         return False
 
     def __hash__(self):
@@ -715,22 +715,22 @@ class _OWLLiteralBasicsInterface(OWLLiteral):
 
     def __lt__(self, other):
         if type(other) is type(self):
-            return self._v < other._v  # type: ignore[operator]
+            return self._v < other._v
         return False
 
     def __gt__(self, other):
         if type(other) is type(self):
-            return self._v > other._v  # type: ignore[operator]
+            return self._v > other._v
         return False
 
     def __le__(self, other):
         if type(other) is type(self):
-            return self._v <= other._v  # type: ignore[operator]
+            return self._v <= other._v
         return False
 
     def __ge__(self, other):
         if type(other) is type(self):
-            return self._v >= other._v  # type: ignore[operator]
+            return self._v >= other._v
         return False
 
 

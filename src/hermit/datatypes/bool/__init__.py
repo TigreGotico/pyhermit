@@ -41,7 +41,9 @@ class BooleanDatatypeHandler(DatatypeHandler):
             return False
         raise MalformedLiteralException(f"Invalid boolean: {lexical_form!r}")
 
-    def create_value_space_subset(self, datatype_iri: str, facet_uris: Any, facet_values: Any) -> BooleanValueSpaceSubset:
+    def create_value_space_subset(
+        self, datatype_iri: str, facet_uris: Any, facet_values: Any
+    ) -> BooleanValueSpaceSubset:
         return BooleanValueSpaceSubset()
 
     def entire_space(self, datatype_iri: str) -> BooleanValueSpaceSubset:

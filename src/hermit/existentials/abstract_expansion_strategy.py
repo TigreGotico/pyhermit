@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from hermit.blocking.blocking_strategy import BlockingStrategy
     from hermit.model import Concept, DLClause, DataRange, Variable
     from hermit.monitor.tableau_monitor import TableauMonitor  # type: ignore[import-untyped]
-    from hermit.tableau.dl_clause_evaluator import DLClauseEvaluator, Worker as DLClauseWorker
+    from hermit.tableau.dl_clause_evaluator import Worker as DLClauseWorker
     from hermit.tableau.extension_manager import ExtensionManager, Retrieval as ExtRetrieval
     from hermit.tableau.interrupt_flag import InterruptFlag
     from hermit.tableau.existential_expansion_manager import ExistentialExpansionManager

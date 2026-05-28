@@ -32,7 +32,9 @@ class RDFPlainLiteralDatatypeHandler(DatatypeHandler):
     def parse_literal(self, lexical_form: str, datatype_iri: str) -> Any:
         return lexical_form
 
-    def create_value_space_subset(self, datatype_iri: str, facet_uris: Any, facet_values: Any) -> RDFPlainLiteralValueSpaceSubset:
+    def create_value_space_subset(
+        self, datatype_iri: str, facet_uris: Any, facet_values: Any
+    ) -> RDFPlainLiteralValueSpaceSubset:
         return RDFPlainLiteralValueSpaceSubset()
 
     def entire_space(self, datatype_iri: str) -> RDFPlainLiteralValueSpaceSubset:

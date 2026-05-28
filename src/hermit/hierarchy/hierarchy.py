@@ -304,7 +304,8 @@ class _HierarchyNodeComparator(Generic[E]):
         self, n1: HierarchyNode[E], n2: HierarchyNode[E]
     ) -> int:
         from functools import cmp_to_key
-        from typing import Callable, Any
+        from typing import Any
+        from collections.abc import Callable
 
         comparator: Callable[[Any, Any], int] = self.m_element_comparator  # type: ignore[assignment]
         cmp = cmp_to_key(comparator)

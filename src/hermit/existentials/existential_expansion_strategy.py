@@ -20,7 +20,7 @@ if TYPE_CHECKING:
         DataRange,
         Variable,
     )
-    from hermit.tableau.dl_clause_evaluator import DLClauseEvaluator, Worker as DLClauseWorker
+    from hermit.tableau.dl_clause_evaluator import Worker as DLClauseWorker
     from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau
 

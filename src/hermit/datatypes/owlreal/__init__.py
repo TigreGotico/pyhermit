@@ -11,15 +11,15 @@ from decimal import Decimal
 from fractions import Fraction
 from typing import Any
 
-# Interval: (lower, upper, lower_inclusive, upper_inclusive)
-Interval = tuple["BigRational", "BigRational", bool, bool]
-
 from hermit.datatypes.registry import (
     DatatypeHandler,
     DatatypeRegistry,
     MalformedLiteralException,
     ValueSpaceSubset,
 )
+
+# Interval: (lower, upper, lower_inclusive, upper_inclusive)
+Interval = tuple["BigRational", "BigRational", bool, bool]
 
 # ---------------------------------------------------------------------------
 # BigRational — port of HermiT's BigRational for owl:real

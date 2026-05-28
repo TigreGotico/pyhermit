@@ -425,7 +425,7 @@ class DLClauseInfo:
             if hasattr(retrieval, "clear"):
                 retrieval.clear()
 
-    def _get_index_for(self, variables: list[Variable], variable: "Variable | None") -> int:
+    def _get_index_for(self, variables: list[Variable], variable: Variable | None) -> int:
         for index, var in enumerate(variables):
             if var == variable:
                 return index

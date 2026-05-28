@@ -32,7 +32,9 @@ class AnyURIDatatypeHandler(DatatypeHandler):
     def parse_literal(self, lexical_form: str, datatype_iri: str) -> Any:
         return lexical_form  # URI is just the string
 
-    def create_value_space_subset(self, datatype_iri: str, facet_uris: Any, facet_values: Any) -> AnyURIValueSpaceSubset:
+    def create_value_space_subset(
+        self, datatype_iri: str, facet_uris: Any, facet_values: Any
+    ) -> AnyURIValueSpaceSubset:
         return AnyURIValueSpaceSubset()
 
     def entire_space(self, datatype_iri: str) -> AnyURIValueSpaceSubset:

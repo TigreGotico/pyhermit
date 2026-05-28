@@ -19,7 +19,7 @@ from hermit.tableau.dl_clause_evaluator import Worker
 
 if TYPE_CHECKING:
     from hermit.model import AtomicRole, DLClause, DataRange, Variable
-    from hermit.tableau import DLClauseEvaluator, ExtensionManager, Tableau
+    from hermit.tableau import ExtensionManager, Tableau
 
 from hermit.tableau.node import Node
 from .blocking_strategy import BlockingStrategy
@@ -188,8 +188,14 @@ class AnywhereValidatedBlocking(BlockingStrategy):
                         node.is_directly_blocked()
                         and (
                             self.m_direct_blocking_checker.has_changed_since_validation(node)
-                            or (_parent is not None and self.m_direct_blocking_checker.has_changed_since_validation(_parent))
-                            or (_blocker is not None and self.m_direct_blocking_checker.has_changed_since_validation(_blocker))
+                            or (
+                                _parent is not None
+                                and self.m_direct_blocking_checker.has_changed_since_validation(_parent)
+                            )
+                            or (
+                                _blocker is not None
+                                and self.m_direct_blocking_checker.has_changed_since_validation(_blocker)
+                            )
                         )
                     ) or (node.parent is not None and not node.parent.is_blocked()):
                         valid_blocker: Node | None = None

@@ -6,7 +6,8 @@ value-space subset enumeration, and datatype clash detection.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Sequence, cast
+from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Sequence
 
 from hermit.tableau.node_type import NodeType
 from hermit.tableau.union_dependency_set import UnionDependencySet
@@ -244,7 +245,10 @@ class DatatypeManager:
             if reached_variable not in self.m_conjunction.m_active_variables:
                 self.m_conjunction.m_active_variables.add(reached_variable)
                 # Concrete root nodes act as "breakers" in the conjunction.
-                if reached_variable.m_node is not None and reached_variable.m_node.node_type != NodeType.ROOT_CONSTANT_NODE:
+                if (
+                    reached_variable.m_node is not None
+                    and reached_variable.m_node.node_type != NodeType.ROOT_CONSTANT_NODE
+                ):
                     # Look for inequalities where reached_node occurs in first position.
                     self.m_inequality01_retrieval.get_bindings_buffer()[0] = Inequality.INSTANCE
                     self.m_inequality01_retrieval.get_bindings_buffer()[1] = reached_variable.m_node

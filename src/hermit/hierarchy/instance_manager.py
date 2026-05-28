@@ -9,18 +9,6 @@ from collections import deque
 from typing import TYPE_CHECKING, Any
 
 from hermit.graph import Graph
-
-
-class _IdentitySet(set):  # type: ignore[type-arg]
-    """A set whose hash and equality are identity-based (like Java IdentityHashMap keys)."""
-
-    def __hash__(self) -> int:  # type: ignore[override]
-        return id(self)
-
-    def __eq__(self, other: object) -> bool:
-        return self is other
-
-
 from hermit.hierarchy.atomic_concept_element import AtomicConceptElement
 from hermit.hierarchy.deterministic_classification import (
     DeterministicClassification,
@@ -38,6 +26,16 @@ from hermit.model import (
     Prefixes,
     Role,
 )
+
+
+class _IdentitySet(set):  # type: ignore[type-arg]
+    """A set whose hash and equality are identity-based (like Java IdentityHashMap keys)."""
+
+    def __hash__(self) -> int:  # type: ignore[override]
+        return id(self)
+
+    def __eq__(self, other: object) -> bool:
+        return self is other
 
 if TYPE_CHECKING:
     from hermit.model import DLClause

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hermit.model import DLClause, Variable
-    from hermit.tableau import DLClauseEvaluator, Tableau, Worker
+    from hermit.tableau import Tableau, Worker
 
 from hermit.tableau.node import Node
 
@@ -289,7 +289,11 @@ class _BlockersCache:
         bucket_index = self._get_index_for(hash_code, len(self.m_buckets))
         entry = self.m_buckets[bucket_index]
         while entry is not None:
-            if entry.m_node is not None and hash_code == entry.m_hash_code and self.m_direct_blocking_checker.is_blocked_by(entry.m_node, node):
+            if (
+                entry.m_node is not None
+                and hash_code == entry.m_hash_code
+                and self.m_direct_blocking_checker.is_blocked_by(entry.m_node, node)
+            ):
                 raise RuntimeError("Internal error: node already in the cache!")
             entry = entry.m_next_entry
 
@@ -313,7 +317,11 @@ class _BlockersCache:
             bucket_index = self._get_index_for(hash_code, len(self.m_buckets))
             entry = self.m_buckets[bucket_index]
             while entry is not None:
-                if entry.m_node is not None and hash_code == entry.m_hash_code and self.m_direct_blocking_checker.is_blocked_by(entry.m_node, node):
+                if (
+                    entry.m_node is not None
+                    and hash_code == entry.m_hash_code
+                    and self.m_direct_blocking_checker.is_blocked_by(entry.m_node, node)
+                ):
                     return entry.m_node
                 entry = entry.m_next_entry
         return None

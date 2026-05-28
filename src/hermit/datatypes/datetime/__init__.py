@@ -55,7 +55,9 @@ class DateTimeDatatypeHandler(DatatypeHandler):
         except (ValueError, TypeError):
             raise MalformedLiteralException(f"Invalid dateTime: {lexical_form!r}") from None
 
-    def create_value_space_subset(self, datatype_iri: str, facet_uris: Any, facet_values: Any) -> DateTimeValueSpaceSubset:
+    def create_value_space_subset(
+        self, datatype_iri: str, facet_uris: Any, facet_values: Any
+    ) -> DateTimeValueSpaceSubset:
         return DateTimeValueSpaceSubset(entire=True)
 
     def entire_space(self, datatype_iri: str) -> DateTimeValueSpaceSubset:
