@@ -34,11 +34,14 @@ from hermit.owl_model.class_expression import (
 )
 from hermit.owl_model.owl_axiom import (
     OWLClassAssertionAxiom,
+    OWLDataPropertyAssertionAxiom,
+    OWLDifferentIndividualsAxiom,
     OWLDisjointClassesAxiom,
     OWLEquivalentClassesAxiom,
     OWLEquivalentDataPropertiesAxiom,
     OWLEquivalentObjectPropertiesAxiom,
     OWLObjectPropertyAssertionAxiom,
+    OWLSameIndividualAxiom,
     OWLSubClassOfAxiom,
     OWLSubDataPropertyOfAxiom,
     OWLSubObjectPropertyOfAxiom,
@@ -149,6 +152,35 @@ def _entails_subclass(
         reasoner.dispose()
 
 
+def _entails_instance(
+    premise_axioms: list, individual, expr: OWLClassExpression, udl: bool
+) -> bool:
+    """premise |= ClassAssertion(expr, individual), via reasoner.has_type."""
+    ind = _individual_internal(individual)
+    if ind is None:
+        return False
+    concept = _atomic(expr)
+    extra: list = []
+    if concept is None:
+        q = OWLClass(_AUX + "Inst")
+        extra.append(OWLEquivalentClassesAxiom([q, expr]))
+        concept = AtomicConcept.create(_AUX + "Inst")
+    reasoner = _build_reasoner(premise_axioms + extra, udl)
+    try:
+        if not reasoner.is_consistent():
+            return True
+        return reasoner.has_type(ind, concept)
+    finally:
+        reasoner.dispose()
+
+
+def _individual_internal(individual):  # type: ignore[no-untyped-def]
+    iri = getattr(individual, "iri", None)
+    if iri is None:
+        return None
+    return Individual.create(iri.as_str() if hasattr(iri, "as_str") else str(iri))
+
+
 def _entails_disjoint(
     premise_axioms: list, classes: list[OWLClassExpression], udl: bool
 ) -> bool:
@@ -180,12 +212,12 @@ def _entails_axiom(premise_axioms: list, axiom, udl: bool) -> bool:
     if isinstance(axiom, OWLDisjointClassesAxiom):
         return _entails_disjoint(premise_axioms, list(axiom.class_expressions()), udl)
     if isinstance(axiom, OWLClassAssertionAxiom):
-        # hasType(ind, C): faithful via Disjoint reduction -> ind in C iff
-        # {ind} <= C entailed.
+        # hasType(ind, C): mirrors EntailmentChecker.visit(ClassAssertion) ->
+        # reasoner.isInstanceOf(ind, C). Complex C is named via a definitorial
+        # equivalence and the instance check runs against the fresh atomic class.
         ind = axiom.get_individual()
         c = axiom.get_class_expression()
-        one_of = OWLObjectOneOf([ind])
-        return _entails_subclass(premise_axioms, one_of, c, udl)
+        return _entails_instance(premise_axioms, ind, c, udl)
     if isinstance(axiom, OWLSubObjectPropertyOfAxiom):
         sub = _role_name(axiom.get_sub_property())
         sup = _role_name(axiom.get_super_property())
@@ -207,7 +239,65 @@ def _entails_axiom(premise_axioms: list, axiom, udl: bool) -> bool:
         finally:
             reasoner.dispose()
     if isinstance(axiom, OWLObjectPropertyAssertionAxiom):
-        raise UnsupportedConclusion("object property assertion entailment")
+        subj = _individual_internal(axiom.get_subject())
+        obj = _individual_internal(axiom.get_object())
+        role = _role_name(axiom.get_property())
+        if subj is None or obj is None or role is None:
+            raise UnsupportedConclusion("complex object property assertion")
+        reasoner = _build_reasoner(premise_axioms, udl)
+        try:
+            if not reasoner.is_consistent():
+                return True
+            return reasoner.has_role_relationship(
+                subj, AtomicRole.create(role), obj
+            )
+        finally:
+            reasoner.dispose()
+    if isinstance(axiom, OWLSameIndividualAxiom):
+        inds = list(axiom.individuals())
+        reasoner = _build_reasoner(premise_axioms, udl)
+        try:
+            if not reasoner.is_consistent():
+                return True
+            for i in range(len(inds) - 1):
+                a = _individual_internal(inds[i])
+                b = _individual_internal(inds[i + 1])
+                if a is None or b is None or not reasoner.is_same_individual(a, b):
+                    return False
+            return True
+        finally:
+            reasoner.dispose()
+    if isinstance(axiom, OWLDifferentIndividualsAxiom):
+        from hermit.owl_model.owl_axiom import OWLSameIndividualAxiom as _Same
+        inds = list(axiom.individuals())
+        # Different(a, b) holds iff asserting SameIndividual(a, b) makes the
+        # premise inconsistent (mirrors EntailmentChecker via the reasoner).
+        for i in range(len(inds) - 1):
+            for j in range(i + 1, len(inds)):
+                same = _Same([inds[i], inds[j]])
+                reasoner = _build_reasoner(premise_axioms + [same], udl)
+                try:
+                    if reasoner.is_consistent():
+                        return False
+                finally:
+                    reasoner.dispose()
+        return True
+    if isinstance(axiom, OWLDataPropertyAssertionAxiom):
+        # No direct data-fact entailment query; reduce to consistency of the
+        # premise plus the negation is not expressible without nominals/values.
+        # Mirror EntailmentChecker: a data property assertion is entailed iff
+        # adding its negative form makes the ontology inconsistent.
+        from hermit.owl_model.owl_axiom import (
+            OWLNegativeDataPropertyAssertionAxiom,
+        )
+        neg = OWLNegativeDataPropertyAssertionAxiom(
+            axiom.get_subject(), axiom.get_property(), axiom.get_object()
+        )
+        reasoner = _build_reasoner(premise_axioms + [neg], udl)
+        try:
+            return not reasoner.is_consistent()
+        finally:
+            reasoner.dispose()
     raise UnsupportedConclusion(f"{type(axiom).__name__}")
 
 
