@@ -24,8 +24,9 @@ __all__ = [
     "Configuration",
     "Reasoner",
     "load_ontology",
+    "load_ontology_from_string",
 ]
 
 from hermit.configuration import Configuration
 from hermit.reasoner import Reasoner
-from hermit.parser import load_ontology
+from hermit.parser import load_ontology, load_ontology_from_string
