@@ -219,6 +219,28 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
         # Return both constraints as a list; caller must split into two inclusions
         return [AtLeastConcept.create(n, role, filler), AtMostConcept.create(n, role, filler)]
 
+    from hermit.owl_model.class_expression.restriction import OWLObjectOneOf
+
+    if isinstance(expr, OWLObjectOneOf):
+        # {a, b, ...} → nominal concept(s). Each individual a maps to an internal
+        # nominal concept ``internal:nom#a``; the fact a ∈ internal:nom#a is
+        # seeded during clausification. A singleton becomes one nominal concept;
+        # an enumeration of several becomes their disjunction (a list of
+        # AtomicConcepts), which the inclusion path already treats as a
+        # disjunction.
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+
+        nominals: list[AtomicConcept] = []
+        for ind in expr.operands():
+            if isinstance(ind, OWLNamedIndividual):
+                iri = ind.iri.as_str() if hasattr(ind.iri, "as_str") else str(ind.iri)
+                nominals.append(AtomicConcept.create("internal:nom#" + iri))
+        if not nominals:
+            return AtomicConcept.NOTHING
+        if len(nominals) == 1:
+            return nominals[0]
+        return nominals
+
     # Fallback: unknown expression — return as-is and let the clausifier handle it
     return expr
 

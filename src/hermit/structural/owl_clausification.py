@@ -162,6 +162,12 @@ class OWLClausification:
                     dl_clauses.add(ec.get_safe_version(AtomicConcept.THING))
                 extra.clear()
 
+        # -- Nominal facts --
+        # Concepts named ``internal:nom#<iri>`` arise from OWLObjectOneOf /
+        # ObjectHasValue. Seed the fact ``<iri> ∈ internal:nom#<iri>`` so the
+        # nominal denotes exactly its individual.
+        self._seed_nominal_facts(axioms, positive_facts)
+
         # -- Data range inclusion clauses --
         data_range_clausifier = NormalizedDataRangeAxiomClausifier(
             data_range_converter, set(axioms.defined_datatype_iris)
@@ -307,6 +313,25 @@ class OWLClausification:
                 if isinstance(role, InverseRole):
                     return True
         return False
+
+    @staticmethod
+    def _seed_nominal_facts(
+        axioms: NormalizedAxioms, positive_facts: set[Atom]
+    ) -> None:
+        """Add ``a ∈ internal:nom#a`` facts for every nominal concept used."""
+        seen: set[str] = set()
+        for inclusion in axioms.concept_inclusions:
+            for concept in inclusion:
+                if (
+                    isinstance(concept, AtomicConcept)
+                    and concept.iri.startswith("internal:nom#")
+                    and concept.iri not in seen
+                ):
+                    seen.add(concept.iri)
+                    ind_iri = concept.iri[len("internal:nom#"):]
+                    individual = Individual.create(ind_iri)
+                    positive_facts.add(Atom.create(concept, individual))
+                    axioms.named_individuals.add(individual)
 
     @staticmethod
     def _has_nominals_check(axioms: NormalizedAxioms) -> bool:
