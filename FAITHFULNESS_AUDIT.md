@@ -87,24 +87,26 @@ Abstract base classes (`ABC`) replace Java interfaces and abstract classes; list
 growth replaces `System.arraycopy`; relative imports replace package references.
 No behavioural effect.
 
-## 4. External dependency substitution — the parser
+## 4. The ontology loader
 
-**File:** `parser.py`.
+**Files:** `parser.py`, `rdfxml.py`, `owl_rdf.py`, `fss.py`, `owlxml.py`.
 
-Java HermiT loads ontologies through the **OWL API**. There is no OWL API in
-Python, so `load_ontology` bridges through **owlready2**, a different OWL library
-with different parsing behaviour. This is the least faithful component: it is an
-adapter, not a port. Known consequences, relative to the OWL API:
+Java HermiT loads ontologies through the **OWL API**. The Python loader is a
+self-contained, standard-library reader that produces the same
+`hermit.owl_model` axiom objects the OWL API would: `load_ontology` dispatches by
+syntax to an RDF/XML reader (`rdfxml.py`) feeding an OWL-2-from-RDF mapper
+(`owl_rdf.py`), a Functional-Style Syntax reader (`fss.py`), or an OWL/XML
+reader (`owlxml.py`). It parses Functional-Style Syntax and OWL/XML, accepts
+custom and relative datatype IRIs, retains class assertions on anonymous
+individuals, and preserves cyclic `EquivalentClasses` / `EquivalentProperties`
+axioms. There is no third-party OWL stack on the load path.
 
-- Functional-Style Syntax and OWL/XML inputs are not parsed.
-- Custom / unrecognised datatypes raise during load.
-- Class assertions on anonymous individuals are silently dropped.
-- Cyclic `EquivalentClasses` / `EquivalentProperties` axioms are mangled
-  (owlready2 emits a cyclic-subclass warning and discards an edge).
-
-The reasoning core is independent of this; replacing the loader (a faithful
-RDF/FSS reader, or porting the OWL API loading path) is what unblocks the
-WebOnt-description-logic conformance family.
+Every class expression the mapper emits is one of the types the clausifier
+already handles, so each round-trips through `_owl_expr_to_internal` and the
+clausifier visitor. Constructs the reasoning core does not yet support —
+datatype restrictions on data properties, and named-class nominal enumerations
+requiring nominal closure — are over-approximated or omitted rather than emitted
+as expressions the clausifier cannot accept.
 
 ## 5. Partial subsystems
 
@@ -158,4 +160,4 @@ a strict `xfail` in `tests/test_tableau.py::TestHeadDisjunctionExpansion`.
 | Quasi-order classification | `hierarchy/quasi_order_classification.py` | Faithful |
 | Deterministic classification | `hierarchy/deterministic_classification.py` | Delegates to quasi-order (§2.2) |
 | Datalog / query evaluation | `datalog/` | Nested-loop join (§5.1) |
-| Ontology loading | `parser.py` | owlready2 adapter, not OWL API (§4) |
+| Ontology loading | `parser.py`, `rdfxml.py`, `owl_rdf.py`, `fss.py`, `owlxml.py` | Stdlib RDF/XML + FSS + OWL/XML reader (§4) |
