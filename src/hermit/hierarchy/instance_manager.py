@@ -1824,10 +1824,15 @@ class InstanceManager:
     def is_same_individual(
         self, individual1: Individual, individual2: Individual
     ) -> bool:
+        # i1 and i2 are necessarily equal iff asserting i1 != i2 over the
+        # permanent ABox is unsatisfiable.
+        from hermit.model import Atom
+
+        inequality = Atom.create(Inequality.INSTANCE, individual1, individual2)
         return not self.m_reasoner.get_tableau().is_satisfiable(
             True,
             False,
-            {Inequality.INSTANCE},
+            {inequality},
             None,
             None,
             None,

@@ -53,7 +53,13 @@ class TupleTable:
         return idx
 
     def retrieve_tuple(self, buffer: list[Any], tuple_index: int) -> None:
-        for i in range(self._tuple_arity):
+        # Copy only as many columns as the caller's buffer holds. A tuple slot
+        # stores the logical columns first and (when dependency sets are kept)
+        # one trailing dependency-set column; retrieval consumers size their
+        # buffer to the logical arity they expect, so the trailing slot must not
+        # overflow it.
+        count = min(self._tuple_arity, len(buffer))
+        for i in range(count):
             buffer[i] = self._data[tuple_index + i]
 
     def get_tuple_object(self, tuple_index: int, object_index: int) -> Any:
