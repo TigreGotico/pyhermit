@@ -8,3 +8,5 @@ build/
 .ruff_cache/
 .coverage
 coverage.json
+.pytest_cache/
+.plan/
