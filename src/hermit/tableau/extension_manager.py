@@ -664,21 +664,8 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         ):
             self._after_delta_new_tuple_index = first_free_tuple_index
 
-        # ``delta_new_not_empty`` reports whether the range that is about to be
-        # promoted into DELTA_OLD ([m_afterExtensionThis, m_afterDeltaNew)) was
-        # non-empty -- this is the range applyDLClauses() will read next. Java
-        # HermiT relies on the saturation while-loop running long enough that a
-        # tuple appended after the last propagation (which lands in
-        # [m_afterDeltaNew, first_free)) is first promoted into delta-new on one
-        # call and then into DELTA_OLD on the following call. To preserve that
-        # two-step promotion we must keep the loop alive while *either* the
-        # current delta-new range is non-empty *or* there are freshly appended
-        # tuples not yet promoted ([m_afterDeltaNew, first_free) non-empty);
-        # otherwise a disjunct/existential added at the end of an iteration is
-        # promoted but never resolved, and clashes are missed.
         delta_new_not_empty = (
             self._after_extension_this_tuple_index != self._after_delta_new_tuple_index
-            or self._after_delta_new_tuple_index != first_free_tuple_index
         )
         self._after_extension_old_tuple_index = self._after_extension_this_tuple_index
         self._after_extension_this_tuple_index = self._after_delta_new_tuple_index
