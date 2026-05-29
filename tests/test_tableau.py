@@ -559,3 +559,82 @@ class TestGroundDisjunction:
         assert hasattr(GroundDisjunction, "__init__")
         # Full instantiation requires a complete tableau and header,
         # which is tested indirectly through the reasoner integration tests.
+
+
+class TestHeadDisjunctionExpansion:
+    """Head-disjunction expansion and dependency-directed backtracking.
+
+    A disjunct asserted at a branching point must enter the δ-new range so
+    hyperresolution promotes it into δ-old and any clause consuming it fires; a
+    branch whose disjunct clashes must backtrack and try the next disjunct.
+    """
+
+    NS = "http://disj#"
+
+    def _ontology(self, dl_clauses, facts, iri):
+        return DLOntology(
+            ontology_iri=iri,
+            dl_clauses=frozenset(dl_clauses),
+            positive_facts=frozenset(facts),
+            negative_facts=frozenset(),
+        )
+
+    def _consistent(self, dl_clauses, facts, iri):
+        from hermit.reasoner import Reasoner
+
+        reasoner = Reasoner(self._ontology(dl_clauses, facts, iri))
+        try:
+            return reasoner.is_consistent()
+        finally:
+            reasoner.dispose()
+
+    @pytest.mark.xfail(
+        reason="head-disjunction inconsistency: a disjunct asserted at a branching "
+        "point is not promoted into the apply range, so its clash never fires; "
+        "see TODO.md / FAITHFULNESS_AUDIT.md",
+        strict=True,
+    )
+    def test_both_disjuncts_clash_is_inconsistent(self):
+        """U(a); U(X)->A(X)|B(X); A->clash; B->clash  =>  inconsistent."""
+        x = Variable.create("X")
+        u = AtomicConcept.create(self.NS + "U")
+        a = AtomicConcept.create(self.NS + "A")
+        b = AtomicConcept.create(self.NS + "B")
+        ind = Individual.create(self.NS + "a")
+        clauses = [
+            DLClause.create(
+                (Atom.create(a, x), Atom.create(b, x)), (Atom.create(u, x),)
+            ),
+            DLClause.create((), (Atom.create(a, x),)),
+            DLClause.create((), (Atom.create(b, x),)),
+        ]
+        assert not self._consistent(clauses, [Atom.create(u, ind)], "urn:disj:unsat")
+
+    def test_both_disjuncts_satisfiable_is_consistent(self):
+        """U(a); U(X)->A(X)|B(X) with A,B both satisfiable  =>  consistent."""
+        x = Variable.create("X")
+        u = AtomicConcept.create(self.NS + "U")
+        a = AtomicConcept.create(self.NS + "A")
+        b = AtomicConcept.create(self.NS + "B")
+        ind = Individual.create(self.NS + "a")
+        clauses = [
+            DLClause.create(
+                (Atom.create(a, x), Atom.create(b, x)), (Atom.create(u, x),)
+            ),
+        ]
+        assert self._consistent(clauses, [Atom.create(u, ind)], "urn:disj:sat")
+
+    def test_first_disjunct_clashes_backtracks_to_second(self):
+        """U(a); U(X)->A(X)|B(X); A->clash  =>  consistent via B."""
+        x = Variable.create("X")
+        u = AtomicConcept.create(self.NS + "U")
+        a = AtomicConcept.create(self.NS + "A")
+        b = AtomicConcept.create(self.NS + "B")
+        ind = Individual.create(self.NS + "a")
+        clauses = [
+            DLClause.create(
+                (Atom.create(a, x), Atom.create(b, x)), (Atom.create(u, x),)
+            ),
+            DLClause.create((), (Atom.create(a, x),)),
+        ]
+        assert self._consistent(clauses, [Atom.create(u, ind)], "urn:disj:mixed")

@@ -54,7 +54,10 @@ packages = ["src/hermit"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -m 'not slow'"
+markers = [
+    "slow: heavy integration tests (W3C OWL WG conformance corpus); run with -m slow",
+]
 
 [tool.mypy]
 python_version = "3.10"
