@@ -50,7 +50,7 @@ from hermit.structural.owl_normalization import OWLNormalization
 
 from .registry import Subtest, TestType, format_extension
 
-_AUX = "urn:pyhermit:wg:aux#"
+_AUX = "http://pyhermit.invalid/wg/aux#"
 
 
 class UnsupportedConclusion(Exception):
@@ -108,7 +108,10 @@ def run_consistency(subtest: Subtest) -> Outcome:
 # ---------------------------------------------------------------------------
 
 def _name(c: OWLClass) -> str:
-    return c.iri if hasattr(c, "iri") else str(c)
+    iri = getattr(c, "iri", None)
+    if iri is None:
+        return str(c)
+    return iri.as_str() if hasattr(iri, "as_str") else str(iri)
 
 
 def _atomic(expr: OWLClassExpression) -> AtomicConcept | None:
@@ -166,7 +169,7 @@ def _entails_axiom(premise_axioms: list, axiom, udl: bool) -> bool:
             premise_axioms, axiom.sub_class, axiom.super_class, udl
         )
     if isinstance(axiom, OWLEquivalentClassesAxiom):
-        exprs = list(axiom.class_expressions)
+        exprs = list(axiom.class_expressions())
         first = exprs[0]
         for nxt in exprs[1:]:
             if not _entails_subclass(premise_axioms, first, nxt, udl):
@@ -175,7 +178,7 @@ def _entails_axiom(premise_axioms: list, axiom, udl: bool) -> bool:
                 return False
         return True
     if isinstance(axiom, OWLDisjointClassesAxiom):
-        return _entails_disjoint(premise_axioms, list(axiom.class_expressions), udl)
+        return _entails_disjoint(premise_axioms, list(axiom.class_expressions()), udl)
     if isinstance(axiom, OWLClassAssertionAxiom):
         # hasType(ind, C): faithful via Disjoint reduction -> ind in C iff
         # {ind} <= C entailed.
@@ -209,9 +212,10 @@ def _entails_axiom(premise_axioms: list, axiom, udl: bool) -> bool:
 
 
 def _role_name(prop) -> str | None:
-    if hasattr(prop, "iri"):
-        return prop.iri
-    return None
+    iri = getattr(prop, "iri", None)
+    if iri is None:
+        return None
+    return iri.as_str() if hasattr(iri, "as_str") else str(iri)
 
 
 def run_entailment(subtest: Subtest) -> Outcome:
@@ -222,7 +226,7 @@ def run_entailment(subtest: Subtest) -> Outcome:
     conclusion_axioms = _load_axioms(text, fmt)
 
     pres = subtest.descriptor.premise_string()
-    premise_axioms = _load_axioms(*pres) if pres is not None else []
+    premise_axioms = _load_axioms(pres[1], pres[0]) if pres is not None else []
 
     logical = [
         a
