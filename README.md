@@ -3,11 +3,11 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-A faithful Python port of [HermiT](http://hermit-reasoner.com), a conformant OWL 2 DL reasoner developed at the University of Oxford. Reasons about OWL ontologies using tableau-based decision procedures — no JVM required.
+A Python port of [HermiT](http://hermit-reasoner.com), an OWL 2 DL reasoner developed at the University of Oxford. Reasons about OWL ontologies using tableau-based decision procedures — no JVM required.
 
 ## Key Features
 
-- **OWL 2 DL reasoning** — Full support for all Direct Semantics constructs
+- **OWL 2 DL reasoning** — tableau decision procedure over the OWL 2 Direct Semantics constructs
 - **Tableau algorithm** — Hyperresolution with configurable blocking strategies
 - **Non-simple property validation** — Enforces OWL 2 spec: transitive, role-chain, and inherited-superrole properties are rejected at clausification time if used in cardinality restrictions, hasSelf, asymmetric, irreflexive, or disjoint axioms (`ValueError`)
 - **All OWL 2 datatypes** — xsd:string, decimal, integer, float, double, dateTime, boolean, anyURI, etc.
@@ -118,21 +118,24 @@ Source: `ObjectPropertyInclusionManager._validate_complex_property_constraints` 
 
 ## Project Status
 
-**Feature-complete port of Java HermiT 1.3.8**
+Structural port of Java HermiT. The reasoning core (tableau, blocking,
+hyperresolution, classification, datatype reasoning, SWRL/Datalog query
+answering) is implemented; ontology loading goes through owlready2.
 
-- TBox reasoning (classification, subsumption) — Production Ready
-- ABox instance retrieval — Production Ready
-- Datatype reasoning — Production Ready
-- SWRL rules & Datalog — Production Ready
-- Non-simple property validation — Production Ready
-- OWL file parsing (owlready2) — Production Ready
+- TBox reasoning (classification, subsumption)
+- ABox instance retrieval
+- Datatype reasoning
+- SWRL rules & Datalog query answering
+- Non-simple property validation
+- OWL file parsing via owlready2
 
-**Test Results:** 2244 tests, all passing (0 skips, 0 xfails)
+**Conformance:** passes 185/350 W3C OWL WG Approved-DL test cases
+(`pytest -m slow tests/test_wg_conformance.py`, or
+`python scripts/wg_run.py approved`). Known open items, including head-disjunction
+inconsistency, are tracked in `TODO.md` and `FAITHFULNESS_AUDIT.md`.
 
-## AI Transparency
-
-This port was developed with [Claude](https://claude.ai) (Anthropic) as the primary developer.
-All source code was written by Claude. See git history for development record.
+The unit suite passes under `pytest` (the W3C conformance corpus is marked
+`slow` and excluded by default); the code passes `mypy --strict` and `ruff`.
 
 ## Documentation
 
