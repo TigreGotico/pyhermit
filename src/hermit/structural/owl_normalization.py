@@ -354,7 +354,97 @@ class OWLNormalization:
             if changed:
                 simplified = OWLObjectUnionOf(new_operands)
 
+        # Structural transformation for conjunction operands.
+        #
+        # After NNF + simplification a head clause is a disjunction of literals.
+        # A disjunct may still be an OWLObjectIntersectionOf -- e.g. the NNF of
+        # DisjointClasses produces (not b and not c) as one disjunct. The
+        # clausifier expects every operand to be a literal, so we eliminate the
+        # conjunction the way Java HermiT's OWLNormalization does:
+        #
+        #   * single conjunction disjunct  sub <= X1 and ... and Xm
+        #     -> split into m inclusions sub <= X1, ..., sub <= Xm
+        #   * conjunction among several disjuncts
+        #     -> introduce a fresh Q with Q == X1 and ... and Xm (both
+        #        directions) and replace the disjunct with Q.
+        simplified = self._eliminate_conjunction_disjuncts(simplified, result)
+        if simplified is None:
+            # the inclusion was fully discharged by splitting
+            return
+
         result.add_concept_inclusion(simplified)
+
+    def _eliminate_conjunction_disjuncts(
+        self, simplified: object, result: NormalizedAxioms
+    ) -> object | None:
+        """Remove OWLObjectIntersectionOf operands from a head disjunction.
+
+        Returns the rewritten expression to add as a single concept inclusion,
+        or ``None`` if the inclusion was fully handled by splitting (the single
+        conjunction case, which emits its own inclusions).
+        """
+        from hermit.owl_model.class_expression import (
+            OWLObjectIntersectionOf,
+            OWLObjectUnionOf,
+        )
+
+        if isinstance(simplified, OWLObjectIntersectionOf):
+            # sub <= C1 and ... and Cm  ==>  one inclusion per conjunct.
+            for conjunct in simplified.operands():
+                inc = self._define_conjunct_as_inclusion(conjunct, result)
+                result.add_concept_inclusion(inc)
+            return None
+
+        if isinstance(simplified, OWLObjectUnionOf):
+            operands = list(simplified.operands())
+            if not any(isinstance(o, OWLObjectIntersectionOf) for o in operands):
+                return simplified
+            new_operands: list[object] = []
+            for operand in operands:
+                if isinstance(operand, OWLObjectIntersectionOf):
+                    fresh = self._fresh_concept("internal:and-aux")
+                    # Q -> X_j   (Q <= X_j) for every conjunct
+                    for conjunct in operand.operands():
+                        self._process_sub_class_of(
+                            OWLSubClassOfAxiom(fresh, conjunct), result
+                        )
+                    # X_1 and ... and X_m -> Q  (the conjunction <= Q)
+                    self._process_sub_class_of(
+                        OWLSubClassOfAxiom(operand, fresh), result
+                    )
+                    new_operands.append(fresh)
+                else:
+                    new_operands.append(operand)
+            return OWLObjectUnionOf(new_operands)  # type: ignore[arg-type]
+
+        return simplified
+
+    def _define_conjunct_as_inclusion(
+        self, conjunct: object, result: NormalizedAxioms
+    ) -> object:
+        """Return a NNF expression suitable as a single-disjunct inclusion.
+
+        If the conjunct is itself complex (nested conjunction/disjunction) it is
+        recursively normalised by routing through _process_sub_class_of with a
+        fresh definition; otherwise it is returned unchanged.
+        """
+        from hermit.owl_model.class_expression import (
+            OWLObjectIntersectionOf,
+            OWLObjectUnionOf,
+        )
+
+        if isinstance(conjunct, OWLObjectIntersectionOf):
+            # flatten nested conjunction
+            fresh = self._fresh_concept("internal:and-aux")
+            for inner in conjunct.operands():
+                self._process_sub_class_of(OWLSubClassOfAxiom(fresh, inner), result)
+            self._process_sub_class_of(OWLSubClassOfAxiom(conjunct, fresh), result)
+            return fresh
+        if isinstance(conjunct, OWLObjectUnionOf):
+            fresh = self._fresh_concept("internal:or-aux")
+            self._process_sub_class_of(OWLSubClassOfAxiom(fresh, conjunct), result)
+            return fresh
+        return conjunct
 
     def _emit_all_values_from_clause(
         self,
