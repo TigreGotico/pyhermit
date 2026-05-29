@@ -367,12 +367,12 @@ class OWLNormalization:
         #   * conjunction among several disjuncts
         #     -> introduce a fresh Q with Q == X1 and ... and Xm (both
         #        directions) and replace the disjunct with Q.
-        simplified = self._eliminate_conjunction_disjuncts(simplified, result)
-        if simplified is None:
+        rewritten = self._eliminate_conjunction_disjuncts(simplified, result)
+        if rewritten is None:
             # the inclusion was fully discharged by splitting
             return
 
-        result.add_concept_inclusion(simplified)
+        result.add_concept_inclusion(rewritten)
 
     def _eliminate_conjunction_disjuncts(
         self, simplified: object, result: NormalizedAxioms
