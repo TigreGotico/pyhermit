@@ -449,6 +449,7 @@ class _FullRetrieval(Retrieval):
         self._owns_buffers = owns_buffers
         self._view = view
         self._current_index = -1
+        self._end_index = 0
         self._arity = extension_table.m_tuple_arity
         self._after_last = True
 
@@ -457,7 +458,30 @@ class _FullRetrieval(Retrieval):
         self._after_last = True
 
     def open(self) -> None:
-        self._current_index = 0
+        # Restrict the scan to the requested view, mirroring Java's
+        # UnindexedRetrieval.open(): each view maps to a [start, end) range over
+        # the delta boundaries. Bounding the scan (rather than walking the whole
+        # tuple table) is both faithful -- hyperresolution secondary atoms are
+        # meant to range only over EXTENSION_THIS -- and the dominant perf win on
+        # large tableaux, where scanning the full table per clause application is
+        # quadratic.
+        arity = self._arity
+        slot_size = arity + 1
+        ext = self._extension_table
+        if self._view == "EXTENSION_THIS":
+            start = 0
+            end = ext._after_extension_this_tuple_index
+        elif self._view == "EXTENSION_OLD":
+            start = 0
+            end = ext._after_extension_old_tuple_index
+        elif self._view == "DELTA_OLD":
+            start = ext._after_extension_old_tuple_index
+            end = ext._after_extension_this_tuple_index
+        else:  # TOTAL
+            start = 0
+            end = ext._after_delta_new_tuple_index
+        self._current_index = start * slot_size
+        self._end_index = end * slot_size
         self._after_last = True
         # Pre-load first match (Java semantics: open() positions at first result)
         self._find_next()
@@ -469,7 +493,8 @@ class _FullRetrieval(Retrieval):
         slot_size = arity + 1
         positions = self._binding_positions
         bindings = self._bindings_buffer
-        while self._current_index < table.size:
+        limit = self._end_index if self._end_index < table.size else table.size
+        while self._current_index < limit:
             match = True
             for i in range(slot_size):
                 pos = positions[i]
@@ -485,7 +510,7 @@ class _FullRetrieval(Retrieval):
                 self._after_last = False
                 return
             self._current_index += slot_size
-        self._current_index = table.size
+        self._current_index = limit
         self._after_last = True
 
     def next(self) -> None:
