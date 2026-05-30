@@ -669,15 +669,16 @@ class TestDependencySetFactory:
         assert not back.contains_branching_point(1)
 
     def test_factory_permanent_sets(self):
-        """Permanent sets with usage tracking (without remove_unused_sets)."""
+        """Interned permanent sets persist across no-op usage calls."""
         factory = DependencySetFactory()
         s1 = factory.add_branching_point(factory.empty_set, 5)
         perm = factory.get_permanent(s1)
         factory.add_usage(perm)
         factory.remove_usage(perm)
-        # remove_unused_sets has a bug when set is not in entries table;
-        # just verify the set exists
+        factory.remove_unused_sets()
+        # Usage calls are no-ops; the interned set is unaffected.
         assert perm is not None
+        assert perm.contains_branching_point(5)
 
     def test_factory_large_union(self):
         """Union of many branching points."""

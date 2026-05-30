@@ -59,36 +59,40 @@ class TestDependencySetFactoryMethods:
         assert union.contains_branching_point(2)
         assert union.contains_branching_point(5)
 
-    def test_remove_usage_destroys_unreachable(self):
-        """Test that remove_usage properly decrements and frees dependency sets."""
+    def test_usage_calls_are_noops(self):
+        """add_usage/remove_usage no longer reference-count: they never destroy."""
         factory = self._make_factory()
         empty = factory.empty_set
         ds = factory.add_branching_point(empty, 3)
         factory.add_usage(ds)
-        factory.remove_usage(ds)  # usage back to 1
-        assert factory._size >= 0
+        factory.remove_usage(ds)
+        # The interned set persists regardless of usage calls.
+        assert factory._size == 1
+        assert ds.contains_branching_point(3)
 
-    def test_remove_unused_sets_destroys_entry(self):
-        """remove_unused_sets correctly removes from hash table (bug fix regression)."""
+    def test_remove_unused_sets_is_noop(self):
+        """remove_unused_sets keeps interned sets alive (GC owns reclamation)."""
         factory = self._make_factory()
         empty = factory.empty_set
         ds = factory.add_branching_point(empty, 10)
         factory.add_usage(ds)
-        factory.remove_usage(ds)  # usage_counter → 0, added to unused list
-        factory.remove_unused_sets()  # must not raise RuntimeError
-        assert factory._size == 0
+        factory.remove_usage(ds)
+        factory.remove_unused_sets()  # no-op; must not raise and must not free
+        assert factory._size == 1
+        assert ds.contains_branching_point(10)
 
-    def test_recycle_destroyed_set(self):
-        """After destroy, next create reuses the recycled PermanentDependencySet."""
+    def test_equal_sets_are_interned_to_same_object(self):
+        """Re-creating an equal set returns the same interned instance (is)."""
         factory = self._make_factory()
         empty = factory.empty_set
         ds = factory.add_branching_point(empty, 7)
         factory.add_usage(ds)
         factory.remove_usage(ds)
         factory.remove_unused_sets()
-        assert factory._size == 0
+        assert factory._size == 1
         ds2 = factory.add_branching_point(empty, 7)
-        assert ds2.contains_branching_point(7)
+        # Interning: structurally equal sets share identity, so equality is `is`.
+        assert ds2 is ds
         assert factory._size == 1
 
     def test_add_branching_point_existing_middle_line143(self):

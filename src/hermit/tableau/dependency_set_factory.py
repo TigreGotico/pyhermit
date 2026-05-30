@@ -43,8 +43,16 @@ class DependencySetFactory:
     """Factory for creating and interning :class:`PermanentDependencySet` instances.
 
     The factory maintains a hash table of existing permanent sets so that
-    structurally equivalent sets share the same object instance.  It also
-    tracks usage counts and reclaims unused sets.
+    structurally equivalent sets share the same object instance: two dependency
+    sets with the same content are the *same* object, so equality is object
+    identity (``is``) and hashing is structural.
+
+    Interned sets are immutable in content and live for the lifetime of the
+    factory; there is no manual reclamation.  Python's garbage collector
+    reclaims everything when :meth:`clear` drops the hash table (or when the
+    factory itself is collected).  The :meth:`add_usage`, :meth:`remove_usage`
+    and :meth:`remove_unused_sets` methods are retained as no-ops so existing
+    callers need not change, but they perform no reference counting.
     """
 
     def __init__(self) -> None:
@@ -52,8 +60,6 @@ class DependencySetFactory:
         self._merge_sets: list[PermanentDependencySet] = []
         self._unprocessed_sets: list[UnionDependencySet] = []
         self._empty_set: PermanentDependencySet | None = None
-        self._first_unused_set: PermanentDependencySet | None = None
-        self._first_destroyed_set: PermanentDependencySet | None = None
         self._entries: list[PermanentDependencySet | None] = [None] * 16
         self._size: int = 0
         self._resize_threshold: int = int(len(self._entries) * 0.75)
@@ -78,14 +84,9 @@ class DependencySetFactory:
 
         empty_set = PermanentDependencySet()
         empty_set._branching_point = -1
-        empty_set._usage_counter = 1
         empty_set._rest = None
-        empty_set._previous_unused_set = None
-        empty_set._next_unused_set = None
 
         self._empty_set = empty_set
-        self._first_unused_set = None
-        self._first_destroyed_set = None
         self._entries = [None] * 16
         self._resize_threshold = int(len(self._entries) * 0.75)
         self._size = 0
@@ -97,32 +98,19 @@ class DependencySetFactory:
         return self._empty_set
 
     def remove_unused_sets(self) -> None:
-        """Destroy all dependency sets whose usage counter has reached zero."""
-        while self._first_unused_set is not None:
-            self._destroy_dependency_set(self._first_unused_set)
+        """No-op: interned sets are reclaimed by Python's garbage collector.
+
+        Retained for call-site compatibility.  Interned permanent sets are
+        immutable and shared; they live for the lifetime of the factory and
+        are dropped wholesale by :meth:`clear`, so there is nothing to reclaim
+        eagerly here.
+        """
 
     def add_usage(self, dependency_set: PermanentDependencySet) -> None:
-        """Increment the usage counter for *dependency_set*."""
-        assert (
-            dependency_set._branching_point >= 0
-            or dependency_set is self._empty_set
-        )
-        if dependency_set._usage_counter == 0:
-            self._remove_from_unused_list(dependency_set)
-        dependency_set._usage_counter += 1
+        """No-op: usage is no longer reference-counted (see class docstring)."""
 
     def remove_usage(self, dependency_set: PermanentDependencySet) -> None:
-        """Decrement the usage counter; add to unused list when it hits zero."""
-        assert (
-            dependency_set._branching_point >= 0
-            or dependency_set is self._empty_set
-        )
-        assert dependency_set._usage_counter > 0
-        assert dependency_set._previous_unused_set is None
-        assert dependency_set._next_unused_set is None
-        dependency_set._usage_counter -= 1
-        if dependency_set._usage_counter == 0:
-            self._add_to_unused_list(dependency_set)
+        """No-op: usage is no longer reference-counted (see class docstring)."""
 
     def add_branching_point(
         self, dependency_set: DependencySet | None, branching_point: int
@@ -302,78 +290,17 @@ class DependencySetFactory:
     def _create_dependency_set(
         self, rest: PermanentDependencySet, branching_point: int
     ) -> PermanentDependencySet:
-        """Allocate and initialise a new PermanentDependencySet."""
-        if self._first_destroyed_set is None:
-            new_set = PermanentDependencySet()
-        else:
-            new_set = self._first_destroyed_set
-            self._first_destroyed_set = self._first_destroyed_set._next_entry
+        """Allocate and initialise a new interned PermanentDependencySet.
 
+        The new set is immutable in content (``_rest`` and ``_branching_point``
+        never change after this point) and is kept alive by the entries table
+        for the lifetime of the factory.  No reference counting is performed.
+        """
+        new_set = PermanentDependencySet()
         new_set._rest = rest
         new_set._branching_point = branching_point
-        new_set._usage_counter = 0
-        self.add_usage(new_set._rest)
-        self._add_to_unused_list(new_set)
         self._size += 1
         return new_set
-
-    def _destroy_dependency_set(self, dependency_set: PermanentDependencySet) -> None:
-        """Remove *dependency_set* from the factory."""
-        assert dependency_set._branching_point >= 0
-        assert dependency_set._usage_counter == 0
-        assert dependency_set._rest is not None
-        assert dependency_set._rest._usage_counter > 0
-
-        self._remove_from_unused_list(dependency_set)
-        self.remove_usage(dependency_set._rest)
-        self._remove_from_entries(dependency_set)
-        dependency_set._rest = None
-        dependency_set._branching_point = -2
-        dependency_set._next_entry = self._first_destroyed_set
-        self._first_destroyed_set = dependency_set
-        self._size -= 1
-
-    def _remove_from_entries(self, dependency_set: PermanentDependencySet) -> None:
-        """Remove *dependency_set* from the hash table."""
-        index = dependency_set._rest._hash() & (len(self._entries) - 1)  # type: ignore[union-attr]
-        last_entry: PermanentDependencySet | None = None
-        entry: PermanentDependencySet | None = self._entries[index]
-        while entry is not None:
-            if entry is dependency_set:
-                if last_entry is None:
-                    self._entries[index] = dependency_set._next_entry
-                else:
-                    last_entry._next_entry = dependency_set._next_entry
-                return
-            last_entry = entry
-            entry = entry._next_entry
-        raise RuntimeError(
-            "Internal error: dependency set not in the entries table. "
-            "Please inform HermiT authors about this."
-        )
-
-    def _remove_from_unused_list(self, dependency_set: PermanentDependencySet) -> None:
-        """Unlink *dependency_set* from the doubly-linked unused list."""
-        if dependency_set._previous_unused_set is not None:
-            dependency_set._previous_unused_set._next_unused_set = (
-                dependency_set._next_unused_set
-            )
-        else:
-            self._first_unused_set = dependency_set._next_unused_set
-        if dependency_set._next_unused_set is not None:
-            dependency_set._next_unused_set._previous_unused_set = (
-                dependency_set._previous_unused_set
-            )
-        dependency_set._previous_unused_set = None
-        dependency_set._next_unused_set = None
-
-    def _add_to_unused_list(self, dependency_set: PermanentDependencySet) -> None:
-        """Prepend *dependency_set* to the doubly-linked unused list."""
-        dependency_set._previous_unused_set = None
-        dependency_set._next_unused_set = self._first_unused_set
-        if self._first_unused_set is not None:
-            self._first_unused_set._previous_unused_set = dependency_set
-        self._first_unused_set = dependency_set
 
     def _resize_entries(self) -> None:
         """Double the hash table size and rehash all entries."""

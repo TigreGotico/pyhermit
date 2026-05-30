@@ -10,37 +10,34 @@ class PermanentDependencySet(DependencySet):
 
     Permanent dependency sets are managed by :class:`DependencySetFactory`
     and are shared (interned) so that structural equality is equivalent to
-    object identity.  They are organised as a linked list of branching
+    object identity (``is``).  They are organised as a linked list of branching
     points sorted in descending order.
 
-    Fields mirror the Java ``PermanentDependencySet``:
+    Once created by the factory the *content* of a permanent set is immutable:
+    ``_rest`` and ``_branching_point`` are never reassigned, which is what
+    makes interning (and ``is``-equality) sound.  There is no reference
+    counting; interned sets are reclaimed by Python's garbage collector when
+    the factory's hash table is dropped.
 
-    * ``_rest`` -- the remainder of the linked list (tail).
+    Fields:
+
+    * ``_rest`` -- the remainder of the linked list (tail); immutable content.
     * ``_branching_point`` -- the branching point stored at this node
-      (``-1`` indicates the empty set, ``-2`` indicates an uninitialised
-      or recycled slot).
-    * ``_next_entry`` -- next entry in the same hash bucket.
-    * ``_usage_counter`` -- number of active references.
-    * ``_previous_unused_set`` / ``_next_unused_set`` -- doubly-linked list
-      of sets with ``_usage_counter == 0``.
+      (``-1`` indicates the empty set); immutable content.
+    * ``_next_entry`` -- next entry in the same hash bucket; pure table
+      bookkeeping, reassigned only on rehash.
     """
 
     __slots__ = (
         "_rest",
         "_branching_point",
         "_next_entry",
-        "_usage_counter",
-        "_previous_unused_set",
-        "_next_unused_set",
     )
 
     def __init__(self) -> None:
         self._rest: PermanentDependencySet | None = None
         self._branching_point: int = -2
         self._next_entry: PermanentDependencySet | None = None
-        self._usage_counter: int = 0
-        self._previous_unused_set: PermanentDependencySet | None = None
-        self._next_unused_set: PermanentDependencySet | None = None
 
     # -- DependencySet interface ---------------------------------------
 

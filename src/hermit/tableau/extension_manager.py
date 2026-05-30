@@ -97,26 +97,23 @@ class LastObjectDependencySetManager(DependencySetManager):
         return cast("DependencySet | None", table.get_tuple_object(tuple_index, arity))
 
     def store_dependency_set(self, tuple_index: int, dependency_set: DependencySet) -> None:
-        # Mirror Java LastObjectDependencySetManager.setDependencySet: intern the
-        # (possibly transient) dependency set to its permanent representative, store
-        # the permanent in the slot, and register one usage on it. The matching
-        # remove_usage happens in forget_dependency_set when the tuple is dropped
-        # during backtracking.
+        # Intern the (possibly transient) dependency set to its permanent,
+        # interned representative and store the permanent in the slot. Storing
+        # the interned permanent set -- rather than a transient union -- is what
+        # gives the tableau fast ``is``/hash equality on dependency sets. The
+        # interned set is immutable and reclaimed by Python's garbage collector;
+        # there is no usage counting to register here.
         arity = self._extension_table.m_tuple_arity
         table = self._extension_table.m_tuple_table
         factory = self._extension_table.m_tableau.m_dependency_set_factory
         permanent = factory.get_permanent(dependency_set)
         table._data[tuple_index + arity] = permanent
-        factory.add_usage(permanent)
 
     def forget_dependency_set(self, tuple_index: int) -> None:
-        arity = self._extension_table.m_tuple_arity
-        table = self._extension_table.m_tuple_table
-        factory = self._extension_table.m_tableau.m_dependency_set_factory
-        permanent = cast(
-            "PermanentDependencySet", table.get_tuple_object(tuple_index, arity)
-        )
-        factory.remove_usage(permanent)
+        # No-op: the tuple slot is dropped wholesale when the tuple table is
+        # truncated during backtracking, and the interned permanent set is
+        # reclaimed by Python's garbage collector once nothing references it.
+        pass
 
 
 class DeterministicDependencySetManager(DependencySetManager):
