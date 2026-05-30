@@ -30,6 +30,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from hermit.model import (
+    AnnotatedEquality,
     AtLeastConcept,
     AtLeastDataRange,
     AtMostConcept,
@@ -37,6 +38,8 @@ from hermit.model import (
     AtomicConcept,
     AtomicNegationConcept,
     AtomicRole,
+    NodeIDLessEqualThan,
+    NodeIDsAscendingOrEqual,
     Concept,
     Constant,
     ConstantEnumeration,
@@ -540,55 +543,74 @@ class NormalizedAxiomClausifier:
             self._head_atoms.append(Atom.create(concept, X))
 
     def visit_at_most_concept(self, concept: AtMostConcept) -> None:
-        """AtMostConcept (≤n R.C) -> pairwise equality DL clauses.
+        """AtMostConcept (≤n R.C) -> NN-rule head atoms in the current clause.
 
-        For ≤n R.C: generate n+1 fresh Y-variables.  For each pair (Yi, Yj)
-        with i < j, emit a separate DL clause:
+        Faithful mirror of the Java ``NormalizedAxiomClausifier`` handling of
+        ``OWLObjectMaxCardinality``.  The at-most contributes to the *current*
+        DL clause (sharing head/body with the other disjuncts of the inclusion),
+        rather than emitting separate global clauses:
 
-            A(X) ∧ R(X, Yi) ∧ C(Yi) ∧ R(X, Yj) ∧ C(Yj) → Yi = Yj
-
-        The equality head forces the tableau to nondeterministically merge
-        the two successor nodes — this is the correct DL encoding of ≤n R.C.
-
-        The body atom A(X) is whatever is currently in self._body_atoms
-        (the subclass of the current GCI).  The method temporarily builds
-        each pairwise clause and accumulates them in self._head_atoms as a
-        sentinel — the caller (clausify()) must flush each clause immediately.
-
-        Implementation note: for ≤0 R.C we emit one clause:
-            A(X) ∧ R(X, Y) ∧ C(Y) → ⊥   (empty head = contradiction)
+        - ``n+1`` fresh Y-variables are introduced; for each, ``R(X, Yi)`` is
+          added to the body.
+        - If the filler is a positive atomic concept ``C``, ``C(Yi)`` goes to
+          the body; if it is a negated atomic concept ``¬C``, ``C(Yi)`` goes to
+          the head; ``owl:Thing`` fillers contribute no filler atom.
+        - For ``n ≥ 2`` (more than two witnesses), node-ordering guards
+          ``NodeIDLessEqualThan`` and ``NodeIDsAscendingOrEqual`` are added to
+          the body so the NN-rule only fires on canonically-ordered tuples.
+        - For every pair ``(Yi, Yj)`` with ``i < j`` an ``AnnotatedEquality``
+          head atom ``Yi == Yj`` (annotated with the cardinality / role /
+          filler and the central node ``X``) is added.  The disjunction of
+          these equalities, together with the inclusion's other disjuncts, is
+          what the tableau's NN-rule merges nondeterministically.
         """
         n = concept.number
         role = concept.on_role
         filler = concept.to_concept
 
-        # Save current body (the A(X) guard from the GCI subclass)
-        saved_body = list(self._body_atoms)
+        self._ensure_y_not_zero()
 
-        if n == 0:
-            # ≤0 R.C: A(X) ∧ R(X,Y) ∧ C(Y) → ⊥
-            y_var = Variable.create("Y")
-            body = tuple(saved_body) + (
-                Atom.create(role, X, y_var),  # type: ignore[arg-type]
-                Atom.create(filler, y_var),  # type: ignore[arg-type]
+        # Determine whether the filler atom (if any) is positive or negated.
+        atomic_concept: AtomicConcept | None
+        if isinstance(filler, AtomicNegationConcept):
+            is_positive = False
+            negated = filler.negated
+            atomic_concept = None if negated.is_always_false() else negated
+        elif isinstance(filler, AtomicConcept):
+            is_positive = True
+            atomic_concept = None if filler.is_always_true() else filler
+        else:  # pragma: no cover - normal form guarantees atomic fillers
+            raise ValueError(
+                f"Invalid at-most filler in normal form: {filler!r}"
             )
-            self._extra_clauses.append(DLClause.create((), body))
-        else:
-            # ≤n R.C: pairwise inequality for n+1 witnesses
-            y_vars = [Variable.create(f"Y{i}") for i in range(n + 1)]
-            for i in range(n + 1):
-                for j in range(i + 1, n + 1):
-                    body = tuple(saved_body) + (
-                        Atom.create(role, X, y_vars[i]),  # type: ignore[arg-type]
-                        Atom.create(filler, y_vars[i]),  # type: ignore[arg-type]
-                        Atom.create(role, X, y_vars[j]),  # type: ignore[arg-type]
-                        Atom.create(filler, y_vars[j]),  # type: ignore[arg-type]
-                    )
-                    head = (Atom.create(Equality.INSTANCE, y_vars[i], y_vars[j]),)
-                    self._extra_clauses.append(DLClause.create(head, body))
 
-        # No head atoms from this visit — the clauses are in _extra_clauses
-        # The caller must consume _extra_clauses after get_dl_clause()
+        annotated_equality = AnnotatedEquality.create(n, role, filler)
+        y_vars = []
+        for _ in range(n + 1):
+            y_var = self._next_y()
+            y_vars.append(y_var)
+            self._body_atoms.append(_role_atom(role, X, y_var))
+            if atomic_concept is not None:
+                atom = Atom.create(atomic_concept, y_var)
+                if is_positive:
+                    self._body_atoms.append(atom)
+                else:
+                    self._head_atoms.append(atom)
+
+        if len(y_vars) > 2:
+            for i in range(len(y_vars) - 1):
+                self._body_atoms.append(
+                    Atom.create(NodeIDLessEqualThan.INSTANCE, y_vars[i], y_vars[i + 1])
+                )
+            self._body_atoms.append(
+                Atom.create(NodeIDsAscendingOrEqual.create(len(y_vars)), *y_vars)
+            )
+
+        for i in range(len(y_vars)):
+            for j in range(i + 1, len(y_vars)):
+                self._head_atoms.append(
+                    Atom.create(annotated_equality, y_vars[i], y_vars[j], X)
+                )
 
     def visit_exists_description_graph(self, concept: ExistsDescriptionGraph) -> None:
         """ExistsDescriptionGraph -> head atom."""
