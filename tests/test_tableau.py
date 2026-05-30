@@ -588,12 +588,6 @@ class TestHeadDisjunctionExpansion:
         finally:
             reasoner.dispose()
 
-    @pytest.mark.xfail(
-        reason="head-disjunction inconsistency: a disjunct asserted at a branching "
-        "point is not promoted into the apply range, so its clash never fires; "
-        "see TODO.md / FAITHFULNESS_AUDIT.md",
-        strict=True,
-    )
     def test_both_disjuncts_clash_is_inconsistent(self):
         """U(a); U(X)->A(X)|B(X); A->clash; B->clash  =>  inconsistent."""
         x = Variable.create("X")
@@ -638,3 +632,23 @@ class TestHeadDisjunctionExpansion:
             DLClause.create((), (Atom.create(a, x),)),
         ]
         assert self._consistent(clauses, [Atom.create(u, ind)], "urn:disj:mixed")
+
+    def test_satisfiable_disjunction_chain_terminates(self):
+        """A(a); A(X)->D0(X); D0(X)->D0(X)|D1(X) terminates and is consistent.
+
+        The recursive disjunction whose first disjunct re-derives its own body
+        must not loop: the disjunct already holds, so the branch is satisfied and
+        expansion stops. Reaching a verdict at all is the termination check.
+        """
+        x = Variable.create("X")
+        a = AtomicConcept.create(self.NS + "A")
+        d0 = AtomicConcept.create(self.NS + "D0")
+        d1 = AtomicConcept.create(self.NS + "D1")
+        ind = Individual.create(self.NS + "a")
+        clauses = [
+            DLClause.create((Atom.create(d0, x),), (Atom.create(a, x),)),
+            DLClause.create(
+                (Atom.create(d0, x), Atom.create(d1, x)), (Atom.create(d0, x),)
+            ),
+        ]
+        assert self._consistent(clauses, [Atom.create(a, ind)], "urn:disj:chain")

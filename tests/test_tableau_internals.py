@@ -413,36 +413,52 @@ class _FakeDependencySet:
 
 
 class TestUnionDependencySet:
-    def test_empty(self):
+    def test_constructor_sets_constituent_count(self):
+        # New contract (matches Java): the constructor reserves and counts
+        # `number_of_constituents` slots so that callers (DL-clause evaluator,
+        # existential manager) can write directly into m_dependency_sets[i]
+        # without going through add_constituent and still have get_permanent and
+        # the branching-point queries see those constituents.
+        uds = UnionDependencySet(4)
+        assert uds.m_number_of_constituents == 4
+        assert len(uds.m_dependency_sets) == 4
+
+    def test_empty_when_all_slots_none(self):
         uds = UnionDependencySet(4)
         assert uds.is_empty()
 
-    def test_add_constituent_and_contains(self):
-        uds = UnionDependencySet(4)
-        uds.add_constituent(_FakeDependencySet({1, 3}))
-        uds.add_constituent(_FakeDependencySet({5}))
+    def test_direct_slot_write_and_contains(self):
+        # The direct-write contract used by CopyDependencySet workers.
+        uds = UnionDependencySet(2)
+        uds.m_dependency_sets[0] = _FakeDependencySet({1, 3})
+        uds.m_dependency_sets[1] = _FakeDependencySet({5})
         assert uds.contains_branching_point(1)
         assert uds.contains_branching_point(5)
         assert not uds.contains_branching_point(2)
-
-    def test_is_empty_with_non_empty_constituent(self):
-        uds = UnionDependencySet(4)
-        uds.add_constituent(_FakeDependencySet({1}))
+        assert uds.get_maximum_branching_point() == 5
         assert not uds.is_empty()
+
+    def test_add_constituent_after_clear(self):
+        # The dynamic API (datatype manager path): clear first, then append.
+        uds = UnionDependencySet(4)
+        uds.clear_constituents()
+        uds.add_constituent(_FakeDependencySet({1, 3}))
+        uds.add_constituent(_FakeDependencySet({5}))
+        assert uds.m_number_of_constituents == 2
+        assert uds.contains_branching_point(1)
+        assert uds.contains_branching_point(5)
+        assert not uds.contains_branching_point(2)
+        assert uds.get_maximum_branching_point() == 5
 
     def test_is_empty_with_empty_constituent(self):
         uds = UnionDependencySet(4)
+        uds.clear_constituents()
         uds.add_constituent(_FakeDependencySet(set()))
         assert uds.is_empty()
 
-    def test_get_maximum_branching_point(self):
-        uds = UnionDependencySet(4)
-        uds.add_constituent(_FakeDependencySet({1, 3}))
-        uds.add_constituent(_FakeDependencySet({5}))
-        assert uds.get_maximum_branching_point() == 5
-
     def test_clear_constituents(self):
         uds = UnionDependencySet(4)
+        uds.clear_constituents()
         uds.add_constituent(_FakeDependencySet({1}))
         uds.clear_constituents()
         assert uds.is_empty()
@@ -450,6 +466,7 @@ class TestUnionDependencySet:
 
     def test_add_constituent_resize(self):
         uds = UnionDependencySet(2)
+        uds.clear_constituents()
         for i in range(5):
             uds.add_constituent(_FakeDependencySet({i}))
         assert uds.m_number_of_constituents == 5
@@ -653,7 +670,30 @@ class TestNode:
         assert b.previous_tableau_node is a
 
     def test_unprocessed_existentials(self):
-        n = self._make_node()
+        # add_unprocessed_existential draws its backing list from the tableau's
+        # existential-concepts buffer pool (symmetric with the removal path), so a
+        # node needs a tableau exposing that pool.
+        class _BufferPoolTableau:
+            def __init__(self):
+                self._buffers = []
+
+            def get_existential_concepts_buffer(self):
+                return self._buffers.pop() if self._buffers else []
+
+            def put_existential_concepts_buffer(self, buffer):
+                buffer.clear()
+                self._buffers.append(buffer)
+
+            class _DescriptionGraphManager:
+                def initialise_node(self, node):
+                    pass
+
+                def destroy_node(self, node):
+                    pass
+
+            m_description_graph_manager = _DescriptionGraphManager()
+
+        n = self._make_node(tableau=_BufferPoolTableau())
         n.initialize(0, None, NodeType.NAMED_NODE, 0)
         assert not n.has_unprocessed_existentials()
         assert n.get_unprocessed_existentials() == []

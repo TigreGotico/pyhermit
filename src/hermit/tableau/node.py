@@ -146,7 +146,9 @@ class Node:
                 self.m_tableau.put_existential_concepts_buffer(
                     self.m_unprocessed_existentials
                 )
-        self.m_unprocessed_existentials = []  # node is destroyed; reset to empty
+        # Reset to the shared sentinel (not a fresh list) so initialize()'s
+        # precondition holds when this node object is recycled.
+        self.m_unprocessed_existentials = Node._no_existentials
         self.m_previous_tableau_node = None
         self.m_next_tableau_node = None
         self.m_previous_merged_or_pruned_node = None
@@ -283,9 +285,20 @@ class Node:
         self.m_blocker = node
 
     def add_unprocessed_existential(self, existential: Any) -> None:
-        """Add an unprocessed existential."""
+        """Add an unprocessed existential (mirrors Java addToUnprocessedExistentials).
+
+        Draws a list from the tableau's existential-concepts buffer pool so that it
+        is symmetric with :meth:`_remove_from_unprocessed_existentials`, which
+        returns the list to that pool. Allocating a fresh ``[]`` here would pollute
+        the pool with externally-allocated lists.
+        """
+        assert Node._no_existentials == []
         if self.m_unprocessed_existentials is Node._no_existentials:
-            self.m_unprocessed_existentials = []
+            assert self.m_tableau is not None
+            self.m_unprocessed_existentials = (
+                self.m_tableau.get_existential_concepts_buffer()
+            )
+            assert self.m_unprocessed_existentials == []
         self.m_unprocessed_existentials.append(existential)
 
     def is_ancestor_of(self, potential_descendant: Node | None) -> bool:

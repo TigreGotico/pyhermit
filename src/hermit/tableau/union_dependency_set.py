@@ -20,7 +20,7 @@ class UnionDependencySet(DependencySet):
         self.m_dependency_sets: list[DependencySet | None] = [
             None
         ] * number_of_constituents
-        self.m_number_of_constituents = 0  # starts empty, capacity is len(m_dependency_sets)
+        self.m_number_of_constituents = number_of_constituents
 
     # -- DependencySet interface ---------------------------------------
 

@@ -81,6 +81,9 @@ class DependencySetManager(ABC):
     @abstractmethod
     def store_dependency_set(self, tuple_index: int, dependency_set: DependencySet) -> None: ...
 
+    @abstractmethod
+    def forget_dependency_set(self, tuple_index: int) -> None: ...
+
 
 class LastObjectDependencySetManager(DependencySetManager):
     """Stores dependency sets as the last object in each tuple slot."""
@@ -94,9 +97,26 @@ class LastObjectDependencySetManager(DependencySetManager):
         return cast("DependencySet | None", table.get_tuple_object(tuple_index, arity))
 
     def store_dependency_set(self, tuple_index: int, dependency_set: DependencySet) -> None:
+        # Mirror Java LastObjectDependencySetManager.setDependencySet: intern the
+        # (possibly transient) dependency set to its permanent representative, store
+        # the permanent in the slot, and register one usage on it. The matching
+        # remove_usage happens in forget_dependency_set when the tuple is dropped
+        # during backtracking.
         arity = self._extension_table.m_tuple_arity
         table = self._extension_table.m_tuple_table
-        table._data[tuple_index + arity] = dependency_set
+        factory = self._extension_table.m_tableau.m_dependency_set_factory
+        permanent = factory.get_permanent(dependency_set)
+        table._data[tuple_index + arity] = permanent
+        factory.add_usage(permanent)
+
+    def forget_dependency_set(self, tuple_index: int) -> None:
+        arity = self._extension_table.m_tuple_arity
+        table = self._extension_table.m_tuple_table
+        factory = self._extension_table.m_tableau.m_dependency_set_factory
+        permanent = cast(
+            "PermanentDependencySet", table.get_tuple_object(tuple_index, arity)
+        )
+        factory.remove_usage(permanent)
 
 
 class DeterministicDependencySetManager(DependencySetManager):
@@ -109,6 +129,9 @@ class DeterministicDependencySetManager(DependencySetManager):
         return self._extension_table.m_tableau.m_dependency_set_factory.empty_set
 
     def store_dependency_set(self, tuple_index: int, dependency_set: DependencySet) -> None:
+        pass
+
+    def forget_dependency_set(self, tuple_index: int) -> None:
         pass
 
 
@@ -526,15 +549,43 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         self._after_delta_new_tuple_index = 0
 
     def branching_point_pushed(self) -> None:
-        slot_size = self.m_tuple_arity + 1
-        self._after_extension_this_tuple_index = self.m_tuple_table.size // slot_size
-        self._after_delta_new_tuple_index = self.m_tuple_table.size // slot_size
+        # Mirror Java ExtensionTable.branchingPointPushed: snapshot all three
+        # delta boundaries for the current level into m_indices_by_branching_point
+        # at offset level*3, without mutating any of them. Collapsing them here is
+        # what jammed disjuncts asserted after a push into "extension-this" so their
+        # clash never re-entered DELTA_OLD.
+        level = self.m_tableau.get_current_branching_point_level()
+        start = level * 3
+        required_size = start + 3
+        if required_size > len(self.m_indices_by_branching_point):
+            new_size = len(self.m_indices_by_branching_point) * 3 // 2
+            while required_size > new_size:
+                new_size = new_size * 3 // 2
+            new_indices = [0] * new_size
+            new_indices[: len(self.m_indices_by_branching_point)] = (
+                self.m_indices_by_branching_point
+            )
+            self.m_indices_by_branching_point = new_indices
+        self.m_indices_by_branching_point[start] = self._after_extension_old_tuple_index
+        self.m_indices_by_branching_point[start + 1] = self._after_extension_this_tuple_index
+        self.m_indices_by_branching_point[start + 2] = self._after_delta_new_tuple_index
 
     def backtrack(self) -> None:
-        self.m_tuple_table.truncate(self._after_extension_old_tuple_index * (self.m_tuple_arity + 1))
+        # Mirror Java ExtensionTable.backtrack: restore all three boundaries from
+        # the snapshot and truncate the tuple table to the saved afterDeltaNew,
+        # running postRemove + forgetDependencySet for every dropped tuple.
+        level = self.m_tableau.get_current_branching_point_level()
+        start = level * 3
         slot_size = self.m_tuple_arity + 1
-        self._after_extension_this_tuple_index = self.m_tuple_table.size // slot_size
-        self._after_delta_new_tuple_index = self.m_tuple_table.size // slot_size
+        new_after_delta_new = self.m_indices_by_branching_point[start + 2]
+        for tuple_index in range(self._after_delta_new_tuple_index - 1, new_after_delta_new - 1, -1):
+            element_index = tuple_index * slot_size
+            self.m_dependency_set_manager.forget_dependency_set(element_index)
+            self._post_remove(element_index)
+        self.m_tuple_table.truncate(new_after_delta_new * slot_size)
+        self._after_extension_old_tuple_index = self.m_indices_by_branching_point[start]
+        self._after_extension_this_tuple_index = self.m_indices_by_branching_point[start + 1]
+        self._after_delta_new_tuple_index = new_after_delta_new
 
     def add_tuple(
         self,
@@ -552,6 +603,11 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         self.m_dependency_set_manager.store_dependency_set(tuple_index, dependency_set)
         if is_core:
             self.m_core_manager.mark_core(tuple_index, True)
+        # Advance the delta-new boundary so the freshly added tuple becomes part of
+        # DELTA_NEW (Java: m_afterDeltaNewTupleIndex = getFirstFreeTupleIndex()).
+        self._after_delta_new_tuple_index = self.m_tuple_table.size // (
+            self.m_tuple_arity + 1
+        )
 
         # Post-add processing (mirrors Java ExtensionTable.postAdd)
         dl_predicate = tuple_data[0]
@@ -602,6 +658,69 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         # Notify clash manager
         self.m_tableau.m_clash_manager.tuple_added(self, tuple_data, dependency_set, is_core)
         return True
+
+    def _post_remove(self, element_index: int) -> None:
+        """Undo the side effects of a tuple add (mirrors Java ExtensionTable.postRemove).
+
+        Decrements the per-node assertion counters, drops the existential from the
+        node's unprocessed queue, and notifies the expansion strategy that the
+        assertion was removed. *element_index* is the flat array index of the tuple.
+        """
+        from hermit.model import (
+            AtomicConcept,
+            AtomicNegationConcept,
+            AtomicRole,
+            DataRange,
+            DescriptionGraph,
+            ExistentialConcept,
+            NegatedAtomicRole,
+        )
+
+        table = self.m_tuple_table
+        dl_predicate = table.get_tuple_object(element_index, 0)
+        is_core = self.m_core_manager.is_core(element_index)
+        strat = (
+            self.m_tableau.m_existential_expansion_strategy
+            if self.m_tableau is not None
+            else None
+        )
+        if isinstance(dl_predicate, AtomicConcept):
+            node = table.get_tuple_object(element_index, 1)
+            if node is not None:
+                if strat is not None:
+                    strat.assertion_removed_concept(dl_predicate, node, is_core)
+                node.m_number_of_positive_atomic_concepts -= 1
+        elif isinstance(dl_predicate, ExistentialConcept):
+            node = table.get_tuple_object(element_index, 1)
+            if node is not None:
+                if strat is not None:
+                    strat.assertion_removed_concept(dl_predicate, node, is_core)
+                node._remove_from_unprocessed_existentials(dl_predicate)
+        elif isinstance(dl_predicate, AtomicNegationConcept):
+            # Mirror postAdd: only the counter is touched here; the expansion
+            # strategy is not notified for negated atomic concepts.
+            node = table.get_tuple_object(element_index, 1)
+            if node is not None:
+                node.m_number_of_negated_atomic_concepts -= 1
+        elif isinstance(dl_predicate, DataRange):
+            node = table.get_tuple_object(element_index, 1)
+            if node is not None and strat is not None:
+                strat.assertion_removed_data_range(dl_predicate, node, is_core)
+        elif isinstance(dl_predicate, AtomicRole):
+            node1 = table.get_tuple_object(element_index, 1)
+            node2 = table.get_tuple_object(element_index, 2)
+            if strat is not None:
+                strat.assertion_removed_atomic_role(dl_predicate, node1, node2, is_core)
+        elif isinstance(dl_predicate, NegatedAtomicRole):
+            node = table.get_tuple_object(element_index, 1)
+            if node is not None:
+                node.m_number_of_negated_role_assertions -= 1
+        elif isinstance(dl_predicate, DescriptionGraph):
+            tuple_buffer: list[Any] = [None] * (self.m_tuple_arity + 1)
+            table.retrieve_tuple(tuple_buffer, element_index)
+            self.m_tableau.m_description_graph_manager.description_graph_tuple_removed(
+                element_index, tuple_buffer
+            )
 
     def contains_tuple(self, tuple_data: list[Any]) -> bool:
         table = self.m_tuple_table
