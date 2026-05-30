@@ -10,3 +10,4 @@ build/
 coverage.json
 .pytest_cache/
 .plan/
+.claude/
