@@ -600,11 +600,11 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         self.m_dependency_set_manager.store_dependency_set(tuple_index, dependency_set)
         if is_core:
             self.m_core_manager.mark_core(tuple_index, True)
-        # Advance the delta-new boundary so the freshly added tuple becomes part of
-        # DELTA_NEW (Java: m_afterDeltaNewTupleIndex = getFirstFreeTupleIndex()).
-        self._after_delta_new_tuple_index = self.m_tuple_table.size // (
-            self.m_tuple_arity + 1
-        )
+        # The delta-new boundary is advanced by propagate_delta_new, not here:
+        # Java ExtensionTable.addTuple leaves m_afterDeltaNewTupleIndex untouched
+        # so freshly added tuples sit beyond DELTA_NEW until the next propagation
+        # rotates the boundaries. Advancing it on every add corrupts the delta
+        # accounting and breaks saturation termination.
 
         # Post-add processing (mirrors Java ExtensionTable.postAdd)
         dl_predicate = tuple_data[0]
