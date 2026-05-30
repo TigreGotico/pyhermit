@@ -202,9 +202,12 @@ class DependencySetFactory:
         if isinstance(dependency_set, PermanentDependencySet):
             return dependency_set
 
-        # Flatten UnionDependencySet constituents
-        from hermit.tableau.union_dependency_set import UnionDependencySet
-
+        # Flatten union-of-constituents dependency sets. Several distinct union
+        # implementations exist (UnionDependencySet plus the lightweight inline
+        # unions in MergingManager and ClashManager); they share the
+        # m_number_of_constituents / m_dependency_sets duck-typed interface but do
+        # not share a base class, so recognise a union by that interface rather
+        # than by a single concrete type.
         self._unprocessed_sets.clear()
         self._merge_sets.clear()
         self._unprocessed_sets.append(dependency_set)  # type: ignore[arg-type]
@@ -215,8 +218,10 @@ class DependencySetFactory:
                 constituent = union_ds.m_dependency_sets[idx]
                 if constituent is None:
                     continue
-                elif isinstance(constituent, UnionDependencySet):
-                    self._unprocessed_sets.append(constituent)
+                elif isinstance(constituent, PermanentDependencySet):
+                    self._merge_sets.append(constituent)
+                elif hasattr(constituent, "m_number_of_constituents"):
+                    self._unprocessed_sets.append(constituent)  # type: ignore[arg-type]
                 else:
                     self._merge_sets.append(constituent)  # type: ignore[arg-type]
 
