@@ -536,11 +536,44 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         self._bp_tuple_index = 0
         self._bp_delta_index = 0
         self._bp_extension_index = 0
+        # Membership hash index: maps a key built from the identities of a
+        # tuple's logical columns to that tuple's flat element-index in the
+        # tuple table. Mirrors Java's hash tuple-index and makes contains_tuple
+        # /get_dependency_set/is_core O(1) instead of a linear scan over the
+        # whole table. At most one live slot exists per key because add_tuple
+        # rejects duplicates before inserting, so a single int value per key is
+        # sufficient; backtrack() removes keys for every truncated tuple to keep
+        # the index consistent with the table.
+        self._membership_index: dict[tuple[int, ...], int] = {}
+
+    def _tuple_key(self, tuple_data: list[Any]) -> tuple[int, ...]:
+        """Build the membership-index key from a tuple's logical columns.
+
+        Columns are compared by object identity throughout the tableau, so the
+        key uses ``id()`` of each logical column (the dependency-set column is
+        excluded). Model objects live for the tableau's lifetime, so their ids
+        are stable while indexed.
+        """
+        arity = self.m_tuple_arity
+        if arity == 2:
+            return (id(tuple_data[0]), id(tuple_data[1]))
+        if arity == 3:
+            return (id(tuple_data[0]), id(tuple_data[1]), id(tuple_data[2]))
+        return tuple(id(tuple_data[i]) for i in range(arity))
+
+    def _key_at_index(self, element_index: int) -> tuple[int, ...]:
+        """Build the membership-index key for the stored tuple at *element_index*."""
+        table = self.m_tuple_table
+        arity = self.m_tuple_arity
+        return tuple(
+            id(table.get_tuple_object(element_index, i)) for i in range(arity)
+        )
 
     def clear(self) -> None:
         self.m_tuple_table.clear()
         if isinstance(self.m_core_manager, RealCoreManager):
             self.m_core_manager._core_flags.clear()
+        self._membership_index.clear()
         self._after_extension_old_tuple_index = 0
         self._after_extension_this_tuple_index = 0
         self._after_delta_new_tuple_index = 0
@@ -577,6 +610,10 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         new_after_delta_new = self.m_indices_by_branching_point[start + 2]
         for tuple_index in range(self._after_delta_new_tuple_index - 1, new_after_delta_new - 1, -1):
             element_index = tuple_index * slot_size
+            key = self._key_at_index(element_index)
+            existing = self._membership_index.get(key)
+            if existing == element_index:
+                del self._membership_index[key]
             self.m_dependency_set_manager.forget_dependency_set(element_index)
             self._post_remove(element_index)
         self.m_tuple_table.truncate(new_after_delta_new * slot_size)
@@ -597,6 +634,7 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         if self.m_tuple_arity < len(self._tuple_buffer) if hasattr(self, "_tuple_buffer") else True:
             elements.append(dependency_set)
         tuple_index = self.m_tuple_table.add_tuple(elements)
+        self._membership_index[self._tuple_key(tuple_data)] = tuple_index
         self.m_dependency_set_manager.store_dependency_set(tuple_index, dependency_set)
         if is_core:
             self.m_core_manager.mark_core(tuple_index, True)
@@ -725,43 +763,19 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
             )
 
     def contains_tuple(self, tuple_data: list[Any]) -> bool:
-        table = self.m_tuple_table
-        arity = self.m_tuple_arity
-        for idx in range(0, table.size, arity + 1):
-            match = True
-            for i in range(arity):
-                if table.get_tuple_object(idx, i) is not tuple_data[i]:
-                    match = False
-                    break
-            if match:
-                return True
-        return False
+        return self._tuple_key(tuple_data) in self._membership_index
 
     def get_dependency_set(self, tuple_data: list[Any]) -> DependencySet | None:
-        table = self.m_tuple_table
-        arity = self.m_tuple_arity
-        for idx in range(0, table.size, arity + 1):
-            match = True
-            for i in range(arity):
-                if table.get_tuple_object(idx, i) is not tuple_data[i]:
-                    match = False
-                    break
-            if match:
-                return self.m_dependency_set_manager.get_dependency_set(idx)
-        return None
+        idx = self._membership_index.get(self._tuple_key(tuple_data))
+        if idx is None:
+            return None
+        return self.m_dependency_set_manager.get_dependency_set(idx)
 
     def is_core(self, tuple_data: list[Any]) -> bool:
-        table = self.m_tuple_table
-        arity = self.m_tuple_arity
-        for idx in range(0, table.size, arity + 1):
-            match = True
-            for i in range(arity):
-                if table.get_tuple_object(idx, i) is not tuple_data[i]:
-                    match = False
-                    break
-            if match:
-                return self.m_core_manager.is_core(idx)
-        return False
+        idx = self._membership_index.get(self._tuple_key(tuple_data))
+        if idx is None:
+            return False
+        return self.m_core_manager.is_core(idx)
 
     def propagate_delta_new(self) -> bool:
         """Propagate delta-new tuples to extension-this, and extension-this to extension-old.
