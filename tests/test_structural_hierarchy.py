@@ -1322,8 +1322,10 @@ class TestOWLNormalization:
         assert len(result.data_property_inclusions) == 3
         # disjoint-data-properties -> disjoint_data_properties (1)
         assert len(result.disjoint_data_properties) == 1
-        # range and functional -> positive_facts (2 still go through)
-        assert len(result.positive_facts) == 2
+        # range -> direct DL clause; functional -> at-most-1 concept inclusion
+        assert len(result.positive_facts) == 0
+        assert len(result.direct_dl_clauses) == 1
+        assert len(result.concept_inclusions) == 1
 
 
     def test_process_object_property_domain_range(self):
@@ -1347,7 +1349,10 @@ class TestOWLNormalization:
             OWLDataPropertyDomainAxiom(p, cls),
         ]
         result = norm.process_ontology(axioms)
-        assert len(result.positive_facts) == 3
+        # Domain/range now produce DL clauses instead of parked axioms:
+        # two Horn domain clauses plus the range universal clause.
+        assert len(result.positive_facts) == 0
+        assert len(result.direct_dl_clauses) == 3
 
 
     def test_process_disjoint_object_properties(self):

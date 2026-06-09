@@ -781,15 +781,56 @@ class OWLNormalization:
     def _process_object_property_domain(
         self, axiom: OWLObjectPropertyDomainAxiom, result: NormalizedAxioms
     ) -> None:
-        """Process ObjectPropertyDomain: Domain(R) = C → ∀R.⊤ ⊑ C becomes ∃R.⊤ ⊑ C."""
-        # This is handled during clausification
-        result.positive_facts.append(axiom)
+        """Process ObjectPropertyDomain(R, C): ∃R.⊤ ⊑ C.
+
+        A literal domain becomes the Horn clause C(X) :- R(X,Y); a complex
+        domain routes through the generic inclusion path (Java emits the
+        inclusion {domain, ∀R.⊥}).
+        """
+        from hermit.model import Atom, AtomicConcept, DLClause, Variable
+        from hermit.owl_model.class_expression.restriction import (
+            OWLObjectSomeValuesFrom,
+        )
+        from hermit.owl_model.class_expression import OWLThing
+        from hermit.structural.owl_clausification import _role_atom
+
+        role = _owl_prop_to_role(axiom.get_property())
+        domain = self._expression_manager.get_nnf(axiom.get_domain())
+        if role is None or not isinstance(domain, OWLClassExpression):
+            return
+        if isinstance(domain, OWLClass):
+            xv = Variable.create("X")
+            yv = Variable.create("Y")
+            iri = _iri_str(domain)
+            if iri is None:
+                return
+            head = (Atom.create(AtomicConcept.create(iri), xv),)
+            result.direct_dl_clauses.append(
+                DLClause.create(head, (_role_atom(role, xv, yv),))
+            )
+            return
+        self._process_sub_class_of(
+            OWLSubClassOfAxiom(
+                OWLObjectSomeValuesFrom(axiom.get_property(), OWLThing), domain
+            ),
+            result,
+        )
 
     def _process_object_property_range(
         self, axiom: OWLObjectPropertyRangeAxiom, result: NormalizedAxioms
     ) -> None:
-        """Process ObjectPropertyRange: Range(R) = C."""
-        result.positive_facts.append(axiom)
+        """Process ObjectPropertyRange(R, C): ⊤ ⊑ ∀R.C."""
+        from hermit.owl_model.class_expression import OWLThing
+        from hermit.owl_model.class_expression.restriction import (
+            OWLObjectAllValuesFrom,
+        )
+        self._process_sub_class_of(
+            OWLSubClassOfAxiom(
+                OWLThing,
+                OWLObjectAllValuesFrom(axiom.get_property(), axiom.get_range()),
+            ),
+            result,
+        )
 
     def _process_data_property_domain(
         self, axiom: OWLDataPropertyDomainAxiom, result: NormalizedAxioms
