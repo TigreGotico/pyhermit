@@ -983,19 +983,36 @@ class OWLNormalization:
     def _process_class_assertion(
         self, axiom: OWLClassAssertionAxiom, result: NormalizedAxioms
     ) -> None:
-        """Route ClassAssertion(C, a) to typed positive_concept_facts."""
+        """Route ClassAssertion(C, a) to typed positive_concept_facts.
+
+        A complex class expression gets a definition Q with Q ⊑ C and the
+        assertion becomes Q(a), as in the Java visit(OWLClassAssertionAxiom).
+        """
         from hermit.model import AtomicConcept
         from hermit.owl_model.class_expression import OWLClass
         ind = _owl_ind_to_internal(axiom.get_individual())
         ce = axiom.get_class_expression()
-        if ind is not None and isinstance(ce, OWLClass):
+        if ind is None:
+            result.positive_facts.append(axiom)
+            return
+        if isinstance(ce, OWLClass):
             iri = _iri_str(ce)
             if iri is not None:
                 concept = AtomicConcept.create(iri)
                 result.positive_concept_facts.append((ind, concept))
                 result.named_individuals.add(ind)
                 return
-        # Fallback: store raw axiom for later processing
+        if isinstance(ce, OWLClassExpression):
+            nnf = self._expression_manager.get_nnf(ce)
+            assert isinstance(nnf, OWLClassExpression)
+            definition = self._get_definition_for(nnf, result)
+            def_iri = _iri_str(definition)
+            assert def_iri is not None
+            result.positive_concept_facts.append(
+                (ind, AtomicConcept.create(def_iri))
+            )
+            result.named_individuals.add(ind)
+            return
         result.positive_facts.append(axiom)
 
     def _process_object_property_assertion(

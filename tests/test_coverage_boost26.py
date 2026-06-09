@@ -101,13 +101,16 @@ class TestNormalizationPositiveFacts:
         r = OWLObjectProperty(IRI.create(NS + "r"))
         ind = OWLNamedIndividual(IRI.create(NS + "a"))
 
-        # ClassAssertion with union concept (not atomic concept) → fallback to positive_facts
+        # ClassAssertion with a union concept: a definition Q is introduced
+        # with Q \u2291 A \u2294 B and the assertion becomes Q(a).
         union_concept = OWLObjectUnionOf([A, B])
         axiom = OWLClassAssertionAxiom(ind, union_concept)
 
         norm = OWLNormalization()
         result = norm.process_ontology([axiom])
-        assert len(result.positive_facts) > 0
+        assert len(result.positive_facts) == 0
+        assert len(result.positive_concept_facts) == 1
+        assert len(result.concept_inclusions) == 1
 
     def test_process_object_property_assertion_fallback(self):
         """Line 478: ObjectPropertyAssertion with unresolvable role → positive_facts."""

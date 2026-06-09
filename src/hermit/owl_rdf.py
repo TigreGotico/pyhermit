@@ -273,6 +273,18 @@ class _Mapper:
             self._handle_type(s, o)
             return
 
+        if p == RDF_TYPE and isinstance(o, BNode):
+            # ClassAssertion with an anonymous class expression.
+            from hermit.owl_model.owl_axiom import OWLClassAssertionAxiom
+            if self._is_class_structure(s):
+                return
+            ce = self._class_expr(o)
+            if ce is not None:
+                ind = self._individual(s)
+                if ind is not None:
+                    self._add(OWLClassAssertionAxiom(ind, ce))
+            return
+
         # Property assertions: subject p object where p is a user property.
         if isinstance(p, str) and not p.startswith((RDF, RDFS, OWL, XSD)):
             self._assertion(s, p, o)

@@ -171,7 +171,7 @@ class OWLClausification:
         # Concepts named ``internal:nom#<iri>`` arise from OWLObjectOneOf /
         # ObjectHasValue. Seed the fact ``<iri> ∈ internal:nom#<iri>`` so the
         # nominal denotes exactly its individual.
-        self._seed_nominal_facts(axioms, positive_facts)
+        self._seed_nominal_facts(axioms, positive_facts, dl_clauses)
 
         # -- Data range inclusion clauses --
         data_range_clausifier = NormalizedDataRangeAxiomClausifier(
@@ -321,9 +321,16 @@ class OWLClausification:
 
     @staticmethod
     def _seed_nominal_facts(
-        axioms: NormalizedAxioms, positive_facts: set[Atom]
+        axioms: NormalizedAxioms,
+        positive_facts: set[Atom],
+        dl_clauses: set[DLClause],
     ) -> None:
-        """Add ``a ∈ internal:nom#a`` facts for every nominal concept used."""
+        """Give every used nominal concept its singleton semantics.
+
+        For each ``internal:nom#a``, assert the fact ``nom_a(a)`` and emit the
+        clause ``X == Y :- nom_a(X), nom_a(Y)``: together they merge every node
+        labelled with the nominal into the individual.
+        """
         seen: set[str] = set()
         for inclusion in axioms.concept_inclusions:
             for concept in inclusion:
@@ -337,6 +344,12 @@ class OWLClausification:
                     individual = Individual.create(ind_iri)
                     positive_facts.add(Atom.create(concept, individual))
                     axioms.named_individuals.add(individual)
+                    dl_clauses.add(
+                        DLClause.create(
+                            (Atom.create(Equality.INSTANCE, X, Y),),
+                            (Atom.create(concept, X), Atom.create(concept, Y)),
+                        )
+                    )
 
     @staticmethod
     def _has_nominals_check(axioms: NormalizedAxioms) -> bool:
