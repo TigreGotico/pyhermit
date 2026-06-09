@@ -28,9 +28,8 @@ from hermit.model import AtomicConcept, AtomicRole, Individual
 from hermit.owl_model.class_expression import (
     OWLClass,
     OWLClassExpression,
+    OWLObjectAllValuesFrom,
     OWLObjectComplementOf,
-    OWLObjectIntersectionOf,
-    OWLObjectOneOf,
 )
 from hermit.owl_model.owl_axiom import (
     OWLClassAssertionAxiom,
@@ -38,14 +37,18 @@ from hermit.owl_model.owl_axiom import (
     OWLDifferentIndividualsAxiom,
     OWLDisjointClassesAxiom,
     OWLEquivalentClassesAxiom,
-    OWLEquivalentDataPropertiesAxiom,
     OWLEquivalentObjectPropertiesAxiom,
     OWLObjectPropertyAssertionAxiom,
+    OWLObjectPropertyDomainAxiom,
+    OWLObjectPropertyRangeAxiom,
     OWLSameIndividualAxiom,
     OWLSubClassOfAxiom,
     OWLSubDataPropertyOfAxiom,
     OWLSubObjectPropertyOfAxiom,
+    OWLSymmetricObjectPropertyAxiom,
+    OWLTransitiveObjectPropertyAxiom,
 )
+from hermit.owl_model.owl_individual import OWLNamedIndividual
 from hermit.parser import load_ontology
 from hermit.reasoner import Reasoner
 from hermit.structural.owl_clausification import OWLClausification
@@ -194,6 +197,54 @@ def _entails_disjoint(
     return True
 
 
+def _fresh_individuals(n: int) -> list[OWLNamedIndividual]:
+    """Fresh ABox individuals in the aux namespace (disjoint from test data)."""
+    return [OWLNamedIndividual(f"{_AUX}fresh{i}") for i in range(n)]
+
+
+def _refutes(premise_axioms: list, counterexample: list, udl: bool) -> bool:
+    """premise + counterexample axioms is inconsistent.
+
+    Standard reduction: premise |= alpha iff premise plus a counterexample
+    ABox for alpha (on fresh individuals) has no model.
+    """
+    reasoner = _build_reasoner(premise_axioms + counterexample, udl)
+    try:
+        return not reasoner.is_consistent()
+    finally:
+        reasoner.dispose()
+
+
+def _denied_edge(x, prop, y) -> list:  # type: ignore[no-untyped-def]
+    """Axioms whose models are exactly those where ``prop(x, y)`` is false.
+
+    Pseudo-nominal encoding: a fresh marker class holds only ``y`` among
+    relevant individuals, and ``x`` is asserted to reach no marker via
+    ``prop``. The combination clashes iff every model connects x to y by
+    prop.
+    """
+    marker = OWLClass(_AUX + "EdgeMarker")
+    source = OWLClass(_AUX + "EdgeSource")
+    return [
+        OWLClassAssertionAxiom(y, marker),
+        OWLClassAssertionAxiom(x, source),
+        OWLSubClassOfAxiom(
+            source, OWLObjectAllValuesFrom(prop, OWLObjectComplementOf(marker))
+        ),
+    ]
+
+
+def _entails_subproperty(premise_axioms: list, sub, sup, udl: bool) -> bool:
+    """premise |= SubObjectPropertyOf(sub sup): assert sub(a,b) and deny
+    sup(a,b) on fresh individuals; entailed iff inconsistent."""
+    a, b = _fresh_individuals(2)
+    return _refutes(
+        premise_axioms,
+        [OWLObjectPropertyAssertionAxiom(a, sub, b), *_denied_edge(a, sup, b)],
+        udl,
+    )
+
+
 def _entails_axiom(premise_axioms: list, axiom, udl: bool) -> bool:
     """Faithful per-axiom entailment, mirroring EntailmentChecker.visit(...)."""
     if isinstance(axiom, OWLSubClassOfAxiom):
@@ -298,6 +349,68 @@ def _entails_axiom(premise_axioms: list, axiom, udl: bool) -> bool:
             return not reasoner.is_consistent()
         finally:
             reasoner.dispose()
+    if isinstance(axiom, OWLSymmetricObjectPropertyAxiom):
+        # SymmetricObjectProperty(p) == SubObjectPropertyOf(p ObjectInverseOf(p)):
+        # assert p(a,b) and deny p(b,a) on fresh individuals.
+        p = axiom.get_property()
+        a, b = _fresh_individuals(2)
+        return _refutes(
+            premise_axioms,
+            [OWLObjectPropertyAssertionAxiom(a, p, b), *_denied_edge(b, p, a)],
+            udl,
+        )
+    if isinstance(axiom, OWLTransitiveObjectPropertyAxiom):
+        # assert p(a,b), p(b,c) and deny p(a,c) on fresh individuals.
+        p = axiom.get_property()
+        a, b, c = _fresh_individuals(3)
+        return _refutes(
+            premise_axioms,
+            [
+                OWLObjectPropertyAssertionAxiom(a, p, b),
+                OWLObjectPropertyAssertionAxiom(b, p, c),
+                *_denied_edge(a, p, c),
+            ],
+            udl,
+        )
+    if isinstance(axiom, OWLEquivalentObjectPropertiesAxiom):
+        # mutual sub-property checks along the chain (covers all pairs by
+        # transitivity of entailed sub-property inclusions)
+        props = list(axiom.properties())
+        first = props[0]
+        for nxt in props[1:]:
+            if not _entails_subproperty(premise_axioms, first, nxt, udl):
+                return False
+            if not _entails_subproperty(premise_axioms, nxt, first, udl):
+                return False
+        return True
+    if isinstance(axiom, OWLObjectPropertyRangeAxiom):
+        # assert p(a,b) and put b under a fresh class disjoint from C.
+        p = axiom.get_property()
+        a, b = _fresh_individuals(2)
+        q = OWLClass(_AUX + "NotRange")
+        return _refutes(
+            premise_axioms,
+            [
+                OWLObjectPropertyAssertionAxiom(a, p, b),
+                OWLSubClassOfAxiom(q, OWLObjectComplementOf(axiom.get_range())),
+                OWLClassAssertionAxiom(b, q),
+            ],
+            udl,
+        )
+    if isinstance(axiom, OWLObjectPropertyDomainAxiom):
+        # assert p(a,b) and put a under a fresh class disjoint from C.
+        p = axiom.get_property()
+        a, b = _fresh_individuals(2)
+        q = OWLClass(_AUX + "NotDomain")
+        return _refutes(
+            premise_axioms,
+            [
+                OWLObjectPropertyAssertionAxiom(a, p, b),
+                OWLSubClassOfAxiom(q, OWLObjectComplementOf(axiom.get_domain())),
+                OWLClassAssertionAxiom(a, q),
+            ],
+            udl,
+        )
     raise UnsupportedConclusion(f"{type(axiom).__name__}")
 
 
