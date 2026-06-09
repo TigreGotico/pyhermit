@@ -864,3 +864,63 @@ class TestTransitivePropagation:
     def test_without_transitivity_remains_satisfiable(self):
         """Without trans(r), ∀r.¬B only constrains direct successors."""
         assert self._consistent(self._axioms(transitive=False))
+
+
+class TestNominalSpyPoint:
+    """A nominal spy point bounds the domain via at-most on its inverse role."""
+
+    NS = "http://example.org/spy#"
+
+    def test_spy_point_domain_bound_is_inconsistent(self):
+        """⊤ ⊑ ∃p.{spy}, spy: ≤2 p⁻.⊤, a: ≥3 r.⊤ has no model.
+
+        Every element is a p-predecessor of spy, so the domain holds at most
+        two elements, contradicting the three pairwise-distinct r-successors
+        (WebOnt-description-logic-035 core).
+        """
+        from hermit.configuration import Configuration
+        from hermit.owl_model.class_expression import OWLClass
+        from hermit.owl_model.class_expression.restriction import (
+            OWLObjectMaxCardinality,
+            OWLObjectMinCardinality,
+            OWLObjectOneOf,
+            OWLObjectSomeValuesFrom,
+        )
+        from hermit.owl_model.owl_axiom import (
+            OWLClassAssertionAxiom,
+            OWLInverseObjectPropertiesAxiom,
+            OWLSubClassOfAxiom,
+        )
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+        from hermit.owl_model.owl_property import OWLObjectProperty
+        from hermit.owl_model.class_expression import OWLThing
+        from hermit.reasoner import Reasoner
+        from hermit.structural.owl_clausification import OWLClausification
+        from hermit.structural.owl_normalization import OWLNormalization
+
+        p = OWLObjectProperty(self.NS + "p")
+        inv_p = OWLObjectProperty(self.NS + "invP")
+        r = OWLObjectProperty(self.NS + "r")
+        spy = OWLNamedIndividual(self.NS + "spy")
+        a = OWLNamedIndividual(self.NS + "a")
+        unsat = OWLClass(self.NS + "Unsat")
+        axioms = [
+            OWLInverseObjectPropertiesAxiom(p, inv_p),
+            OWLSubClassOfAxiom(
+                OWLThing, OWLObjectSomeValuesFrom(p, OWLObjectOneOf([spy]))
+            ),
+            OWLClassAssertionAxiom(
+                spy, OWLObjectMaxCardinality(2, inv_p, OWLThing)
+            ),
+            OWLSubClassOfAxiom(
+                unsat, OWLObjectMinCardinality(3, r, OWLThing)
+            ),
+            OWLClassAssertionAxiom(a, unsat),
+        ]
+        normalized = OWLNormalization().process_ontology(axioms)
+        ontology = OWLClausification().clausify(
+            normalized, ontology_iri="urn:test:spy"
+        )
+        config = Configuration()
+        config.throw_inconsistent_ontology_exception = False
+        assert not Reasoner(ontology, config).is_consistent()

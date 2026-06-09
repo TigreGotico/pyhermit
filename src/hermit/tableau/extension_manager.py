@@ -241,6 +241,20 @@ class ExtensionTable(ABC):
         slot_size = self.m_tuple_arity + 1
         return tuple_index < self._after_extension_this_tuple_index * slot_size
 
+    def is_tuple_active_nodes(self, tuple_data: list[Any]) -> bool:
+        """Return True if every node argument of the tuple is active.
+
+        Mirrors the Java ``ExtensionTable.isTupleActive(Object[])``: tuples
+        mentioning merged or pruned nodes must be invisible to retrievals and
+        containment checks.
+        """
+        for index in range(1, self.m_tuple_arity):
+            argument = tuple_data[index]
+            is_active = getattr(argument, "is_active", None)
+            if is_active is not None and not is_active():
+                return False
+        return True
+
     @abstractmethod
     def create_retrieval(
         self,
@@ -381,9 +395,10 @@ class _SimpleRetrieval(Retrieval):
                         break
             if match:
                 table.retrieve_tuple(self._tuple_buffer, self._current_index)
-                self._current_index += slot_size
-                self._after_last = False
-                return
+                if self._extension_table.is_tuple_active_nodes(self._tuple_buffer):
+                    self._current_index += slot_size
+                    self._after_last = False
+                    return
             self._current_index += slot_size
         self._current_index = self._end_index
         self._after_last = True
@@ -506,9 +521,10 @@ class _FullRetrieval(Retrieval):
                         break
             if match:
                 table.retrieve_tuple(self._tuple_buffer, self._current_index)
-                self._current_index += slot_size
-                self._after_last = False
-                return
+                if self._extension_table.is_tuple_active_nodes(self._tuple_buffer):
+                    self._current_index += slot_size
+                    self._after_last = False
+                    return
             self._current_index += slot_size
         self._current_index = limit
         self._after_last = True
@@ -642,6 +658,8 @@ class _IndexedRetrieval(Retrieval):
         self._after_last = True
 
     def _is_tuple_valid(self) -> bool:
+        if not self._extension_table.is_tuple_active_nodes(self._tuple_buffer):
+            return False
         if self._check_tuple_selection:
             positions = self._binding_positions
             buffer = self._tuple_buffer
@@ -804,7 +822,9 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         dependency_set: DependencySet,
         is_core: bool,
     ) -> bool:
-        if self.contains_tuple(tuple_data):
+        if not self.is_tuple_active_nodes(tuple_data):
+            return False
+        if self._tuple_key(tuple_data) in self._membership_index:
             return False
         # Store dependency set
         elements = list(tuple_data)
@@ -942,7 +962,10 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
             )
 
     def contains_tuple(self, tuple_data: list[Any]) -> bool:
-        return self._tuple_key(tuple_data) in self._membership_index
+        return (
+            self._tuple_key(tuple_data) in self._membership_index
+            and self.is_tuple_active_nodes(tuple_data)
+        )
 
     def get_dependency_set(self, tuple_data: list[Any]) -> DependencySet | None:
         idx = self._membership_index.get(self._tuple_key(tuple_data))

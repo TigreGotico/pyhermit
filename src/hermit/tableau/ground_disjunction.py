@@ -145,7 +145,7 @@ class GroundDisjunction:
                     arg0_node = arg0.get_canonical_node() if isinstance(arg0, Node) else arg0
                     arg1_node = arg1.get_canonical_node() if isinstance(arg1, Node) else arg1
                     arg2_node = arg2.get_canonical_node() if isinstance(arg2, Node) else arg2
-                    if extension_manager.contains_assertion_ternary(
+                    if extension_manager.contains_annotated_equality(
                         dl_predicate,
                         arg0_node,
                         arg1_node,
