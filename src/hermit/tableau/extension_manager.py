@@ -545,6 +545,145 @@ class _FullRetrieval(Retrieval):
         return [pos for pos in self._binding_positions if pos >= 0]
 
 
+class _IndexedRetrieval(Retrieval):
+    """Retrieval answered from a trie ``TupleIndex``.
+
+    Mirrors the Java ``ExtensionTableWithTupleIndexes.IndexedRetrieval``: the
+    bound prefix of the index's indexing sequence is resolved by a trie walk
+    (``TupleIndexRetrieval``); the remaining bound positions, if any, are
+    checked per candidate; the view restricts candidates to a tuple-index
+    range.
+    """
+
+    def __init__(
+        self,
+        extension_table: ExtensionTable,
+        tuple_index: Any,
+        binding_positions: list[int],
+        bindings_buffer: list[Any],
+        tuple_buffer: list[Any],
+        owns_buffers: bool,
+        view: str,
+    ) -> None:
+        from hermit.tableau.tuple_index import TupleIndexRetrieval
+
+        self._extension_table = extension_table
+        self._binding_positions = binding_positions
+        self._bindings_buffer = bindings_buffer
+        self._tuple_buffer = tuple_buffer
+        self._owns_buffers = owns_buffers
+        self._view = view
+        self._arity = extension_table.m_tuple_arity
+        indexing_sequence = tuple_index.indexing_sequence
+        selection_indices: list[int] = []
+        for position in indexing_sequence:
+            if binding_positions[position] != -1:
+                selection_indices.append(binding_positions[position])
+            else:
+                break
+        self._inner = TupleIndexRetrieval(
+            tuple_index, bindings_buffer, selection_indices
+        )
+        number_of_bound = sum(
+            1
+            for position in range(self._arity)
+            if binding_positions[position] != -1
+        )
+        self._check_tuple_selection = number_of_bound > len(selection_indices)
+        self._current_index = -1
+        self._first_index = 0
+        self._end_index = 0
+        self._after_last = True
+
+    def clear(self) -> None:
+        self._current_index = -1
+        self._after_last = True
+        if self._owns_buffers:
+            for i in range(len(self._tuple_buffer)):
+                self._tuple_buffer[i] = None
+            for i in range(len(self._bindings_buffer)):
+                self._bindings_buffer[i] = None
+
+    def open(self) -> None:
+        ext = self._extension_table
+        slot_size = self._arity + 1
+        if self._view == "EXTENSION_THIS":
+            start = 0
+            end = ext._after_extension_this_tuple_index
+        elif self._view == "EXTENSION_OLD":
+            start = 0
+            end = ext._after_extension_old_tuple_index
+        elif self._view == "DELTA_OLD":
+            start = ext._after_extension_old_tuple_index
+            end = ext._after_extension_this_tuple_index
+        else:  # TOTAL
+            start = 0
+            end = ext._after_delta_new_tuple_index
+        self._first_index = start * slot_size
+        self._end_index = end * slot_size
+        self._after_last = True
+        self._inner.open()
+        self._advance_to_valid()
+
+    def _advance_to_valid(self) -> None:
+        table = self._extension_table.m_tuple_table
+        inner = self._inner
+        first = self._first_index
+        end = self._end_index
+        while not inner.after_last():
+            tuple_index = inner.get_current_tuple_index()
+            if first <= tuple_index < end:
+                table.retrieve_tuple(self._tuple_buffer, tuple_index)
+                if self._is_tuple_valid():
+                    self._current_index = tuple_index
+                    self._after_last = False
+                    return
+            inner.next()
+        self._after_last = True
+
+    def _is_tuple_valid(self) -> bool:
+        if self._check_tuple_selection:
+            positions = self._binding_positions
+            buffer = self._tuple_buffer
+            bindings = self._bindings_buffer
+            for index in range(self._arity):
+                pos = positions[index]
+                if pos != -1 and buffer[index] is not bindings[pos]:
+                    return False
+        return True
+
+    def next(self) -> None:
+        self._after_last = True
+        self._inner.next()
+        self._advance_to_valid()
+
+    def after_last(self) -> bool:
+        return self._after_last
+
+    def get_tuple_buffer(self) -> list[Any]:
+        return self._tuple_buffer
+
+    def get_bindings_buffer(self) -> list[Any]:
+        return self._bindings_buffer
+
+    def get_dependency_set(self) -> DependencySet | None:
+        return self._extension_table.m_dependency_set_manager.get_dependency_set(
+            self._current_index
+        )
+
+    def is_core(self) -> bool:
+        return self._extension_table.m_core_manager.is_core(self._current_index)
+
+    def get_extension_table(self) -> ExtensionTable:
+        return self._extension_table
+
+    def get_current_tuple_index(self) -> int:
+        return self._current_index
+
+    def get_binding_positions(self) -> list[int]:
+        return [pos for pos in self._binding_positions if pos >= 0]
+
+
 class ExtensionTableWithTupleIndexes(ExtensionTable):
     """Extension table with tuple-based indexing."""
 
@@ -557,6 +696,9 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
     ) -> None:
         super().__init__(tableau, tuple_arity, needs_dependency_sets)
         self._is_tuple_active_override: Any = None
+        # Trie indexes answering bound-prefix retrievals in sub-linear time;
+        # values are flat element indexes into the tuple table.
+        self.m_tuple_indexes: list[Any] = list(tuple_indexes) if tuple_indexes else []
         # For branching point tracking
         self._bp_tuple_index = 0
         self._bp_delta_index = 0
@@ -599,6 +741,8 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         if isinstance(self.m_core_manager, RealCoreManager):
             self.m_core_manager._core_flags.clear()
         self._membership_index.clear()
+        for tuple_index in self.m_tuple_indexes:
+            tuple_index.clear()
         self._after_extension_old_tuple_index = 0
         self._after_extension_this_tuple_index = 0
         self._after_delta_new_tuple_index = 0
@@ -633,12 +777,20 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         start = level * 3
         slot_size = self.m_tuple_arity + 1
         new_after_delta_new = self.m_indices_by_branching_point[start + 2]
+        table = self.m_tuple_table
+        arity = self.m_tuple_arity
         for tuple_index in range(self._after_delta_new_tuple_index - 1, new_after_delta_new - 1, -1):
             element_index = tuple_index * slot_size
             key = self._key_at_index(element_index)
             existing = self._membership_index.get(key)
             if existing == element_index:
                 del self._membership_index[key]
+            if self.m_tuple_indexes:
+                removed_tuple = [
+                    table.get_tuple_object(element_index, i) for i in range(arity)
+                ]
+                for trie_index in self.m_tuple_indexes:
+                    trie_index.remove_tuple(removed_tuple)
             self.m_dependency_set_manager.forget_dependency_set(element_index)
             self._post_remove(element_index)
         self.m_tuple_table.truncate(new_after_delta_new * slot_size)
@@ -660,6 +812,8 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
             elements.append(dependency_set)
         tuple_index = self.m_tuple_table.add_tuple(elements)
         self._membership_index[self._tuple_key(tuple_data)] = tuple_index
+        for trie_index in self.m_tuple_indexes:
+            trie_index.add_tuple(tuple_data, tuple_index)
         self.m_dependency_set_manager.store_dependency_set(tuple_index, dependency_set)
         if is_core:
             self.m_core_manager.mark_core(tuple_index, True)
@@ -853,14 +1007,26 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         """
         # Detect signature by checking first element type
         if bound_mask_or_positions and isinstance(bound_mask_or_positions[0], bool):
-            # Simple retrieval: (bound_mask, view)
+            # Simple retrieval: (bound_mask, view). Mirror the Java overload by
+            # translating the mask into binding positions with owned buffers so
+            # the trie indexes answer these retrievals as well.
             v = view_or_bindings if isinstance(view_or_bindings, str) else view
-            return _SimpleRetrieval(self, cast("list[bool]", bound_mask_or_positions), v)
+            bound_mask = cast("list[bool]", bound_mask_or_positions)
+            binding_positions = [
+                i if bound else -1 for i, bound in enumerate(bound_mask)
+            ] + [-1]
+            return self.create_retrieval_full(
+                binding_positions,
+                [None] * len(bound_mask),
+                [None] * (len(bound_mask) + 1),
+                True,
+                v,
+            )
         else:
             # Full retrieval: (binding_positions, bindings_buffer, tuple_buffer, owns_buffers, view)
             bindings = view_or_bindings if isinstance(view_or_bindings, list) else []
-            return _FullRetrieval(
-                self, cast("list[int]", bound_mask_or_positions), bindings,
+            return self.create_retrieval_full(
+                cast("list[int]", bound_mask_or_positions), bindings,
                 tuple_buffer or [None] * len(bound_mask_or_positions),
                 owns_buffers, view
             )
@@ -873,8 +1039,29 @@ class ExtensionTableWithTupleIndexes(ExtensionTable):
         owns_buffers: bool,
         view: str,
     ) -> Retrieval:
-        return _FullRetrieval(
-            self, binding_positions, bindings_buffer, tuple_buffer, owns_buffers, view
+        # Pick the trie index whose indexing-sequence prefix covers the most
+        # bound positions, as in the Java createRetrieval; fall back to the
+        # scanning retrieval when no index helps.
+        selected: Any = None
+        bound_prefix_in_selected = 0
+        for trie_index in self.m_tuple_indexes:
+            bound_prefix = 0
+            for position in trie_index.indexing_sequence:
+                if binding_positions[position] != -1:
+                    bound_prefix += 1
+                else:
+                    break
+            if bound_prefix > bound_prefix_in_selected:
+                selected = trie_index
+                bound_prefix_in_selected = bound_prefix
+        if selected is None:
+            return _FullRetrieval(
+                self, binding_positions, bindings_buffer, tuple_buffer,
+                owns_buffers, view
+            )
+        return _IndexedRetrieval(
+            self, selected, binding_positions, bindings_buffer, tuple_buffer,
+            owns_buffers, view
         )
 
 
@@ -930,15 +1117,19 @@ class ExtensionManager:
         self.m_dependency_set_factory = tableau.m_dependency_set_factory
         self.m_extension_tables_by_arity: dict[int, ExtensionTable] = {}
 
+        from hermit.tableau.tuple_index import TupleIndex
+
         # Binary extension table (arity 2: concept assertions)
         self.m_binary_extension_table = ExtensionTableWithTupleIndexes(
-            tableau, 2, not tableau.is_deterministic()
+            tableau, 2, not tableau.is_deterministic(),
+            [TupleIndex([1, 0]), TupleIndex([0, 1])],
         )
         self.m_extension_tables_by_arity[2] = self.m_binary_extension_table
 
         # Ternary extension table (arity 3: role assertions)
         self.m_ternary_extension_table = ExtensionTableWithTupleIndexes(
-            tableau, 3, not tableau.is_deterministic()
+            tableau, 3, not tableau.is_deterministic(),
+            [TupleIndex([0, 1, 2]), TupleIndex([1, 2, 0]), TupleIndex([2, 0, 1])],
         )
         self.m_extension_tables_by_arity[3] = self.m_ternary_extension_table
 

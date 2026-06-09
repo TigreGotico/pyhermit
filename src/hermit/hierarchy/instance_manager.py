@@ -671,14 +671,7 @@ class InstanceManager:
         )
         retrieval.open()
         tuple_buffer = retrieval.get_tuple_buffer()
-        # _SimpleRetrieval: open() sets position but doesn't populate the buffer.
-        # next() scans forward, populates the buffer on match, and advances past it.
-        # After next(), after_last() tells us whether there are more matches AHEAD,
-        # but the buffer holds the match that was just found (if any).
-        # We use a prev_index trick: if next() advanced the index, it found a match.
-        prev_index = retrieval._current_index
-        retrieval.next()
-        while retrieval._current_index != prev_index:
+        while not retrieval.after_last():
             predicate = tuple_buffer[0]
             if isinstance(predicate, AtomicConcept):
                 atomic_concept = predicate
@@ -708,7 +701,6 @@ class InstanceManager:
                             )
                             self.m_reading_off_found_possible_concept_instance = True
             self.m_interrupt_flag.check_interrupt()
-            prev_index = retrieval._current_index
             retrieval.next()
         return has_been_added
 
