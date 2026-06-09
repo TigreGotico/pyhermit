@@ -507,6 +507,12 @@ class NormalizedAxioms:
     direct_dl_clauses: list[DLClause] = field(default_factory=list)
     """DL clauses emitted directly by normalization (e.g. for ∀R.C)."""
 
+    all_values_from_records: list[tuple[object, Role, object]] = field(
+        default_factory=list
+    )
+    """(guard concept, role, filler concept) for every emitted ∀R.C clause;
+    consumed by the transitivity axiomatization pass."""
+
     # -- Conversion tracking (populated by _owl_expr_to_internal) --
     cardinality_restriction_roles: list[Role] = field(default_factory=list)
     """Roles appearing in syntactic object cardinality restrictions

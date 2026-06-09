@@ -799,3 +799,68 @@ class TestSignatureCacheBlockerSentinel:
         node.set_blocked(Node.SIGNATURE_CACHE_BLOCKER, True)
         assert node.is_blocked()
         assert node.is_directly_blocked()
+
+
+class TestTransitivePropagation:
+    """Universals must propagate over transitive (sub-)roles."""
+
+    NS = "http://example.org/trans#"
+
+    def _consistent(self, axioms):
+        from hermit.configuration import Configuration
+        from hermit.reasoner import Reasoner
+        from hermit.structural.owl_clausification import OWLClausification
+        from hermit.structural.owl_normalization import OWLNormalization
+
+        normalized = OWLNormalization().process_ontology(axioms)
+        ontology = OWLClausification().clausify(
+            normalized, ontology_iri="urn:test:trans"
+        )
+        config = Configuration()
+        config.throw_inconsistent_ontology_exception = False
+        return Reasoner(ontology, config).is_consistent()
+
+    def _axioms(self, *, transitive):
+        """A ⊑ ∃r.∃r.B ⊓ ∀r.¬B with a B-successor two r-steps away."""
+        from hermit.owl_model.class_expression import OWLClass
+        from hermit.owl_model.class_expression.class_expression import (
+            OWLObjectComplementOf,
+        )
+        from hermit.owl_model.class_expression.restriction import (
+            OWLObjectAllValuesFrom,
+            OWLObjectSomeValuesFrom,
+        )
+        from hermit.owl_model.owl_axiom import (
+            OWLClassAssertionAxiom,
+            OWLSubClassOfAxiom,
+            OWLTransitiveObjectPropertyAxiom,
+        )
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        a_cls = OWLClass(self.NS + "A")
+        b_cls = OWLClass(self.NS + "B")
+        r = OWLObjectProperty(self.NS + "r")
+        axioms = [
+            OWLSubClassOfAxiom(
+                a_cls,
+                OWLObjectSomeValuesFrom(
+                    r, OWLObjectSomeValuesFrom(r, b_cls)
+                ),
+            ),
+            OWLSubClassOfAxiom(
+                a_cls, OWLObjectAllValuesFrom(r, OWLObjectComplementOf(b_cls))
+            ),
+            OWLClassAssertionAxiom(OWLNamedIndividual(self.NS + "a"), a_cls),
+        ]
+        if transitive:
+            axioms.append(OWLTransitiveObjectPropertyAxiom(r))
+        return axioms
+
+    def test_transitive_role_propagates_universal(self):
+        """With trans(r), the two-step B-successor violates ∀r.¬B."""
+        assert not self._consistent(self._axioms(transitive=True))
+
+    def test_without_transitivity_remains_satisfiable(self):
+        """Without trans(r), ∀r.¬B only constrains direct successors."""
+        assert self._consistent(self._axioms(transitive=False))
