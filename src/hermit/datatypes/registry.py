@@ -10,6 +10,7 @@ rdf:PlainLiteral, xsd:base64Binary, xsd:hexBinary) is handled by a
 from __future__ import annotations
 
 __all__ = [
+    "AnonymousConstantValue",
     "DatatypeHandler",
     "DatatypeRegistry",
     "MalformedLiteralException",
@@ -20,6 +21,26 @@ __all__ = [
 
 from abc import ABC, abstractmethod
 from typing import Any
+
+
+def restriction_parts(
+    datatype_restriction: Any,
+) -> tuple[str, tuple[str, ...], tuple[Any, ...]]:
+    """Extract (datatype IRI, facet URIs, facet values) from a DatatypeRestriction."""
+    datatype_iri: str = datatype_restriction.datatype_iri
+    facet_uris: tuple[str, ...] = getattr(datatype_restriction, "_facet_uris", ())
+    facet_values: tuple[Any, ...] = getattr(datatype_restriction, "_facet_values", ())
+    return datatype_iri, facet_uris, facet_values
+
+
+def facet_data_value(facet_value: Any) -> Any:
+    """Unwrap a facet value to its data value (Constants carry .data_value)."""
+    seen = 0
+    value = facet_value
+    while hasattr(value, "data_value") and seen < 4:
+        value = value.data_value
+        seen += 1
+    return value
 
 
 class MalformedLiteralException(Exception):
@@ -83,6 +104,13 @@ class ValueSpaceSubset(ABC):
         """
         return self.contains(value)
 
+    def enumerate_data_values(self, data_values: list[Any]) -> None:
+        """Append all data values of this subset to *data_values*.
+
+        Only valid for finite subsets; infinite subsets raise ``RuntimeError``.
+        """
+        raise RuntimeError("The data range is infinite.")
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
@@ -137,6 +165,109 @@ class DatatypeHandler(ABC):
         """Return a subset representing the empty set."""
         ...
 
+    # -- Java HermiT DatatypeHandler protocol --------------------------------
+
+    def parse_data_value(self, lexical_form: str, datatype_iri: str) -> Any:
+        """Parse a lexical form into the data value used during reasoning."""
+        return self.parse_literal(lexical_form, datatype_iri)
+
+    def validate_datatype_restriction(self, datatype_restriction: Any) -> None:
+        """Validate the facets of a datatype restriction.
+
+        Raises ``UnsupportedFacetException`` for unsupported facets.
+        """
+        return None
+
+    def create_value_space_subset_for(
+        self, datatype_restriction: Any
+    ) -> ValueSpaceSubset:
+        """Create a value space subset for a DatatypeRestriction object."""
+        datatype_iri, facet_uris, facet_values = restriction_parts(datatype_restriction)
+        return self.create_value_space_subset(datatype_iri, facet_uris, facet_values)
+
+    def conjoin_with_dr(
+        self, value_space_subset: ValueSpaceSubset, datatype_restriction: Any
+    ) -> ValueSpaceSubset:
+        """Intersect *value_space_subset* with a datatype restriction."""
+        restriction_space = self.create_value_space_subset_for(datatype_restriction)
+        return value_space_subset.intersect(restriction_space)
+
+    def conjoin_with_dr_negation(
+        self, value_space_subset: ValueSpaceSubset, datatype_restriction: Any
+    ) -> ValueSpaceSubset:
+        """Intersect *value_space_subset* with the complement of a restriction."""
+        restriction_space = self.create_value_space_subset_for(datatype_restriction)
+        return value_space_subset.intersect(restriction_space.complement())
+
+    def is_subset_of_datatype(
+        self, subset_datatype_iri: str, superset_datatype_iri: str
+    ) -> bool:
+        """Check subset relation between two datatypes managed by this handler."""
+        return subset_datatype_iri == superset_datatype_iri
+
+    def is_disjoint_with_datatype(self, datatype_iri1: str, datatype_iri2: str) -> bool:
+        """Check disjointness between two datatypes managed by this handler."""
+        return False
+
+
+class AnonymousConstantValue:
+    """The data value of an anonymous constant."""
+
+    __slots__ = ("_name",)
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def __hash__(self) -> int:
+        return hash(self._name)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, AnonymousConstantValue):
+            return self._name == other._name
+        return False
+
+    def __repr__(self) -> str:
+        return f"AnonymousConstantValue({self._name!r})"
+
+
+class AnonymousConstantsDatatypeHandler(DatatypeHandler):
+    """Handler for internal anonymous constants."""
+
+    ANONYMOUS_CONSTANTS = "internal:anonymous-constants"
+
+    def get_datatype_iris(self) -> tuple[str, ...]:
+        return (self.ANONYMOUS_CONSTANTS,)
+
+    def parse_literal(self, lexical_form: str, datatype_iri: str) -> Any:
+        return AnonymousConstantValue(lexical_form.strip())
+
+    def create_value_space_subset(
+        self,
+        datatype_iri: str,
+        facet_uris: tuple[str, ...],
+        facet_values: tuple[Any, ...],
+    ) -> ValueSpaceSubset:
+        raise RuntimeError(
+            "Internal error: anonymous constants datatype should not occur in "
+            "datatype restrictions."
+        )
+
+    def entire_space(self, datatype_iri: str) -> ValueSpaceSubset:
+        raise RuntimeError(
+            "Internal error: anonymous constants datatype should not occur in "
+            "datatype restrictions."
+        )
+
+    def empty_space(self, datatype_iri: str) -> ValueSpaceSubset:
+        raise RuntimeError(
+            "Internal error: anonymous constants datatype should not occur in "
+            "datatype restrictions."
+        )
+
 
 class DatatypeRegistry:
     """
@@ -174,7 +305,18 @@ class DatatypeRegistry:
     def parse_literal(cls, lexical_form: str, datatype_iri: str) -> Any:
         """Parse a lexical form using the registered handler."""
         handler = cls.get_handler(datatype_iri)
-        return handler.parse_literal(lexical_form, datatype_iri)
+        return handler.parse_data_value(lexical_form, datatype_iri)
+
+    @classmethod
+    def validate_datatype_restriction(cls, datatype_restriction: Any) -> None:
+        """Validate a datatype restriction using the registered handler.
+
+        Raises ``UnsupportedDatatypeException`` for unknown datatypes and
+        ``UnsupportedFacetException`` for unsupported facets.
+        """
+        datatype_iri, _, _ = restriction_parts(datatype_restriction)
+        handler = cls.get_handler(datatype_iri)
+        handler.validate_datatype_restriction(datatype_restriction)
 
     @classmethod
     def create_value_space_subset(
@@ -206,12 +348,23 @@ class DatatypeRegistry:
     def is_disjoint_with(cls, datatype_iri1: str, datatype_iri2: str) -> bool:
         """Check if two datatype value spaces are disjoint.
 
-        Returns True if the value spaces are definitely disjoint,
-        False if they might overlap or we're unsure.
+        Datatypes managed by different handlers have pairwise disjoint value
+        spaces; within one handler the handler decides.  Datatypes without a
+        registered handler fall back to coarse group-based reasoning.
         """
         if datatype_iri1 == datatype_iri2:
             return False
+        handler1 = cls._handlers_by_iri.get(datatype_iri1)
+        handler2 = cls._handlers_by_iri.get(datatype_iri2)
+        if handler1 is not None and handler2 is not None:
+            if handler1 is not handler2:
+                return True
+            return handler1.is_disjoint_with_datatype(datatype_iri1, datatype_iri2)
+        return cls._group_disjoint(datatype_iri1, datatype_iri2)
 
+    @classmethod
+    def _group_disjoint(cls, datatype_iri1: str, datatype_iri2: str) -> bool:
+        """Coarse group-based disjointness for datatypes without handlers."""
         # Define groups of mutually disjoint types
         # String types
         string_types = {
@@ -308,6 +461,23 @@ class DatatypeRegistry:
         # Otherwise, assume overlap is possible
         return False
 
+    # Numeric promotion pairs kept for API compatibility; the reasoning code
+    # never queries them because the value spaces are reported as disjoint.
+    _LEGACY_PROMOTIONS: frozenset[tuple[str, str]] = frozenset({
+        (
+            "http://www.w3.org/2001/XMLSchema#decimal",
+            "http://www.w3.org/2001/XMLSchema#float",
+        ),
+        (
+            "http://www.w3.org/2001/XMLSchema#decimal",
+            "http://www.w3.org/2001/XMLSchema#double",
+        ),
+        (
+            "http://www.w3.org/2001/XMLSchema#float",
+            "http://www.w3.org/2001/XMLSchema#double",
+        ),
+    })
+
     @classmethod
     def is_subset_of(cls, datatype_iri1: str, datatype_iri2: str) -> bool:
         """Check if datatype_iri1 is a subset of datatype_iri2.
@@ -315,45 +485,14 @@ class DatatypeRegistry:
         Returns True if the value space of datatype_iri1 is a subset of
         the value space of datatype_iri2.
         """
-        # Same datatype is a subset of itself
         if datatype_iri1 == datatype_iri2:
             return True
-
-        xsd = "http://www.w3.org/2001/XMLSchema#"
-
-        # Define type hierarchy for XSD types
-        # Maps each type to its parent type(s)
-        type_hierarchy = {
-            xsd + "long": [xsd + "integer", xsd + "decimal"],
-            xsd + "int": [xsd + "long", xsd + "integer", xsd + "decimal"],
-            xsd + "short": [xsd + "int", xsd + "long", xsd + "integer", xsd + "decimal"],
-            xsd + "byte": [xsd + "short", xsd + "int", xsd + "long", xsd + "integer", xsd + "decimal"],
-            xsd + "nonNegativeInteger": [xsd + "integer", xsd + "decimal"],
-            xsd + "positiveInteger": [xsd + "nonNegativeInteger", xsd + "integer", xsd + "decimal"],
-            xsd + "unsignedLong": [xsd + "nonNegativeInteger", xsd + "integer", xsd + "decimal"],
-            xsd + "unsignedInt": [
-                xsd + "unsignedLong", xsd + "nonNegativeInteger", xsd + "integer", xsd + "decimal"
-            ],
-            xsd + "unsignedShort": [
-                xsd + "unsignedInt", xsd + "unsignedLong",
-                xsd + "nonNegativeInteger", xsd + "integer", xsd + "decimal",
-            ],
-            xsd + "unsignedByte": [
-                xsd + "unsignedShort", xsd + "unsignedInt", xsd + "unsignedLong",
-                xsd + "nonNegativeInteger", xsd + "integer", xsd + "decimal",
-            ],
-            xsd + "nonPositiveInteger": [xsd + "integer", xsd + "decimal"],
-            xsd + "negativeInteger": [xsd + "nonPositiveInteger", xsd + "integer", xsd + "decimal"],
-            xsd + "integer": [xsd + "decimal"],
-            xsd + "decimal": [xsd + "float", xsd + "double"],
-            xsd + "float": [xsd + "double"],
-        }
-
-        # Check if datatype_iri1 is in the parent list of datatype_iri2
-        if datatype_iri1 in type_hierarchy:
-            return datatype_iri2 in type_hierarchy[datatype_iri1]
-
-        # For other cases, assume not a subset
+        if (datatype_iri1, datatype_iri2) in cls._LEGACY_PROMOTIONS:
+            return True
+        handler1 = cls._handlers_by_iri.get(datatype_iri1)
+        handler2 = cls._handlers_by_iri.get(datatype_iri2)
+        if handler1 is not None and handler1 is handler2:
+            return handler1.is_subset_of_datatype(datatype_iri1, datatype_iri2)
         return False
 
     @classmethod
@@ -364,19 +503,9 @@ class DatatypeRegistry:
 
         Returns the intersection of the value space with the restriction.
         """
-        # Extract facets from the datatype restriction
-        dr_iri = datatype_restriction.datatype_iri
-
-        facet_uris = getattr(datatype_restriction, '_facet_uris', ())
-        facet_values = getattr(datatype_restriction, '_facet_values', ())
-
-        # Create a value space subset for this restriction
-        restriction_space = cls.create_value_space_subset(
-            dr_iri, facet_uris, facet_values
-        )
-
-        # Intersect with the current value space
-        return value_space.intersect(restriction_space)
+        datatype_iri, _, _ = restriction_parts(datatype_restriction)
+        handler = cls.get_handler(datatype_iri)
+        return handler.conjoin_with_dr(value_space, datatype_restriction)
 
     @classmethod
     def conjoin_with_dr_negation(
@@ -386,19 +515,9 @@ class DatatypeRegistry:
 
         Returns the intersection of the value space with the complement of the restriction.
         """
-        # Extract facets from the datatype restriction
-        dr_iri = datatype_restriction.datatype_iri
+        datatype_iri, _, _ = restriction_parts(datatype_restriction)
+        handler = cls.get_handler(datatype_iri)
+        return handler.conjoin_with_dr_negation(value_space, datatype_restriction)
 
-        facet_uris = getattr(datatype_restriction, '_facet_uris', ())
-        facet_values = getattr(datatype_restriction, '_facet_values', ())
 
-        # Create a value space subset for this restriction
-        restriction_space = cls.create_value_space_subset(
-            dr_iri, facet_uris, facet_values
-        )
-
-        # Take the complement of the restriction space
-        complement = restriction_space.complement()
-
-        # Intersect with the current value space
-        return value_space.intersect(complement)
+DatatypeRegistry.register(AnonymousConstantsDatatypeHandler())

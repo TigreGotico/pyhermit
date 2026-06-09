@@ -310,8 +310,8 @@ class DatatypeManager:
 
     def _add_data_range(self, variable: DVariable, data_range: DataRange) -> None:
         """Add a data range assertion to a variable."""
-        from hermit.datatypes.registry import DatatypeRegistry
         from hermit.model import (
+            AtomicDataRange,
             AtomicNegationDataRange,
             ConstantEnumeration,
             DatatypeRestriction,
@@ -329,43 +329,14 @@ class DatatypeManager:
                     or data_range not in self.m_unknown_datatype_restrictions_additional
                 )
             ):
-                variable.m_positive_datatype_restrictions.append(data_range)
-                if variable.m_most_specific_restriction is None:
-                    variable.m_most_specific_restriction = data_range
-                elif DatatypeRegistry.is_disjoint_with(
-                    variable.m_most_specific_restriction.datatype_iri,
-                    data_range.datatype_iri,
-                ):
-                    self.m_union_dependency_set.clear_constituents()
-                    assert variable.m_node is not None
-                    ds1 = self.m_extension_manager.get_assertion_dependency_set_unary(
-                        variable.m_most_specific_restriction, variable.m_node
-                    )
-                    assert ds1 is not None
-                    self.m_union_dependency_set.add_constituent(ds1)
-                    ds2 = self.m_extension_manager.get_assertion_dependency_set_unary(
-                        data_range, variable.m_node
-                    )
-                    assert ds2 is not None
-                    self.m_union_dependency_set.add_constituent(ds2)
-                    if self.m_tableau_monitor is not None:
-                        self.m_tableau_monitor.clash_detection_started(
-                            [variable.m_most_specific_restriction, variable.m_node],
-                            [data_range, variable.m_node],
-                        )
-                    self.m_extension_manager.set_clash(self.m_union_dependency_set)
-                    if self.m_tableau_monitor is not None:
-                        self.m_tableau_monitor.clash_detection_finished(
-                            [variable.m_most_specific_restriction, variable.m_node],
-                            [data_range, variable.m_node],
-                        )
-                elif DatatypeRegistry.is_subset_of(
-                    data_range.datatype_iri,
-                    variable.m_most_specific_restriction.datatype_iri,
-                ):
-                    variable.m_most_specific_restriction = data_range
+                self._add_positive_datatype_restriction(variable, data_range)
         elif isinstance(data_range, ConstantEnumeration):
             variable.m_positive_constant_enumerations.append(data_range)
+        elif isinstance(data_range, AtomicDataRange):
+            # A bare datatype reference acts as a facet-less restriction.
+            self._add_positive_datatype_restriction(
+                variable, cast("DatatypeRestriction", data_range)
+            )
         elif isinstance(data_range, AtomicNegationDataRange):
             negated_data_range = data_range.negated
             if isinstance(negated_data_range, InternalDatatype):
@@ -385,10 +356,56 @@ class DatatypeManager:
                     variable.add_forbidden_data_value(
                         negated_data_range.get_constant(i).data_value
                     )
+            elif isinstance(negated_data_range, AtomicDataRange):
+                variable.m_negative_datatype_restrictions.append(
+                    cast("DatatypeRestriction", negated_data_range)
+                )
             else:
                 raise RuntimeError("Internal error: invalid data range.")
         else:
             raise RuntimeError("Internal error: invalid data range.")
+
+    def _add_positive_datatype_restriction(
+        self, variable: DVariable, data_range: DatatypeRestriction
+    ) -> None:
+        """Record a positive datatype restriction, checking datatype compatibility."""
+        from hermit.datatypes.registry import DatatypeRegistry
+
+        variable.m_positive_datatype_restrictions.append(data_range)
+        if variable.m_most_specific_restriction is None:
+            variable.m_most_specific_restriction = data_range
+        elif DatatypeRegistry.is_disjoint_with(
+            variable.m_most_specific_restriction.datatype_iri,
+            data_range.datatype_iri,
+        ):
+            self.m_union_dependency_set.clear_constituents()
+            assert variable.m_node is not None
+            ds1 = self.m_extension_manager.get_assertion_dependency_set_unary(
+                variable.m_most_specific_restriction, variable.m_node
+            )
+            assert ds1 is not None
+            self.m_union_dependency_set.add_constituent(ds1)
+            ds2 = self.m_extension_manager.get_assertion_dependency_set_unary(
+                data_range, variable.m_node
+            )
+            assert ds2 is not None
+            self.m_union_dependency_set.add_constituent(ds2)
+            if self.m_tableau_monitor is not None:
+                self.m_tableau_monitor.clash_detection_started(
+                    [variable.m_most_specific_restriction, variable.m_node],
+                    [data_range, variable.m_node],
+                )
+            self.m_extension_manager.set_clash(self.m_union_dependency_set)
+            if self.m_tableau_monitor is not None:
+                self.m_tableau_monitor.clash_detection_finished(
+                    [variable.m_most_specific_restriction, variable.m_node],
+                    [data_range, variable.m_node],
+                )
+        elif DatatypeRegistry.is_subset_of(
+            data_range.datatype_iri,
+            variable.m_most_specific_restriction.datatype_iri,
+        ):
+            variable.m_most_specific_restriction = data_range
 
     def _normalize(self, variable: DVariable) -> None:
         """Normalize a variable's datatype information."""
@@ -399,7 +416,7 @@ class DatatypeManager:
 
     def _normalize_as_enumeration(self, variable: DVariable) -> None:
         """Normalize when positive constant enumerations are present."""
-        from hermit.datatypes.registry import DatatypeRegistry
+        from hermit.datatypes.registry import DatatypeRegistry, restriction_parts
 
         variable.m_has_explicit_data_values = True
         explicit_data_values = variable.m_explicit_data_values
@@ -424,7 +441,7 @@ class DatatypeManager:
         for restriction in reversed(variable.m_positive_datatype_restrictions):
             if explicit_data_values:
                 value_space_subset = DatatypeRegistry.create_value_space_subset(
-                    restriction.datatype_iri, restriction._facet_uris, restriction._facet_values
+                    *restriction_parts(restriction)
                 )
                 self._eliminate_data_values_using_value_space_subset(
                     value_space_subset, explicit_data_values, False
@@ -432,7 +449,7 @@ class DatatypeManager:
         for restriction in reversed(variable.m_negative_datatype_restrictions):
             if explicit_data_values:
                 value_space_subset = DatatypeRegistry.create_value_space_subset(
-                    restriction.datatype_iri, restriction._facet_uris, restriction._facet_values
+                    *restriction_parts(restriction)
                 )
                 self._eliminate_data_values_using_value_space_subset(
                     value_space_subset, explicit_data_values, True
@@ -464,15 +481,13 @@ class DatatypeManager:
 
     def _normalize_as_value_space_subset(self, variable: DVariable) -> None:
         """Normalize when positive datatype restrictions are present."""
-        from hermit.datatypes.registry import DatatypeRegistry
+        from hermit.datatypes.registry import DatatypeRegistry, restriction_parts
 
         restriction = variable.m_most_specific_restriction
         assert restriction is not None
         most_specific_datatype_uri = restriction.datatype_iri
         variable.m_value_space_subset = DatatypeRegistry.create_value_space_subset(
-            most_specific_datatype_uri,
-            restriction._facet_uris,
-            restriction._facet_values
+            *restriction_parts(restriction)
         )
         for restriction in reversed(variable.m_positive_datatype_restrictions):
             if restriction != variable.m_most_specific_restriction:
@@ -639,6 +654,8 @@ class DatatypeManager:
 
     def _load_assertion_dependency_sets(self, variable: DVariable) -> None:
         """Load dependency sets for all assertions on a variable."""
+        from hermit.model import AtomicNegationDataRange
+
         node = variable.m_node
         assert node is not None
         for data_range in reversed(variable.m_positive_datatype_restrictions):
@@ -648,7 +665,7 @@ class DatatypeManager:
             assert dependency_set is not None
             self.m_union_dependency_set.add_constituent(dependency_set)
         for data_range in reversed(variable.m_negative_datatype_restrictions):
-            literal_data_range = data_range.get_negation()
+            literal_data_range = AtomicNegationDataRange.create(data_range)
             dependency_set = self.m_extension_manager.get_assertion_dependency_set_unary(
                 literal_data_range, node
             )
