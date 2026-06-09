@@ -387,7 +387,8 @@ class TestOwlNormalizationUnusedPaths:
         dt = OWLDatatype(IRI.create("http://www.w3.org/2001/XMLSchema#string"))
         axiom = OWLDataPropertyRangeAxiom(_mk_data_prop("D"), dt)
         na = _run_normalization([axiom])
-        assert len(na.positive_facts) >= 1
+        # DataPropertyRange(D, xsd:string): clause xsd:string(Y) :- D(X,Y)
+        assert len(na.direct_dl_clauses) >= 1
 
     def test_same_individual(self) -> None:
         from hermit.owl_model.owl_axiom import OWLSameIndividualAxiom
@@ -456,7 +457,8 @@ class TestOwlNormalizationUnusedPaths:
         from hermit.owl_model.owl_axiom import OWLFunctionalDataPropertyAxiom
         axiom = OWLFunctionalDataPropertyAxiom(_mk_data_prop("D"))
         na = _run_normalization([axiom])
-        assert len(na.positive_facts) >= 1
+        # FunctionalDataProperty(D): inclusion with an at-most-1 data atom
+        assert len(na.concept_inclusions) >= 1
 
     def test_inverse_object_properties(self) -> None:
         from hermit.owl_model.owl_axiom import OWLInverseObjectPropertiesAxiom

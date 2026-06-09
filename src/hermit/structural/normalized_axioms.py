@@ -221,6 +221,59 @@ def _owl_expr_to_internal(expr: object, _cardinality_role_registry: list[Role] |
         # Return both constraints as a list; caller must split into two inclusions
         return [AtLeastConcept.create(n, role, filler), AtMostConcept.create(n, role, filler)]
 
+    from hermit.owl_model.class_expression.restriction import (
+        OWLDataAllValuesFrom,
+        OWLDataExactCardinality,
+        OWLDataHasValue,
+        OWLDataMaxCardinality,
+        OWLDataMinCardinality,
+        OWLDataSomeValuesFrom,
+    )
+
+    if isinstance(expr, (OWLDataSomeValuesFrom, OWLDataMinCardinality)):
+        from hermit.model import AtLeastDataRange
+        data_role = _owl_data_prop_to_internal_role(expr.get_property())
+        data_range = _owl_data_range_to_internal(expr.get_filler())
+        if data_role is None or data_range is None:
+            return expr
+        n = 1 if isinstance(expr, OWLDataSomeValuesFrom) else expr.get_cardinality()
+        return AtLeastDataRange.create(n, data_role, data_range)
+
+    if isinstance(expr, OWLDataMaxCardinality):
+        from hermit.model import AtMostDataRange
+        data_role = _owl_data_prop_to_internal_role(expr.get_property())
+        data_range = _owl_data_range_to_internal(expr.get_filler())
+        if data_role is None or data_range is None:
+            return expr
+        return AtMostDataRange.create(expr.get_cardinality(), data_role, data_range)
+
+    if isinstance(expr, OWLDataExactCardinality):
+        from hermit.model import AtLeastDataRange, AtMostDataRange
+        data_role = _owl_data_prop_to_internal_role(expr.get_property())
+        data_range = _owl_data_range_to_internal(expr.get_filler())
+        if data_role is None or data_range is None:
+            return expr
+        n = expr.get_cardinality()
+        return [
+            AtLeastDataRange.create(n, data_role, data_range),
+            AtMostDataRange.create(n, data_role, data_range),
+        ]
+
+    if isinstance(expr, OWLDataHasValue):
+        from hermit.model import AtLeastDataRange, ConstantEnumeration
+        data_role = _owl_data_prop_to_internal_role(expr.get_property())
+        constant = _owl_literal_to_constant(expr.get_filler())
+        if data_role is None or constant is None:
+            return expr
+        return AtLeastDataRange.create(
+            1, data_role, ConstantEnumeration.create((constant,))
+        )
+
+    if isinstance(expr, OWLDataAllValuesFrom):
+        # ∀P.DR is handled upstream by OWLNormalization (direct DL clause);
+        # reaching it here means an unsupported nesting.
+        return expr
+
     from hermit.owl_model.class_expression.restriction import OWLObjectOneOf
 
     if isinstance(expr, OWLObjectOneOf):
@@ -245,6 +298,76 @@ def _owl_expr_to_internal(expr: object, _cardinality_role_registry: list[Role] |
 
     # Fallback: unknown expression — return as-is and let the clausifier handle it
     return expr
+
+
+def _owl_data_prop_to_internal_role(owl_prop: object) -> AtomicRole | None:
+    """Convert an OWL data property expression to an internal AtomicRole."""
+    from hermit.model import AtomicRole
+    iri_obj = getattr(owl_prop, "iri", None)
+    if iri_obj is None:
+        return None
+    iri = iri_obj.as_str() if hasattr(iri_obj, "as_str") else str(iri_obj)
+    return AtomicRole.create(iri)
+
+
+def _owl_data_range_to_internal(data_range: object) -> DataRange | None:
+    """Convert an OWL data range to an internal model DataRange.
+
+    Supports named datatypes (rdfs:Literal maps to the internal top datatype),
+    complements of supported ranges, and literal enumerations. Returns ``None``
+    for unsupported forms so callers can fail loudly instead of weakening.
+    """
+    from hermit.model import (
+        ConstantEnumeration,
+        DatatypeRestriction,
+        InternalDatatype,
+    )
+    from hermit.owl_model.owl_datatype import OWLDatatype
+    from hermit.owl_model.owl_data_ranges import OWLDataComplementOf
+    from hermit.owl_model.class_expression.restriction import OWLDataOneOf
+
+    if isinstance(data_range, OWLDatatype):
+        iri = data_range.iri.as_str()
+        if iri == InternalDatatype.RDFS_LITERAL_IRI:
+            return InternalDatatype.RDFS_LITERAL
+        if iri.startswith("internal:defdata#"):
+            return InternalDatatype.create(iri)
+        return DatatypeRestriction.create(
+            iri,
+            DatatypeRestriction.NO_FACET_URIS,
+            DatatypeRestriction.NO_FACET_VALUES,
+        )
+    if isinstance(data_range, OWLDataComplementOf):
+        inner = _owl_data_range_to_internal(data_range.get_data_range())
+        negation_fn = getattr(inner, "get_negation", None)
+        if negation_fn is None:
+            return None
+        negation: DataRange = negation_fn()
+        return negation
+    if isinstance(data_range, OWLDataOneOf):
+        constants = [_owl_literal_to_constant(lit) for lit in data_range.operands()]
+        if any(c is None for c in constants):
+            return None
+        return ConstantEnumeration.create([c for c in constants if c is not None])
+    return None
+
+
+def _owl_literal_to_constant(literal: object) -> Constant | None:
+    """Convert an OWL literal to an internal Constant."""
+    from hermit.model import Constant
+    get_literal = getattr(literal, "get_literal", None)
+    if get_literal is None:
+        return None
+    lexical_form = get_literal()
+    datatype = getattr(literal, "get_datatype", lambda: None)()
+    dt_iri_obj = getattr(datatype, "iri", None)
+    if dt_iri_obj is None:
+        dt_iri = "http://www.w3.org/2001/XMLSchema#string"
+    else:
+        dt_iri = (
+            dt_iri_obj.as_str() if hasattr(dt_iri_obj, "as_str") else str(dt_iri_obj)
+        )
+    return Constant.create(lexical_form, dt_iri)
 
 
 def _owl_prop_to_internal_role_standalone(owl_prop: object) -> Role:

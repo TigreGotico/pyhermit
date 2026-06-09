@@ -68,6 +68,7 @@ __all__ = [
     "AtLeastConcept",
     "AtLeastDataRange",
     "AtMostConcept",
+    "AtMostDataRange",
     "ExistsDescriptionGraph",
     # Roles
     "Role",
@@ -1367,6 +1368,9 @@ class AtomicNegationDataRange(DataRange):
     def negated(self) -> AtomicDataRange:
         return self._negated
 
+    def get_negation(self) -> AtomicDataRange:
+        return self._negated
+
     @staticmethod
     def create(negated: AtomicDataRange) -> AtomicNegationDataRange:
         return _interner.intern(AtomicNegationDataRange(negated))
@@ -1590,6 +1594,58 @@ class AtMostConcept(Concept):
     @classmethod
     def create(cls, number: int, on_role: Role, to_concept: LiteralConcept) -> AtMostConcept:
         return _interner.intern(cls(number, on_role, to_concept))
+
+
+class AtMostDataRange(Concept):
+    """≤ n P.DR  (at-most cardinality restriction on a data property)."""
+    __slots__ = ("_number", "_on_role", "_to_data_range")
+
+    def __init__(self, number: int, on_role: Role, to_data_range: DataRange) -> None:
+        self._number = number
+        self._on_role = on_role
+        self._to_data_range = to_data_range
+
+    @property
+    def number(self) -> int:
+        return self._number
+
+    @property
+    def on_role(self) -> Role:
+        return self._on_role
+
+    @property
+    def to_data_range(self) -> DataRange:
+        return self._to_data_range
+
+    def is_always_false(self) -> bool:
+        return False
+
+    def is_always_true(self) -> bool:
+        return False
+
+    def accept(self, visitor: Any) -> None:
+        visit = getattr(visitor, "visit_at_most_data_range", None)
+        if visit is None:
+            raise AttributeError(
+                f"{type(visitor).__name__} has no visit_at_most_data_range()"
+            )
+        visit(self)
+
+    def __str__(self) -> str:
+        return f"atMost({self._number} {self._on_role} {self._to_data_range})"
+
+    def __hash__(self) -> int:
+        return (self._number * 13 + hash(self._on_role)) * 17 + hash(self._to_data_range)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, AtMostDataRange):
+            return (self._number == other._number and self._on_role == other._on_role
+                    and self._to_data_range == other._to_data_range)
+        return False
+
+    @classmethod
+    def create(cls, number: int, on_role: Role, to_data_range: DataRange) -> AtMostDataRange:
+        return _interner.intern(cls(number, on_role, to_data_range))
 
 
 # --- ExistsDescriptionGraph ---
@@ -2006,7 +2062,9 @@ class DLOntology:
         self._has_inverse_roles = self._check_inverses(dl_clauses, positive_facts, negative_facts)
         if has_inverse_roles is not None:
             self._has_inverse_roles = self._has_inverse_roles or has_inverse_roles
-        self._has_datatypes = self._check_datatypes(dl_clauses)
+        self._has_datatypes = self._check_datatypes(
+            dl_clauses, positive_facts, negative_facts
+        )
         self._is_horn = all(c.head_length() <= 1 for c in dl_clauses)
         self._has_at_most = False
         self._has_nominals = self._check_nominals(dl_clauses, positive_facts)
@@ -2164,10 +2222,21 @@ class DLOntology:
         return False
 
     @staticmethod
-    def _check_datatypes(clauses: frozenset[DLClause]) -> bool:
-        for atom in DLOntology._atoms_from_clauses(clauses):
-            if isinstance(atom.predicate, (AtomicDataRange, DatatypeRestriction, InternalDatatype)):
+    def _check_datatypes(
+        clauses: frozenset[DLClause],
+        positive_facts: frozenset[Atom],
+        negative_facts: frozenset[Atom],
+    ) -> bool:
+        clause_atoms = DLOntology._atoms_from_clauses(clauses)
+        for atom in (*clause_atoms, *positive_facts, *negative_facts):
+            if isinstance(
+                atom.predicate,
+                (DataRange, AtLeastDataRange, AtMostDataRange),
+            ):
                 return True
+            for index in range(atom.arity()):
+                if isinstance(atom.argument(index), Constant):
+                    return True
         return False
 
     @staticmethod

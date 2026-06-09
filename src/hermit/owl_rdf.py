@@ -237,6 +237,12 @@ class _Mapper:
 
         if p == RDFS + "range" and isinstance(s, str):
             if self._is_data_prop(s):
+                from hermit.owl_model.owl_axiom import OWLDataPropertyRangeAxiom
+                dr = self._data_range(o)
+                if dr is not None:
+                    self._add(
+                        OWLDataPropertyRangeAxiom(self._data_prop(s), dr)
+                    )
                 return
             rng = self._class_expr(o)
             if rng is not None:
@@ -589,11 +595,8 @@ class _Mapper:
         if prop is None:
             return None
 
-        # Data-property restrictions exercise datatype reasoning the clausifier
-        # does not yet support; emit nothing rather than an expression the
-        # clausifier cannot accept.
         if self._is_data_prop(prop) or self.g.has(term, OWL + "onDataRange"):
-            return None
+            return self._data_restriction(term, prop)
 
         some = self.g.value(term, OWL + "someValuesFrom")
         if some is not None:
@@ -630,6 +633,93 @@ class _Mapper:
             return None
 
         return self._cardinality(term, prop)
+
+    def _data_restriction(self, term: Term, prop: Term) -> OWLClassExpression | None:
+        """Map a restriction on a data property to an OWL data restriction."""
+        from hermit.owl_model.class_expression.restriction import (
+            OWLDataAllValuesFrom,
+            OWLDataExactCardinality,
+            OWLDataHasValue,
+            OWLDataMaxCardinality,
+            OWLDataMinCardinality,
+            OWLDataSomeValuesFrom,
+        )
+        from hermit.owl_model.owl_data_ranges import OWLDataRange
+        from hermit.owl_model.owl_literal import TopOWLDatatype
+
+        pe = self._data_prop(prop)
+
+        some = self.g.value(term, OWL + "someValuesFrom")
+        if some is not None:
+            dr = self._data_range(some)
+            return OWLDataSomeValuesFrom(pe, dr) if dr is not None else None
+
+        allv = self.g.value(term, OWL + "allValuesFrom")
+        if allv is not None:
+            dr = self._data_range(allv)
+            return OWLDataAllValuesFrom(pe, dr) if dr is not None else None
+
+        hasv = self.g.value(term, OWL + "hasValue")
+        if hasv is not None:
+            if isinstance(hasv, Literal):
+                return OWLDataHasValue(pe, self._literal(hasv))
+            return None
+
+        for pred, ctor, qual in (
+            (OWL + "minCardinality", OWLDataMinCardinality, None),
+            (
+                OWL + "minQualifiedCardinality",
+                OWLDataMinCardinality,
+                OWL + "onDataRange",
+            ),
+            (OWL + "maxCardinality", OWLDataMaxCardinality, None),
+            (
+                OWL + "maxQualifiedCardinality",
+                OWLDataMaxCardinality,
+                OWL + "onDataRange",
+            ),
+            (OWL + "cardinality", OWLDataExactCardinality, None),
+            (
+                OWL + "qualifiedCardinality",
+                OWLDataExactCardinality,
+                OWL + "onDataRange",
+            ),
+        ):
+            val = self.g.value(term, pred)
+            if val is None:
+                continue
+            n = _int_literal(val)
+            if n is None:
+                return None
+            filler: OWLDataRange = TopOWLDatatype
+            if qual is not None:
+                qv = self.g.value(term, qual)
+                if qv is not None:
+                    qdr = self._data_range(qv)
+                    if qdr is None:
+                        return None
+                    filler = qdr
+            return ctor(n, pe, filler)
+        return None
+
+    def _data_range(self, term: Term):  # type: ignore[no-untyped-def]
+        """Map an RDF term to an OWL data range (named datatype or literal enumeration)."""
+        from hermit.owl_model.class_expression.restriction import OWLDataOneOf
+        from hermit.owl_model.owl_datatype import OWLDatatype
+
+        if isinstance(term, str):
+            return OWLDatatype(term)
+        if isinstance(term, BNode):
+            one_of = self.g.value(term, OWL + "oneOf")
+            if one_of is not None:
+                literals = [
+                    self._literal(m)
+                    for m in self._rdf_list(one_of)
+                    if isinstance(m, Literal)
+                ]
+                if literals:
+                    return OWLDataOneOf(literals)
+        return None
 
     def _cardinality(self, term: Term, prop: Term) -> OWLClassExpression | None:
         from hermit.owl_model.class_expression import (

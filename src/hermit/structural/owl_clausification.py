@@ -34,9 +34,11 @@ from hermit.model import (
     AtLeastConcept,
     AtLeastDataRange,
     AtMostConcept,
+    AtMostDataRange,
     Atom,
     AtomicConcept,
     AtomicNegationConcept,
+    AtomicNegationDataRange,
     AtomicRole,
     NodeIDLessEqualThan,
     NodeIDsAscendingOrEqual,
@@ -610,6 +612,40 @@ class NormalizedAxiomClausifier:
             for j in range(i + 1, len(y_vars)):
                 self._head_atoms.append(
                     Atom.create(annotated_equality, y_vars[i], y_vars[j], X)
+                )
+
+    def visit_at_most_data_range(self, concept: AtMostDataRange) -> None:
+        """AtMostDataRange (≤n P.DR) -> counting atoms in the current clause.
+
+        Mirror of the Java ``NormalizedAxiomClausifier`` handling of
+        ``OWLDataMaxCardinality``: ``n+1`` fresh Y-variables with ``P(X, Yi)``
+        body atoms, the negated data range on each ``Yi`` (in the body when it
+        is a negated internal datatype, in the head otherwise), and a plain
+        equality head atom for every pair ``(Yi, Yj)``.
+        """
+        n = concept.number
+        role = concept.on_role
+        negated_data_range = concept.to_data_range.get_negation()  # type: ignore[attr-defined]
+
+        self._ensure_y_not_zero()
+        y_vars = []
+        for _ in range(n + 1):
+            y_var = self._next_y()
+            y_vars.append(y_var)
+            self._body_atoms.append(_role_atom(role, X, y_var))
+            if isinstance(negated_data_range, AtomicNegationDataRange) and isinstance(
+                negated_data_range.negated, InternalDatatype
+            ):
+                inner = negated_data_range.negated
+                if not inner.is_always_true():
+                    self._body_atoms.append(Atom.create(inner, y_var))
+            elif not negated_data_range.is_always_false():
+                self._head_atoms.append(Atom.create(negated_data_range, y_var))
+
+        for i in range(len(y_vars)):
+            for j in range(i + 1, len(y_vars)):
+                self._head_atoms.append(
+                    Atom.create(Equality.INSTANCE, y_vars[i], y_vars[j])
                 )
 
     def visit_exists_description_graph(self, concept: ExistsDescriptionGraph) -> None:

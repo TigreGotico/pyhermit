@@ -142,6 +142,7 @@ class OWLNormalization:
         for axiom in axioms:
             self._process_axiom(axiom, normalized)
 
+
         return normalized
 
     def _process_axiom(self, axiom: OWLAxiom, result: NormalizedAxioms) -> None:
@@ -198,7 +199,18 @@ class OWLNormalization:
         elif isinstance(axiom, OWLDataPropertyDomainAxiom):
             self._process_data_property_domain(axiom, result)
         elif isinstance(axiom, OWLDataPropertyRangeAxiom):
-            result.positive_facts.append(axiom)
+            # DataPropertyRange(P, DR): ⊤ ⊑ ∀P.DR
+            from hermit.owl_model.class_expression import OWLThing
+            from hermit.owl_model.class_expression.restriction import (
+                OWLDataAllValuesFrom,
+            )
+            self._process_sub_class_of(
+                OWLSubClassOfAxiom(
+                    OWLThing,
+                    OWLDataAllValuesFrom(axiom.get_property(), axiom.get_range()),
+                ),
+                result,
+            )
         elif isinstance(axiom, OWLSameIndividualAxiom):
             self._process_same_individual(axiom, result)
         elif isinstance(axiom, OWLDifferentIndividualsAxiom):
@@ -265,7 +277,21 @@ class OWLNormalization:
             if role is not None:
                 result.irreflexive_object_properties.add(role)
         elif isinstance(axiom, OWLFunctionalDataPropertyAxiom):
-            result.positive_facts.append(axiom)
+            # FunctionalDataProperty(P): ⊤ ⊑ ≤1 P.rdfs:Literal
+            from hermit.owl_model.class_expression import OWLThing
+            from hermit.owl_model.class_expression.restriction import (
+                OWLDataMaxCardinality,
+            )
+            from hermit.owl_model.owl_literal import TopOWLDatatype
+            self._process_sub_class_of(
+                OWLSubClassOfAxiom(
+                    OWLThing,
+                    OWLDataMaxCardinality(
+                        1, axiom.get_property(), TopOWLDatatype
+                    ),
+                ),
+                result,
+            )
         elif isinstance(axiom, OWLInverseObjectPropertiesAxiom):
             # InverseObjectProperties(S, S-): S- ≡ S⁻¹
             # Add simple inclusions: S- ⊑ S⁻¹ and S ⊑ (S-)⁻¹
@@ -293,6 +319,7 @@ class OWLNormalization:
         A(X) ∧ R(X,Y) → C(Y) directly, bypassing the concept-inclusion path.
         """
         from hermit.owl_model.class_expression.restriction import (
+            OWLDataAllValuesFrom,
             OWLObjectAllValuesFrom,
             OWLObjectExactCardinality,
             OWLObjectMinCardinality,
@@ -302,9 +329,22 @@ class OWLNormalization:
         sub_expr = self._expression_manager.get_nnf(axiom.sub_class)
         super_expr = self._expression_manager.get_nnf(axiom.super_class)
 
-        # Intercept ∀R.C: emit two-variable DL clause directly
-        if isinstance(super_expr, OWLObjectAllValuesFrom):
+        # Intercept ∀R.C with a named sub-class: emit the two-variable DL
+        # clause directly. Other sub-expressions fall through to the generic
+        # inclusion path, whose union handling introduces the proper auxiliary
+        # concept (a complement sub-class must become a disjunction, not a
+        # positive body guard).
+        if isinstance(super_expr, OWLObjectAllValuesFrom) and isinstance(
+            sub_expr, OWLClass
+        ):
             self._emit_all_values_from_clause(sub_expr, super_expr, result)
+            return
+
+        # Intercept ∀P.DR on a data property: emit the DL clause directly
+        if isinstance(super_expr, OWLDataAllValuesFrom) and isinstance(
+            sub_expr, OWLClass
+        ):
+            self._emit_data_all_values_from_clause(sub_expr, super_expr, result)
             return
 
         # Intercept =n R.C: decompose to ≥n R.C and ≤n R.C (two separate axioms)
@@ -338,15 +378,17 @@ class OWLNormalization:
         # replace each with a fresh auxiliary concept and emit the DL clause
         # directly.  This avoids the overapproximation (→ ⊤) that occurred
         # when ∀R.C appeared nested inside a union.
-        from hermit.owl_model.class_expression.restriction import OWLObjectAllValuesFrom
         if isinstance(simplified, OWLObjectUnionOf):
             operand_list = list(simplified.operands())
             changed = False
             new_operands: list[OWLClassExpression] = []
             for operand in operand_list:
-                if isinstance(operand, OWLObjectAllValuesFrom):
+                if isinstance(operand, (OWLObjectAllValuesFrom, OWLDataAllValuesFrom)):
                     fresh = self._fresh_concept("internal:allvalues-aux")
-                    self._emit_all_values_from_clause(fresh, operand, result)
+                    if isinstance(operand, OWLObjectAllValuesFrom):
+                        self._emit_all_values_from_clause(fresh, operand, result)
+                    else:
+                        self._emit_data_all_values_from_clause(fresh, operand, result)
                     new_operands.append(fresh)
                     changed = True
                 else:
@@ -429,6 +471,7 @@ class OWLNormalization:
             OWLObjectComplementOf,
         )
         from hermit.owl_model.class_expression.restriction import (
+            OWLDataAllValuesFrom,
             OWLObjectAllValuesFrom,
             OWLObjectMaxCardinality,
             OWLObjectMinCardinality,
@@ -438,6 +481,11 @@ class OWLNormalization:
         if isinstance(expr, OWLObjectAllValuesFrom):
             fresh = self._fresh_concept("internal:allvalues-aux")
             self._emit_all_values_from_clause(fresh, expr, result)
+            return fresh
+
+        if isinstance(expr, OWLDataAllValuesFrom):
+            fresh = self._fresh_concept("internal:allvalues-aux")
+            self._emit_data_all_values_from_clause(fresh, expr, result)
             return fresh
 
         if isinstance(expr, (OWLObjectSomeValuesFrom, OWLObjectMinCardinality)):
@@ -600,6 +648,67 @@ class OWLNormalization:
         clause = DLClause.create((head_atom,), tuple(body_atoms))
         result.direct_dl_clauses.append(clause)
 
+    def _emit_data_all_values_from_clause(
+        self,
+        sub_expr: object,
+        all_values: object,
+        result: NormalizedAxioms,
+    ) -> None:
+        """Emit A(X) ∧ P(X,Y) → DR(Y) for SubClassOf(A, ∀P.DR).
+
+        Mirrors the Java ``NormalizedAxiomClausifier`` handling of
+        ``OWLDataAllValuesFrom``: a negated internal datatype filler puts the
+        positive datatype in the body; other fillers go to the head; the
+        always-false ¬rdfs:Literal filler yields an empty head.
+        """
+        from hermit.structural.normalized_axioms import (
+            _owl_data_prop_to_internal_role,
+            _owl_data_range_to_internal,
+            _owl_expr_to_internal,
+        )
+        from hermit.model import (
+            Atom,
+            AtomicNegationConcept,
+            AtomicNegationDataRange,
+            DLClause,
+            InternalDatatype,
+            Variable,
+        )
+
+        owl_prop = getattr(all_values, "get_property", lambda: None)()
+        owl_filler = getattr(all_values, "get_filler", lambda: None)()
+        data_role = _owl_data_prop_to_internal_role(owl_prop)
+        data_range = _owl_data_range_to_internal(owl_filler)
+        if data_role is None or data_range is None:
+            return
+
+        x_var = Variable.create("X")
+        y_var = Variable.create("Y")
+        body_atoms: list[Atom] = [Atom.create(data_role, x_var, y_var)]
+
+        sub_concept = _owl_expr_to_internal(
+            sub_expr, result.cardinality_restriction_roles
+        )
+        if hasattr(sub_concept, "arity") or hasattr(sub_concept, "accept"):
+            if isinstance(sub_concept, AtomicNegationConcept):
+                body_atoms.insert(0, Atom.create(sub_concept.negated, x_var))
+            else:
+                body_atoms.insert(0, Atom.create(sub_concept, x_var))  # type: ignore[arg-type]
+
+        head_atoms: list[Atom] = []
+        if isinstance(data_range, AtomicNegationDataRange) and isinstance(
+            data_range.negated, InternalDatatype
+        ):
+            inner = data_range.negated
+            if not inner.is_always_true():
+                body_atoms.append(Atom.create(inner, y_var))
+        elif not data_range.is_always_false():
+            head_atoms.append(Atom.create(data_range, y_var))
+
+        result.direct_dl_clauses.append(
+            DLClause.create(tuple(head_atoms), tuple(body_atoms))
+        )
+
     def _process_equivalent_classes(
         self, axiom: OWLEquivalentClassesAxiom, result: NormalizedAxioms
     ) -> None:
@@ -685,8 +794,39 @@ class OWLNormalization:
     def _process_data_property_domain(
         self, axiom: OWLDataPropertyDomainAxiom, result: NormalizedAxioms
     ) -> None:
-        """Process DataPropertyDomain."""
-        result.positive_facts.append(axiom)
+        """Process DataPropertyDomain(P, C): ∃P.rdfs:Literal ⊑ C."""
+        from hermit.model import Atom, AtomicConcept, DLClause, Variable
+        from hermit.structural.normalized_axioms import (
+            _owl_data_prop_to_internal_role,
+        )
+
+        data_role = _owl_data_prop_to_internal_role(axiom.get_property())
+        domain = self._expression_manager.get_nnf(axiom.get_domain())
+        if data_role is None:
+            return
+        if isinstance(domain, OWLClass):
+            iri = _iri_str(domain)
+            if iri is None:
+                return
+            xv = Variable.create("X")
+            yv = Variable.create("Y")
+            head = (Atom.create(AtomicConcept.create(iri), xv),)
+            result.direct_dl_clauses.append(
+                DLClause.create(head, (Atom.create(data_role, xv, yv),))
+            )
+            return
+        from hermit.owl_model.class_expression.restriction import (
+            OWLDataSomeValuesFrom,
+        )
+        from hermit.owl_model.owl_literal import TopOWLDatatype
+        if isinstance(domain, OWLClassExpression):
+            self._process_sub_class_of(
+                OWLSubClassOfAxiom(
+                    OWLDataSomeValuesFrom(axiom.get_property(), TopOWLDatatype),
+                    domain,
+                ),
+                result,
+            )
 
     def _process_class_assertion(
         self, axiom: OWLClassAssertionAxiom, result: NormalizedAxioms
