@@ -434,6 +434,15 @@ class OWLNormalization:
         sub_expr = self._expression_manager.get_nnf(axiom.sub_class)
         super_expr = self._expression_manager.get_nnf(axiom.super_class)
 
+        # {a1,...,an} ⊑ C distributes into the class assertions C(ai).
+        from hermit.owl_model.class_expression.restriction import OWLObjectOneOf
+        if isinstance(sub_expr, OWLObjectOneOf):
+            for individual in sub_expr.operands():
+                self._process_class_assertion(
+                    OWLClassAssertionAxiom(individual, axiom.super_class), result
+                )
+            return
+
         # Intercept ∀R.C with a named sub-class: emit the two-variable DL
         # clause directly. Other sub-expressions fall through to the generic
         # inclusion path, whose union handling introduces the proper auxiliary

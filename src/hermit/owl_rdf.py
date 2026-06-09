@@ -159,9 +159,15 @@ class _Mapper:
                     self._add(OWLEquivalentClassesAxiom([OWLClass(s), expr]))
             return
         if p == OWL + "oneOf":
-            # A named-class enumeration C ≡ {a, ...} requires nominal-closure
-            # reasoning the engine does not yet realize; emit nothing rather
-            # than an unsupported partial definition.
+            # A named-class enumeration C ≡ {a, ...}.
+            if isinstance(s, str):
+                expr = self._boolean_expr(p, o)
+                if expr is not None:
+                    from hermit.owl_model.class_expression import OWLClass
+                    from hermit.owl_model.owl_axiom import (
+                        OWLEquivalentClassesAxiom,
+                    )
+                    self._add(OWLEquivalentClassesAxiom([OWLClass(s), expr]))
             return
 
         if p == OWL + "propertyChainAxiom":
