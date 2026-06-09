@@ -85,10 +85,6 @@ class Node:
         self.m_blocking_cargo: Any = None
         self.m_first_graph_occurrence_node = 0
 
-        # Initialise sentinel on first construction
-        if Node.SIGNATURE_CACHE_BLOCKER is None and tableau is None:
-            Node.SIGNATURE_CACHE_BLOCKER = self
-
     # ------------------------------------------------------------------
     # Initialisation / destruction
     # ------------------------------------------------------------------
@@ -502,3 +498,7 @@ class Node:
 
     def __repr__(self) -> str:
         return f"Node(id={self.m_node_id}, state={self.m_node_state})"
+
+
+# Singleton sentinel marking nodes blocked via the blocking-signature cache.
+Node.SIGNATURE_CACHE_BLOCKER = Node(None)

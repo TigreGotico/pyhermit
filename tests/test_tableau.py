@@ -652,3 +652,150 @@ class TestHeadDisjunctionExpansion:
             ),
         ]
         assert self._consistent(clauses, [Atom.create(a, ind)], "urn:disj:chain")
+
+
+# ===========================================================================
+# End-to-end missed-inconsistency repros (normalization + clausification)
+# ===========================================================================
+
+class TestComplexRestrictionFillers:
+    """Complex fillers of quantified restrictions must not be weakened.
+
+    Small ontologies are built from OWL model axioms and run through the full
+    normalization → clausification → tableau pipeline.
+    """
+
+    NS = "http://example.org/fillers#"
+
+    def _consistent(self, axioms):
+        from hermit.configuration import Configuration
+        from hermit.reasoner import Reasoner
+        from hermit.structural.owl_clausification import OWLClausification
+        from hermit.structural.owl_normalization import OWLNormalization
+
+        normalized = OWLNormalization().process_ontology(axioms)
+        ontology = OWLClausification().clausify(
+            normalized, ontology_iri="urn:test:fillers"
+        )
+        config = Configuration()
+        config.throw_inconsistent_ontology_exception = False
+        return Reasoner(ontology, config).is_consistent()
+
+    def _entities(self):
+        from hermit.owl_model.class_expression import OWLClass
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        return (
+            OWLClass(self.NS + "C"),
+            OWLClass(self.NS + "c1"),
+            OWLClass(self.NS + "c2"),
+            OWLObjectProperty(self.NS + "r"),
+            OWLNamedIndividual(self.NS + "a"),
+        )
+
+    def test_complement_of_intersection_all_values_filler(self):
+        """C ⊑ ∃r3.c1 ⊓ ∃r4.c2 ⊓ ¬∃r3.(c1⊓c2) with functional super-role r.
+
+        The functional super-role merges the two successors into one node in
+        c1 ⊓ c2, so the complement-of-intersection universal must clash
+        (WebOnt-description-logic-004 core).
+        """
+        from hermit.owl_model.class_expression import OWLObjectIntersectionOf
+        from hermit.owl_model.class_expression.class_expression import (
+            OWLObjectComplementOf,
+        )
+        from hermit.owl_model.class_expression.restriction import (
+            OWLObjectSomeValuesFrom,
+        )
+        from hermit.owl_model.owl_axiom import (
+            OWLClassAssertionAxiom,
+            OWLFunctionalObjectPropertyAxiom,
+            OWLSubClassOfAxiom,
+            OWLSubObjectPropertyOfAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        c, c1, c2, r, a = self._entities()
+        r3 = OWLObjectProperty(self.NS + "r3")
+        r4 = OWLObjectProperty(self.NS + "r4")
+        axioms = [
+            OWLSubClassOfAxiom(c, OWLObjectSomeValuesFrom(r3, c1)),
+            OWLSubClassOfAxiom(c, OWLObjectSomeValuesFrom(r4, c2)),
+            OWLSubObjectPropertyOfAxiom(r3, r),
+            OWLSubObjectPropertyOfAxiom(r4, r),
+            OWLFunctionalObjectPropertyAxiom(r),
+            OWLSubClassOfAxiom(
+                c,
+                OWLObjectComplementOf(
+                    OWLObjectSomeValuesFrom(
+                        r3, OWLObjectIntersectionOf([c1, c2])
+                    )
+                ),
+            ),
+            OWLClassAssertionAxiom(a, c),
+        ]
+        assert not self._consistent(axioms)
+
+    def test_intersection_some_values_filler(self):
+        """C ⊑ ∃r.(c1 ⊓ c2) and C ⊑ ∀r.¬c1 is unsatisfiable for a member."""
+        from hermit.owl_model.class_expression import OWLObjectIntersectionOf
+        from hermit.owl_model.class_expression.class_expression import (
+            OWLObjectComplementOf,
+        )
+        from hermit.owl_model.class_expression.restriction import (
+            OWLObjectAllValuesFrom,
+            OWLObjectSomeValuesFrom,
+        )
+        from hermit.owl_model.owl_axiom import (
+            OWLClassAssertionAxiom,
+            OWLSubClassOfAxiom,
+        )
+
+        c, c1, c2, r, a = self._entities()
+        axioms = [
+            OWLSubClassOfAxiom(
+                c,
+                OWLObjectSomeValuesFrom(r, OWLObjectIntersectionOf([c1, c2])),
+            ),
+            OWLSubClassOfAxiom(
+                c, OWLObjectAllValuesFrom(r, OWLObjectComplementOf(c1))
+            ),
+            OWLClassAssertionAxiom(a, c),
+        ]
+        assert not self._consistent(axioms)
+
+    def test_union_all_values_filler_remains_satisfiable(self):
+        """C ⊑ ∃r.c1 ⊓ ∀r.(c1 ⊔ c2) is satisfiable (no over-strengthening)."""
+        from hermit.owl_model.class_expression import OWLObjectUnionOf
+        from hermit.owl_model.class_expression.restriction import (
+            OWLObjectAllValuesFrom,
+            OWLObjectSomeValuesFrom,
+        )
+        from hermit.owl_model.owl_axiom import (
+            OWLClassAssertionAxiom,
+            OWLSubClassOfAxiom,
+        )
+
+        c, c1, c2, r, a = self._entities()
+        axioms = [
+            OWLSubClassOfAxiom(c, OWLObjectSomeValuesFrom(r, c1)),
+            OWLSubClassOfAxiom(
+                c, OWLObjectAllValuesFrom(r, OWLObjectUnionOf([c1, c2]))
+            ),
+            OWLClassAssertionAxiom(a, c),
+        ]
+        assert self._consistent(axioms)
+
+
+class TestSignatureCacheBlockerSentinel:
+    """The signature-cache blocker sentinel must mark nodes as blocked."""
+
+    def test_sentinel_is_initialized(self):
+        assert Node.SIGNATURE_CACHE_BLOCKER is not None
+
+    def test_node_blocked_by_sentinel_is_blocked(self):
+        node = Node(None)
+        node.set_blocked(Node.SIGNATURE_CACHE_BLOCKER, True)
+        assert node.is_blocked()
+        assert node.is_directly_blocked()

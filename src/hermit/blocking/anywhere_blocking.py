@@ -124,8 +124,8 @@ class AnywhereBlocking(BlockingStrategy):
                             blocker = self.m_current_blockers_cache.get_blocker(node)
                             node.set_blocked(blocker, blocker is not None)
 
-                    if not node.is_blocked() and self.m_direct_blocking_checker.can_be_blocker(node):
-                        self.m_current_blockers_cache.add_node(node)
+                        if not node.is_blocked() and self.m_direct_blocking_checker.can_be_blocker(node):
+                            self.m_current_blockers_cache.add_node(node)
                     self.m_direct_blocking_checker.clear_blocking_info_changed(node)
                 node = node.get_next_tableau_node()
 
