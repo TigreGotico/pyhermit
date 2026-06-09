@@ -128,13 +128,13 @@ class TestValidateConstraints:
         with pytest.raises(ValueError, match="disjoint"):
             mgr._validate_complex_property_constraints(norm)
 
-    def test_max_cardinality_complex_raises(self):
-        """Line 349: max_cardinality_roles with complex role raises ValueError."""
+    def test_cardinality_restriction_role_complex_raises(self):
+        """cardinality_restriction_roles with complex role raises ValueError."""
         r = _ar("r")
         mgr = ObjectPropertyInclusionManager()
         mgr.complex_properties.add(r)
-        norm = _norm(max_cardinality_roles=[r])
-        with pytest.raises(ValueError, match="max-cardinality"):
+        norm = _norm(cardinality_restriction_roles=[r])
+        with pytest.raises(ValueError, match="cardinality"):
             mgr._validate_complex_property_constraints(norm)
 
     def test_no_violations_ok(self):
@@ -147,7 +147,7 @@ class TestValidateConstraints:
             asymmetric_object_properties={s},
             irreflexive_object_properties={s},
             disjoint_object_properties=[(s, _ar("t"))],
-            max_cardinality_roles=[s],
+            cardinality_restriction_roles=[s],
         )
         mgr._validate_complex_property_constraints(norm)  # no raise
 

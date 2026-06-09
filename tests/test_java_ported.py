@@ -1128,24 +1128,9 @@ class TestRolesSimple:
 
     SimpleRolesTest tests that ontologies with non-simple properties in
     cardinality restrictions raise IllegalArgumentException.  In pyhermit,
-    the OWL clausification raises a ValueError or similar when a non-simple
-    property is used in a cardinality restriction.
-
-    NOTE: The non-simplicity check for cardinality restrictions is not yet
-    implemented in pyhermit (ObjectPropertyInclusionManager only checks
-    asymmetric/irreflexive/disjoint properties, not cardinality restrictions).
-    Tests that check non-simplicity (assert not simple) are marked xfail.
-    The two tests that check simplicity (assert simple) pass correctly.
+    the OWL clausification raises a ValueError when a non-simple property
+    is used in a cardinality restriction (ObjectPropertyInclusionManager).
     """
-
-    _NONSIMPLICITY_NOT_IMPLEMENTED = pytest.mark.xfail(
-        reason=(
-            "pyhermit does not yet enforce OWL 2 non-simplicity of properties "
-            "used in cardinality restrictions — ObjectPropertyInclusionManager "
-            "only checks asymmetric/irreflexive/disjoint violations."
-        ),
-        strict=True,
-    )
 
     def _is_simple(self, axioms_list) -> bool:
         """Return True if the axioms can be processed without a non-simplicity error."""
@@ -1273,4 +1258,154 @@ class TestRolesSimple:
 
         R = OWLObjectProperty(NS + "R")
         axioms = [OWLTransitiveObjectPropertyAxiom(R)]
+        assert self._is_simple(axioms)
+
+    def test_simple_roles_transitive_direct_max_cardinality(self):
+        """TransitiveObjectProperty(R), C ⊑ ≤1 R — R is non-simple."""
+        from hermit.owl_model.owl_axiom import (
+            OWLTransitiveObjectPropertyAxiom, OWLSubClassOfAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLObjectProperty
+        from hermit.owl_model.class_expression import OWLClass, OWLObjectMaxCardinality, OWLThing
+
+        R = OWLObjectProperty(NS + "R")
+        C = OWLClass(NS + "C")
+        axioms = [
+            OWLTransitiveObjectPropertyAxiom(R),
+            OWLSubClassOfAxiom(C, OWLObjectMaxCardinality(1, R, OWLThing)),
+        ]
+        assert not self._is_simple(axioms)
+
+    def test_simple_roles_transitive_direct_min_cardinality(self):
+        """TransitiveObjectProperty(R), C ⊑ ≥2 R — R is non-simple."""
+        from hermit.owl_model.owl_axiom import (
+            OWLTransitiveObjectPropertyAxiom, OWLSubClassOfAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLObjectProperty
+        from hermit.owl_model.class_expression import OWLClass, OWLObjectMinCardinality, OWLThing
+
+        R = OWLObjectProperty(NS + "R")
+        C = OWLClass(NS + "C")
+        axioms = [
+            OWLTransitiveObjectPropertyAxiom(R),
+            OWLSubClassOfAxiom(C, OWLObjectMinCardinality(2, R, OWLThing)),
+        ]
+        assert not self._is_simple(axioms)
+
+    def test_simple_roles_transitive_some_values_from_is_ok(self):
+        """TransitiveObjectProperty(R), C ⊑ ∃R.⊤ — existential restrictions
+        are legal on non-simple properties."""
+        from hermit.owl_model.owl_axiom import (
+            OWLTransitiveObjectPropertyAxiom, OWLSubClassOfAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLObjectProperty
+        from hermit.owl_model.class_expression import (
+            OWLClass, OWLObjectSomeValuesFrom, OWLThing,
+        )
+
+        R = OWLObjectProperty(NS + "R")
+        C = OWLClass(NS + "C")
+        axioms = [
+            OWLTransitiveObjectPropertyAxiom(R),
+            OWLSubClassOfAxiom(C, OWLObjectSomeValuesFrom(R, OWLThing)),
+        ]
+        assert self._is_simple(axioms)
+
+    def test_simple_roles_transitive_all_values_from_is_ok(self):
+        """TransitiveObjectProperty(R), C ⊑ ∀R.D — universal restrictions
+        are legal on non-simple properties."""
+        from hermit.owl_model.owl_axiom import (
+            OWLTransitiveObjectPropertyAxiom, OWLSubClassOfAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLObjectProperty
+        from hermit.owl_model.class_expression import (
+            OWLClass, OWLObjectAllValuesFrom,
+        )
+
+        R = OWLObjectProperty(NS + "R")
+        C = OWLClass(NS + "C")
+        D = OWLClass(NS + "D")
+        axioms = [
+            OWLTransitiveObjectPropertyAxiom(R),
+            OWLSubClassOfAxiom(C, OWLObjectAllValuesFrom(R, D)),
+        ]
+        assert self._is_simple(axioms)
+
+    def test_simple_roles_plain_subproperties_only_is_ok(self):
+        """SubObjectPropertyOf(R P) with no chain/transitivity anywhere —
+        cardinality on P is legal."""
+        from hermit.owl_model.owl_axiom import (
+            OWLSubObjectPropertyOfAxiom, OWLSubClassOfAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLObjectProperty
+        from hermit.owl_model.class_expression import OWLClass, OWLObjectMaxCardinality, OWLThing
+
+        R = OWLObjectProperty(NS + "R")
+        P = OWLObjectProperty(NS + "P")
+        C = OWLClass(NS + "C")
+        axioms = [
+            OWLSubObjectPropertyOfAxiom(R, P),
+            OWLSubClassOfAxiom(C, OWLObjectMaxCardinality(2, P, OWLThing)),
+        ]
+        assert self._is_simple(axioms)
+
+    def test_simple_roles_subproperty_of_transitive_is_ok(self):
+        """TransitiveObjectProperty(P), SubObjectPropertyOf(R P), C ⊑ ≤2 R —
+        R below the transitive P stays simple; only superroles of complex
+        properties become non-simple."""
+        from hermit.owl_model.owl_axiom import (
+            OWLTransitiveObjectPropertyAxiom, OWLSubObjectPropertyOfAxiom, OWLSubClassOfAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLObjectProperty
+        from hermit.owl_model.class_expression import OWLClass, OWLObjectMaxCardinality, OWLThing
+
+        R = OWLObjectProperty(NS + "R")
+        P = OWLObjectProperty(NS + "P")
+        C = OWLClass(NS + "C")
+        axioms = [
+            OWLTransitiveObjectPropertyAxiom(P),
+            OWLSubObjectPropertyOfAxiom(R, P),
+            OWLSubClassOfAxiom(C, OWLObjectMaxCardinality(2, R, OWLThing)),
+        ]
+        assert self._is_simple(axioms)
+
+    def test_simple_roles_transitive_anonymous_inverse_cardinality(self):
+        """TransitiveObjectProperty(R), C ⊑ ≤1 ObjectInverseOf(R) —
+        the inverse of a non-simple property is non-simple."""
+        from hermit.owl_model.owl_axiom import (
+            OWLTransitiveObjectPropertyAxiom, OWLSubClassOfAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLObjectProperty, OWLObjectInverseOf
+        from hermit.owl_model.class_expression import OWLClass, OWLObjectMaxCardinality, OWLThing
+
+        R = OWLObjectProperty(NS + "R")
+        C = OWLClass(NS + "C")
+        axioms = [
+            OWLTransitiveObjectPropertyAxiom(R),
+            OWLSubClassOfAxiom(
+                C, OWLObjectMaxCardinality(1, OWLObjectInverseOf(R), OWLThing)
+            ),
+        ]
+        assert not self._is_simple(axioms)
+
+    def test_simple_roles_transitive_named_inverse_some_is_ok(self):
+        """TransitiveObjectProperty(R), InverseProperties(R, invR),
+        C ⊑ ∃invR.⊤ — existential over the (non-simple) inverse is legal."""
+        from hermit.owl_model.owl_axiom import (
+            OWLTransitiveObjectPropertyAxiom, OWLSubClassOfAxiom,
+            OWLInverseObjectPropertiesAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLObjectProperty
+        from hermit.owl_model.class_expression import (
+            OWLClass, OWLObjectSomeValuesFrom, OWLThing,
+        )
+
+        R = OWLObjectProperty(NS + "R")
+        invR = OWLObjectProperty(NS + "invR")
+        C = OWLClass(NS + "C")
+        axioms = [
+            OWLTransitiveObjectPropertyAxiom(R),
+            OWLInverseObjectPropertiesAxiom(R, invR),
+            OWLSubClassOfAxiom(C, OWLObjectSomeValuesFrom(invR, OWLThing)),
+        ]
         assert self._is_simple(axioms)

@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 # ===========================================================================
 
 
-def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = None) -> object:
+def _owl_expr_to_internal(expr: object, _cardinality_role_registry: list[Role] | None = None) -> object:
     """Convert an OWL model class expression to an internal model concept.
 
     This is the bridge between OWLNormalization (which produces OWL model NNF
@@ -97,27 +97,27 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
             # ¬(∃R.C) = ∀R.¬C → handle as AllValuesFrom with negated filler
             neg_filler = OWLObjectComplementOf(operand.get_filler())
             all_expr = _All(operand.get_property(), neg_filler)
-            return _owl_expr_to_internal(all_expr, _max_role_registry)
+            return _owl_expr_to_internal(all_expr, _cardinality_role_registry)
         elif isinstance(operand, _All):
             # ¬(∀R.C) = ∃R.¬C
             neg_filler = OWLObjectComplementOf(operand.get_filler())
             some_expr = _Some(operand.get_property(), neg_filler)
-            return _owl_expr_to_internal(some_expr, _max_role_registry)
+            return _owl_expr_to_internal(some_expr, _cardinality_role_registry)
         elif isinstance(operand, _Min):
             # ¬(≥n R.C) = ≤(n-1) R.C
             n = operand.get_cardinality()
             if n == 0:
                 return AtomicConcept.NOTHING  # ¬(≥0 R.C) = ⊥ (impossible)
             max_expr = _Max(n - 1, operand.get_property(), operand.get_filler())
-            return _owl_expr_to_internal(max_expr, _max_role_registry)
+            return _owl_expr_to_internal(max_expr, _cardinality_role_registry)
         elif isinstance(operand, _Max):
             # ¬(≤n R.C) = ≥(n+1) R.C
             n = operand.get_cardinality()
             min_expr = _Min(n + 1, operand.get_property(), operand.get_filler())
-            return _owl_expr_to_internal(min_expr, _max_role_registry)
+            return _owl_expr_to_internal(min_expr, _cardinality_role_registry)
         elif isinstance(operand, _Exact):
             # ¬(=n R.C) = <n R.C ∨ >n R.C → too complex for single concept; use THING approximation
-            inner = _owl_expr_to_internal(operand, _max_role_registry)
+            inner = _owl_expr_to_internal(operand, _cardinality_role_registry)
             if isinstance(inner, AtomicConcept):
                 return AtomicNegationConcept.create(inner)
             return AtomicConcept.THING
@@ -132,7 +132,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
             return AtomicConcept.NOTHING
 
         # For OWLClass and other atomic cases, convert inner then negate
-        inner = _owl_expr_to_internal(operand, _max_role_registry)
+        inner = _owl_expr_to_internal(operand, _cardinality_role_registry)
         if isinstance(inner, AtomicConcept):
             return AtomicNegationConcept.create(inner)
         if isinstance(inner, AtomicNegationConcept):
@@ -165,7 +165,7 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
 
     if isinstance(expr, OWLObjectSomeValuesFrom):
         role = _owl_prop_to_internal_role(expr.get_property())
-        filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
+        filler = _owl_expr_to_internal(expr.get_filler(), _cardinality_role_registry)
         from hermit.model import LiteralConcept
         if not isinstance(filler, LiteralConcept):
             filler = AtomicConcept.THING
@@ -182,10 +182,12 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
     if isinstance(expr, OWLObjectMinCardinality):
         n = expr.get_cardinality()
         role = _owl_prop_to_internal_role(expr.get_property())
-        filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
+        filler = _owl_expr_to_internal(expr.get_filler(), _cardinality_role_registry)
         from hermit.model import LiteralConcept
         if not isinstance(filler, LiteralConcept):
             filler = AtomicConcept.THING
+        if _cardinality_role_registry is not None:
+            _cardinality_role_registry.append(role)
         return AtLeastConcept.create(n, role, filler)
 
     from hermit.owl_model.class_expression.restriction import (
@@ -197,12 +199,12 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
     if isinstance(expr, OWLObjectMaxCardinality):
         n = expr.get_cardinality()
         role = _owl_prop_to_internal_role(expr.get_property())
-        filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
+        filler = _owl_expr_to_internal(expr.get_filler(), _cardinality_role_registry)
         from hermit.model import LiteralConcept
         if not isinstance(filler, LiteralConcept):
             filler = AtomicConcept.THING
-        if _max_role_registry is not None:
-            _max_role_registry.append(role)
+        if _cardinality_role_registry is not None:
+            _cardinality_role_registry.append(role)
         return AtMostConcept.create(n, role, filler)
 
     if isinstance(expr, OWLObjectExactCardinality):
@@ -210,12 +212,12 @@ def _owl_expr_to_internal(expr: object, _max_role_registry: list[Role] | None = 
         # Return a sentinel tuple; add_concept_inclusion handles splitting.
         n = expr.get_cardinality()
         role = _owl_prop_to_internal_role(expr.get_property())
-        filler = _owl_expr_to_internal(expr.get_filler(), _max_role_registry)
+        filler = _owl_expr_to_internal(expr.get_filler(), _cardinality_role_registry)
         from hermit.model import LiteralConcept
         if not isinstance(filler, LiteralConcept):
             filler = AtomicConcept.THING
-        if _max_role_registry is not None:
-            _max_role_registry.append(role)
+        if _cardinality_role_registry is not None:
+            _cardinality_role_registry.append(role)
         # Return both constraints as a list; caller must split into two inclusions
         return [AtLeastConcept.create(n, role, filler), AtMostConcept.create(n, role, filler)]
 
@@ -383,9 +385,13 @@ class NormalizedAxioms:
     """DL clauses emitted directly by normalization (e.g. for ∀R.C)."""
 
     # -- Conversion tracking (populated by _owl_expr_to_internal) --
-    max_cardinality_roles: list[Role] = field(default_factory=list)
-    """Roles appearing in OWLObjectMaxCardinality restrictions; used for
-    non-simplicity validation after OWL→internal conversion."""
+    cardinality_restriction_roles: list[Role] = field(default_factory=list)
+    """Roles appearing in syntactic object cardinality restrictions
+    (OWLObjectMinCardinality / OWLObjectMaxCardinality / OWLObjectExactCardinality);
+    used for non-simplicity validation after OWL→internal conversion.
+    OWLObjectSomeValuesFrom does not register here even though it converts to
+    the same internal AtLeastConcept form — per OWL 2, existential restrictions
+    are legal on non-simple properties while cardinality restrictions are not."""
 
     @property
     def is_horn(self) -> bool:
@@ -428,7 +434,7 @@ class NormalizedAxioms:
                        class expression) representing a concept inclusion in NNF.
         """
         from hermit.owl_model.class_expression import OWLObjectUnionOf
-        reg = self.max_cardinality_roles
+        reg = self.cardinality_restriction_roles
         if isinstance(simplified, OWLObjectUnionOf):
             disjuncts_raw = [_owl_expr_to_internal(op, reg) for op in simplified.operands()]
             # Expand any list entries (from ExactCardinality decomposition)

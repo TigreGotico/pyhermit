@@ -469,7 +469,7 @@ class OWLNormalization:
         y_var = Variable.create("Y")
 
         # Convert subclass to internal body concept (guard atom)
-        sub_concept = _owl_expr_to_internal(sub_expr, result.max_cardinality_roles)
+        sub_concept = _owl_expr_to_internal(sub_expr, result.cardinality_restriction_roles)
 
         # Extract role and filler from ∀R.C
         owl_prop = getattr(all_values, "get_property", lambda: None)()
@@ -477,7 +477,7 @@ class OWLNormalization:
 
         from hermit.structural.normalized_axioms import _owl_prop_to_internal_role_standalone
         role = _owl_prop_to_internal_role_standalone(owl_prop)
-        filler_concept = _owl_expr_to_internal(owl_filler, result.max_cardinality_roles)
+        filler_concept = _owl_expr_to_internal(owl_filler, result.cardinality_restriction_roles)
 
         from hermit.model import LiteralConcept
         if not isinstance(filler_concept, LiteralConcept):
