@@ -19,13 +19,13 @@ from hermit.model import (
     Role,
 )
 from hermit.tableau.dependency_set import DependencySet
+from hermit.tableau.node import Node
 from hermit.tableau.tuple_table import TupleTable
 from hermit.tableau.union_dependency_set import UnionDependencySet
 
 if TYPE_CHECKING:
     from hermit.model import ExistentialConcept
     from hermit.tableau.extension_manager import Retrieval
-    from hermit.tableau.node import Node
     from hermit.tableau.tableau import Tableau
 
 
@@ -153,7 +153,7 @@ class ExistentialExpansionManager:
             existential_concept = self.m_auxiliary_tuple[0]
             for_node = self.m_auxiliary_tuple[1]
             assert isinstance(existential_concept, AtLeast)
-            assert for_node is not None
+            assert isinstance(for_node, Node)
             for_node._add_to_unprocessed_existentials(existential_concept)
         self.m_expanded_existentials.truncate(new_first_free)
 
