@@ -372,7 +372,101 @@ class OWLNormalization:
             # the inclusion was fully discharged by splitting
             return
 
-        result.add_concept_inclusion(rewritten)
+        self._add_inclusion(rewritten, result)
+
+    def _add_inclusion(self, expr: object, result: NormalizedAxioms) -> None:
+        """Add a concept inclusion after replacing complex restriction fillers."""
+        result.add_concept_inclusion(self._replace_complex_fillers(expr, result))
+
+    @staticmethod
+    def _is_literal_expression(expr: object) -> bool:
+        """A literal in the structural normal form: C or ¬C for atomic C."""
+        from hermit.owl_model.class_expression.class_expression import (
+            OWLObjectComplementOf,
+        )
+
+        if isinstance(expr, OWLClass):
+            return True
+        return isinstance(expr, OWLObjectComplementOf) and isinstance(
+            expr.get_operand(), OWLClass
+        )
+
+    def _get_definition_for(
+        self, expr: OWLClassExpression, result: NormalizedAxioms
+    ) -> OWLClass:
+        """Return a named concept Q with Q ⊑ expr, creating it on first use.
+
+        Mirrors the Java ``getDefinitionFor``/``m_newInclusions`` pattern: the
+        defining inclusion is emitted once per distinct expression; positively
+        occurring subexpressions only need the Q ⊑ expr direction.
+        """
+        definition = self._definitions.get(expr)
+        if definition is None:
+            definition = self._fresh_concept("internal:def")
+            self._definitions[expr] = definition
+            self._process_sub_class_of(OWLSubClassOfAxiom(definition, expr), result)
+        return definition
+
+    def _replace_complex_fillers(
+        self, expr: object, result: NormalizedAxioms
+    ) -> object:
+        """Replace non-literal fillers of quantified restrictions by definitions.
+
+        Mirrors the Java ``NormalizationVisitor`` handling of
+        ``OWLObjectSomeValuesFrom`` / ``OWLObjectMinCardinality`` /
+        ``OWLObjectMaxCardinality``: a complex filler C becomes a fresh named
+        concept Q with Q ⊑ C (for the positively occurring some/min fillers) or
+        Q ⊑ ¬C with filler ¬Q (for the negatively occurring max filler), so no
+        constraint is weakened during the OWL → internal conversion.
+        """
+        if isinstance(expr, OWLObjectUnionOf):
+            operands = [
+                self._replace_complex_fillers(op, result) for op in expr.operands()
+            ]
+            return OWLObjectUnionOf(operands)  # type: ignore[arg-type]
+
+        from hermit.owl_model.class_expression.class_expression import (
+            OWLObjectComplementOf,
+        )
+        from hermit.owl_model.class_expression.restriction import (
+            OWLObjectAllValuesFrom,
+            OWLObjectMaxCardinality,
+            OWLObjectMinCardinality,
+            OWLObjectSomeValuesFrom,
+        )
+
+        if isinstance(expr, OWLObjectAllValuesFrom):
+            fresh = self._fresh_concept("internal:allvalues-aux")
+            self._emit_all_values_from_clause(fresh, expr, result)
+            return fresh
+
+        if isinstance(expr, (OWLObjectSomeValuesFrom, OWLObjectMinCardinality)):
+            filler = expr.get_filler()
+            if self._is_literal_expression(filler):
+                return expr
+            definition = self._get_definition_for(filler, result)
+            if isinstance(expr, OWLObjectSomeValuesFrom):
+                return OWLObjectSomeValuesFrom(expr.get_property(), definition)
+            return OWLObjectMinCardinality(
+                expr.get_cardinality(), expr.get_property(), definition
+            )
+
+        if isinstance(expr, OWLObjectMaxCardinality):
+            filler = expr.get_filler()
+            if self._is_literal_expression(filler):
+                return expr
+            complement = self._expression_manager.get_complement_nnf(
+                self._expression_manager.get_simplified(filler)
+            )
+            assert isinstance(complement, OWLClassExpression)
+            definition = self._get_definition_for(complement, result)
+            return OWLObjectMaxCardinality(
+                expr.get_cardinality(),
+                expr.get_property(),
+                OWLObjectComplementOf(definition),
+            )
+
+        return expr
 
     def _eliminate_conjunction_disjuncts(
         self, simplified: object, result: NormalizedAxioms
@@ -392,7 +486,7 @@ class OWLNormalization:
             # sub <= C1 and ... and Cm  ==>  one inclusion per conjunct.
             for conjunct in simplified.operands():
                 inc = self._define_conjunct_as_inclusion(conjunct, result)
-                result.add_concept_inclusion(inc)
+                self._add_inclusion(inc, result)
             return None
 
         if isinstance(simplified, OWLObjectUnionOf):
@@ -477,6 +571,12 @@ class OWLNormalization:
 
         from hermit.structural.normalized_axioms import _owl_prop_to_internal_role_standalone
         role = _owl_prop_to_internal_role_standalone(owl_prop)
+        if not self._is_literal_expression(owl_filler) and isinstance(
+            owl_filler, OWLClassExpression
+        ):
+            # Complex filler: introduce Q with Q ⊑ filler and propagate Q,
+            # so the universal constraint is preserved instead of weakened.
+            owl_filler = self._get_definition_for(owl_filler, result)
         filler_concept = _owl_expr_to_internal(owl_filler, result.cardinality_restriction_roles)
 
         from hermit.model import LiteralConcept
