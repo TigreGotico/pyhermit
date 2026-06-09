@@ -11,3 +11,5 @@ coverage.json
 .pytest_cache/
 .plan/
 .claude/
+TODO.md
+ROADMAP.md
