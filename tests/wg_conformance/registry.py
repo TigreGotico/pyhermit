@@ -30,20 +30,9 @@ TEST_ID_PREFIX = "http://owl.semanticweb.org/id/"
 RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 OWL = "http://www.w3.org/2002/07/owl#"
 
-# Locate the upstream test data (read-only reference repo).
-_THIS = Path(__file__).resolve()
-_WORKSPACE = _THIS.parents[3]  # .../Workspace (tests/wg_conformance/registry.py -> pyhermit -> Workspace)
-_ONTOLOGIES = (
-    _WORKSPACE
-    / "external repos"
-    / "hermit-reasoner"
-    / "test"
-    / "org"
-    / "semanticweb"
-    / "HermiT"
-    / "owl_wg_tests"
-    / "ontologies"
-)
+# The W3C OWL WG test data (all.rdf + owl:imports targets), vendored from the
+# upstream HermiT test suite.
+_ONTOLOGIES = Path(__file__).resolve().parent / "ontologies"
 ALL_RDF = _ONTOLOGIES / "all.rdf"
 
 # Mirrors AbstractTest.registerImportedReosurces(): the WG suite ships local
