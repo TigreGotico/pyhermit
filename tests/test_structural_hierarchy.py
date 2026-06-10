@@ -1379,177 +1379,70 @@ class TestOWLNormalization:
 # BuiltInPropertyManager tests
 # ===========================================================================
 
-_builtin_xfail = pytest.mark.xfail(
-    reason="builtin_property_manager uses object_property_inclusions which doesn't exist on NormalizedAxioms"
-)
-
 
 class TestBuiltInPropertyManager:
-    def test_axiomatize_no_builtin_used(self):
+    def test_no_builtin_used_returns_nothing(self):
         from hermit.structural.builtin_property_manager import BuiltInPropertyManager
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        mgr = BuiltInPropertyManager()
-        axioms = NormalizedAxioms()
-        mgr.axiomatize_builtin_properties(axioms)
-        # No built-in properties used, no axioms added
-        assert len(axioms.positive_concept_facts) == 0
+        assert BuiltInPropertyManager().axioms_for_builtin_properties([]) == []
 
-    def test_axiomatize_skip_flags(self):
+    def test_bottom_object_property_axiomatized(self):
         from hermit.structural.builtin_property_manager import BuiltInPropertyManager
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        mgr = BuiltInPropertyManager()
-        axioms = NormalizedAxioms()
-        mgr.axiomatize_builtin_properties(
-            axioms, skip_top_object=True, skip_bottom_object=True,
-            skip_top_data=True, skip_bottom_data=True,
+        from hermit.owl_model.owl_axiom import (
+            OWLObjectPropertyAssertionAxiom,
+            OWLSubClassOfAxiom,
         )
-        assert len(axioms.positive_concept_facts) == 0
-
-    def test_axiomatize_bottom_object_property(self):
-        from hermit.structural.builtin_property_manager import BuiltInPropertyManager
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        mgr = BuiltInPropertyManager()
-        axioms = NormalizedAxioms()
-        mgr._axiomatize_bottom_object_property(axioms)
-        # Axioms stored in positive_facts (untyped catch-all) for later normalization
-        assert len(axioms.positive_facts) == 1
-
-    def test_axiomatize_top_object_property(self):
-        from hermit.structural.builtin_property_manager import BuiltInPropertyManager
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        mgr = BuiltInPropertyManager()
-        axioms = NormalizedAxioms()
-        mgr._axiomatize_top_object_property(axioms)
-        assert len(axioms.positive_facts) == 1
-
-    def test_axiomatize_top_data_property(self):
-        from hermit.structural.builtin_property_manager import BuiltInPropertyManager
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        mgr = BuiltInPropertyManager()
-        axioms = NormalizedAxioms()
-        mgr._axiomatize_top_data_property(axioms)
-        assert len(axioms.positive_facts) == 1
-
-    def test_axiomatize_bottom_data_property(self):
-        from hermit.structural.builtin_property_manager import BuiltInPropertyManager
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        mgr = BuiltInPropertyManager()
-        axioms = NormalizedAxioms()
-        mgr._axiomatize_bottom_data_property(axioms)
-        assert len(axioms.positive_facts) == 1
-
-    def test_checker_with_object_property_in_expression(self):
-        from hermit.structural.builtin_property_manager import (
-            BuiltInPropertyManager, _BuiltInPropertyChecker,
-        )
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        from hermit.owl_model.class_expression import OWLObjectSomeValuesFrom, OWLClass
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
         from hermit.owl_model.owl_property import OWLObjectProperty
         from hermit.owl_model.iri import IRI
 
-        axioms = NormalizedAxioms()
-        # Add a concept inclusion that uses top object property
-        top_prop = OWLObjectProperty(IRI.create(BuiltInPropertyManager.TOP_OBJECT_PROPERTY_IRI))
-        a = OWLClass(IRI.create("http://ex.org#A"))
-        some = OWLObjectSomeValuesFrom(top_prop, a)
-        axioms.concept_inclusions.append(some)
-
-        checker = _BuiltInPropertyChecker(axioms)
-        assert checker.uses_top_object
-
-    def test_checker_data_property(self):
-        from hermit.structural.builtin_property_manager import (
-            BuiltInPropertyManager, _BuiltInPropertyChecker,
+        bot = OWLObjectProperty(
+            IRI.create(BuiltInPropertyManager.BOTTOM_OBJECT_PROPERTY_IRI)
         )
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        axioms = NormalizedAxioms()
-        checker = _BuiltInPropertyChecker(axioms)
-        assert not checker.uses_top_data
-        assert not checker.uses_bottom_data
-
-    def test_check_object_property_none(self):
-        from hermit.structural.builtin_property_manager import _BuiltInPropertyChecker
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        axioms = NormalizedAxioms()
-        checker = _BuiltInPropertyChecker(axioms)
-        checker._check_object_property(None)
-        assert not checker.uses_top_object
-
-    def test_check_data_property_none(self):
-        from hermit.structural.builtin_property_manager import _BuiltInPropertyChecker
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        axioms = NormalizedAxioms()
-        checker = _BuiltInPropertyChecker(axioms)
-        checker._check_data_property(None)
-        assert not checker.uses_top_data
-
-    def test_check_object_property_with_error(self):
-        from hermit.structural.builtin_property_manager import _BuiltInPropertyChecker
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        axioms = NormalizedAxioms()
-        checker = _BuiltInPropertyChecker(axioms)
-        bad_prop = MagicMock()
-        bad_prop.iri.side_effect = RuntimeError("boom")
-        checker._check_object_property(bad_prop)
-        assert not checker.uses_top_object
-
-    def test_check_data_property_with_error(self):
-        from hermit.structural.builtin_property_manager import _BuiltInPropertyChecker
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        axioms = NormalizedAxioms()
-        checker = _BuiltInPropertyChecker(axioms)
-        bad_prop = MagicMock()
-        bad_prop.iri.side_effect = RuntimeError("boom")
-        checker._check_data_property(bad_prop)
-        assert not checker.uses_top_data
-
-    def test_check_expression_various_types(self):
-        """Cover all branches of _check_class_expression."""
-        from hermit.structural.builtin_property_manager import _BuiltInPropertyChecker
-        from hermit.structural.normalized_axioms import NormalizedAxioms
-        from hermit.owl_model.class_expression import (
-            OWLClass, OWLObjectComplementOf, OWLObjectIntersectionOf,
-            OWLObjectUnionOf, OWLObjectSomeValuesFrom, OWLObjectAllValuesFrom,
-            OWLObjectHasValue, OWLObjectHasSelf,
-            OWLObjectMinCardinality, OWLObjectMaxCardinality, OWLObjectExactCardinality,
-            OWLDataSomeValuesFrom, OWLDataAllValuesFrom, OWLDataHasValue,
-            OWLDataMinCardinality, OWLDataMaxCardinality, OWLDataExactCardinality,
+        a = OWLNamedIndividual(IRI.create("http://ex.org#a"))
+        extra = BuiltInPropertyManager().axioms_for_builtin_properties(
+            [OWLObjectPropertyAssertionAxiom(a, bot, a)]
         )
-        from hermit.owl_model.owl_property import OWLObjectProperty, OWLDataProperty
+        assert len(extra) == 1
+        assert isinstance(extra[0], OWLSubClassOfAxiom)
+
+    def test_top_object_property_axiomatized(self):
+        from hermit.structural.builtin_property_manager import BuiltInPropertyManager
+        from hermit.owl_model.owl_axiom import (
+            OWLObjectPropertyAssertionAxiom,
+            OWLSymmetricObjectPropertyAxiom,
+            OWLTransitiveObjectPropertyAxiom,
+        )
         from hermit.owl_model.owl_individual import OWLNamedIndividual
-        from hermit.owl_model.owl_literal import OWLLiteral
-        from hermit.owl_model.owl_datatype import OWLDatatype
+        from hermit.owl_model.owl_property import OWLObjectProperty
         from hermit.owl_model.iri import IRI
 
-        axioms = NormalizedAxioms()
-        checker = _BuiltInPropertyChecker(axioms)
+        top = OWLObjectProperty(
+            IRI.create(BuiltInPropertyManager.TOP_OBJECT_PROPERTY_IRI)
+        )
+        a = OWLNamedIndividual(IRI.create("http://ex.org#a"))
+        extra = BuiltInPropertyManager().axioms_for_builtin_properties(
+            [OWLObjectPropertyAssertionAxiom(a, top, a)]
+        )
+        assert len(extra) == 3
+        assert any(isinstance(ax, OWLTransitiveObjectPropertyAxiom) for ax in extra)
+        assert any(isinstance(ax, OWLSymmetricObjectPropertyAxiom) for ax in extra)
 
-        a = OWLClass(IRI.create("http://ex.org#A"))
-        prop = OWLObjectProperty(IRI.create("http://ex.org#r"))
-        dprop = OWLDataProperty(IRI.create("http://ex.org#p"))
-        ind = OWLNamedIndividual(IRI.create("http://ex.org#a"))
-        dt = OWLDatatype(IRI.create("http://www.w3.org/2001/XMLSchema#integer"))
-        lit = OWLLiteral("42", dt)
+    def test_data_builtins_axiomatized(self):
+        from hermit.structural.builtin_property_manager import BuiltInPropertyManager
+        from hermit.owl_model.owl_axiom import OWLSubDataPropertyOfAxiom
+        from hermit.owl_model.owl_property import OWLDataProperty
+        from hermit.owl_model.iri import IRI
 
-        # Cover all branches
-        checker._check_class_expression(OWLObjectComplementOf(a))
-        b = OWLClass(IRI.create("http://ex.org#B"))
-        checker._check_class_expression(OWLObjectIntersectionOf((a, b)))
-        checker._check_class_expression(OWLObjectUnionOf((a, b)))
-        checker._check_class_expression(OWLObjectSomeValuesFrom(prop, a))
-        checker._check_class_expression(OWLObjectAllValuesFrom(prop, a))
-        checker._check_class_expression(OWLObjectHasValue(prop, ind))
-        checker._check_class_expression(OWLObjectHasSelf(prop))
-        checker._check_class_expression(OWLObjectMinCardinality(1, prop, a))
-        checker._check_class_expression(OWLObjectMaxCardinality(1, prop, a))
-        checker._check_class_expression(OWLObjectExactCardinality(1, prop, a))
-        checker._check_class_expression(OWLDataSomeValuesFrom(dprop, dt))
-        checker._check_class_expression(OWLDataAllValuesFrom(dprop, dt))
-        checker._check_class_expression(OWLDataHasValue(dprop, lit))
-        checker._check_class_expression(OWLDataMinCardinality(1, dprop, dt))
-        checker._check_class_expression(OWLDataMaxCardinality(1, dprop, dt))
-        checker._check_class_expression(OWLDataExactCardinality(1, dprop, dt))
-        # No assertions -- just ensure no exceptions
+        top = OWLDataProperty(
+            IRI.create(BuiltInPropertyManager.TOP_DATA_PROPERTY_IRI)
+        )
+        bot = OWLDataProperty(
+            IRI.create(BuiltInPropertyManager.BOTTOM_DATA_PROPERTY_IRI)
+        )
+        extra = BuiltInPropertyManager().axioms_for_builtin_properties(
+            [OWLSubDataPropertyOfAxiom(bot, top)]
+        )
+        assert len(extra) == 2
 
 
 # ===========================================================================

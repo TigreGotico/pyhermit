@@ -138,9 +138,17 @@ class OWLNormalization:
         Returns:
             NormalizedAxioms containing normalized inclusions and facts
         """
+        from hermit.structural.builtin_property_manager import (
+            BuiltInPropertyManager,
+        )
+
         normalized = NormalizedAxioms()
 
-        for axiom in axioms:
+        axiom_list = list(axioms)
+        axiom_list.extend(
+            BuiltInPropertyManager().axioms_for_builtin_properties(axiom_list)
+        )
+        for axiom in axiom_list:
             self._process_axiom(axiom, normalized)
 
         return normalized

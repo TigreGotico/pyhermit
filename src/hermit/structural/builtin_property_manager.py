@@ -1,10 +1,16 @@
 """Built-in property manager for top/bottom roles.
 
-Injects axioms for built-in roles (owl:topObjectProperty, owl:bottomObjectProperty,
-owl:topDataProperty, owl:bottomDataProperty) when they're used in the ontology.
+Mirrors the Java ``BuiltInPropertyManager``: when an ontology uses
+owl:topObjectProperty, owl:bottomObjectProperty, owl:topDataProperty, or
+owl:bottomDataProperty, the corresponding semantics are injected as OWL
+axioms before normalization:
 
-This module is not yet wired into the reasoning pipeline. It is available for
-future integration via OWLClausification.clausify().
+* topObjectProperty — transitive, symmetric, and every individual has a
+  topObjectProperty successor (a fresh nominal).
+* bottomObjectProperty — empty extension: ⊤ ⊑ ∀bot.⊥.
+* topDataProperty — every individual has a topDataProperty successor (an
+  anonymous constant).
+* bottomDataProperty — empty extension: ⊤ ⊑ ∀bot.¬rdfs:Literal.
 """
 
 from __future__ import annotations
@@ -12,325 +18,169 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from hermit.structural.normalized_axioms import NormalizedAxioms
+    from hermit.owl_model.owl_axiom import OWLAxiom
 
 
 class BuiltInPropertyManager:
-    """Manages axiomatization of built-in object and data properties."""
+    """Axiomatizes built-in object and data properties when they are used."""
 
-    # Built-in property IRIs
     TOP_OBJECT_PROPERTY_IRI = "http://www.w3.org/2002/07/owl#topObjectProperty"
     BOTTOM_OBJECT_PROPERTY_IRI = "http://www.w3.org/2002/07/owl#bottomObjectProperty"
     TOP_DATA_PROPERTY_IRI = "http://www.w3.org/2002/07/owl#topDataProperty"
     BOTTOM_DATA_PROPERTY_IRI = "http://www.w3.org/2002/07/owl#bottomDataProperty"
 
-    def axiomatize_builtin_properties(
-        self,
-        normalized_axioms: NormalizedAxioms,
-        skip_top_object: bool = False,
-        skip_bottom_object: bool = False,
-        skip_top_data: bool = False,
-        skip_bottom_data: bool = False,
-    ) -> None:
-        """Add axioms for built-in properties if they're used.
+    def axioms_for_builtin_properties(
+        self, axioms: list[OWLAxiom]
+    ) -> list[OWLAxiom]:
+        """Return the axiomatization for built-in properties used in *axioms*."""
+        used: set[str] = set()
+        for axiom in axioms:
+            _collect_property_iris(axiom, used)
 
-        Args:
-            normalized_axioms: NormalizedAxioms to enrich
-            skip_top_object: Skip axiomatizing top object property
-            skip_bottom_object: Skip axiomatizing bottom object property
-            skip_top_data: Skip axiomatizing top data property
-            skip_bottom_data: Skip axiomatizing bottom data property
-        """
-        # Check which built-in properties are actually used
-        checker = _BuiltInPropertyChecker(normalized_axioms)
+        extra: list[OWLAxiom] = []
+        if self.TOP_OBJECT_PROPERTY_IRI in used:
+            extra.extend(self._top_object_property_axioms())
+        if self.BOTTOM_OBJECT_PROPERTY_IRI in used:
+            extra.append(self._bottom_object_property_axiom())
+        if self.TOP_DATA_PROPERTY_IRI in used:
+            extra.append(self._top_data_property_axiom())
+        if self.BOTTOM_DATA_PROPERTY_IRI in used:
+            extra.append(self._bottom_data_property_axiom())
+        return extra
 
-        if checker.uses_top_object and not skip_top_object:
-            self._axiomatize_top_object_property(normalized_axioms)
-
-        if checker.uses_bottom_object and not skip_bottom_object:
-            self._axiomatize_bottom_object_property(normalized_axioms)
-
-        if checker.uses_top_data and not skip_top_data:
-            self._axiomatize_top_data_property(normalized_axioms)
-
-        if checker.uses_bottom_data and not skip_bottom_data:
-            self._axiomatize_bottom_data_property(normalized_axioms)
-
-    @staticmethod
-    def _axiomatize_top_object_property(
-        normalized_axioms: NormalizedAxioms,
-    ) -> None:
-        """Add axioms for top object property.
-
-        Axioms:
-        - TransitiveObjectProperty( owl:topObjectProperty )
-        - SymmetricObjectProperty( owl:topObjectProperty )
-        - ⊤ ⊑ ∃owl:topObjectProperty.{internal:topIndividual}
-        """
-        from hermit.owl_model.owl_property import OWLObjectProperty
-        from hermit.owl_model.iri import IRI
+    def _top_object_property_axioms(self) -> list[OWLAxiom]:
+        """topObjectProperty is transitive, symmetric, and universal."""
         from hermit.owl_model.class_expression import (
-            OWLObjectSomeValuesFrom,
             OWLObjectOneOf,
-            OWLThing,
-        )
-        from hermit.owl_model.owl_individual import OWLNamedIndividual
-        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
-
-        top_prop = OWLObjectProperty(IRI.create(BuiltInPropertyManager.TOP_OBJECT_PROPERTY_IRI))
-
-        # Add axiom: ⊤ ⊑ ∃owl:topObjectProperty.{internal:topIndividual}
-        top_individual = OWLNamedIndividual(IRI("internal:nam#", "topIndividual"))
-        one_of = OWLObjectOneOf(top_individual)
-        some_values = OWLObjectSomeValuesFrom(top_prop, one_of)
-
-        # Add as concept inclusion (will be normalized by OWLNormalization)
-        # For now, add the axiom directly
-        # NOTE: This implementation is incomplete - axioms should be converted to DL facts
-        inclusion_axiom = OWLSubClassOfAxiom(OWLThing, some_values)
-        normalized_axioms.positive_facts.append(inclusion_axiom)
-
-    @staticmethod
-    def _axiomatize_bottom_object_property(
-        normalized_axioms: NormalizedAxioms,
-    ) -> None:
-        """Add axioms for bottom object property.
-
-        Axiom:
-        - ⊤ ⊑ ∀owl:bottomObjectProperty.⊥
-        """
-        from hermit.owl_model.owl_property import OWLObjectProperty
-        from hermit.owl_model.iri import IRI
-        from hermit.owl_model.class_expression import (
-            OWLObjectAllValuesFrom,
-            OWLNothing,
-            OWLThing,
-        )
-        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
-
-        bottom_prop = OWLObjectProperty(
-            IRI.create(BuiltInPropertyManager.BOTTOM_OBJECT_PROPERTY_IRI)
-        )
-
-        # Add axiom: ⊤ ⊑ ∀owl:bottomObjectProperty.⊥
-        all_values = OWLObjectAllValuesFrom(bottom_prop, OWLNothing)
-        axiom = OWLSubClassOfAxiom(OWLThing, all_values)
-        normalized_axioms.positive_facts.append(axiom)
-
-    @staticmethod
-    def _axiomatize_top_data_property(
-        normalized_axioms: NormalizedAxioms,
-    ) -> None:
-        """Add axioms for top data property.
-
-        Axiom:
-        - ⊤ ⊑ ∃owl:topDataProperty.{internal:constant}
-        """
-        from hermit.owl_model.owl_property import OWLDataProperty
-        from hermit.owl_model.iri import IRI
-        from hermit.owl_model.class_expression import (
-            OWLDataSomeValuesFrom,
-            OWLThing,
-        )
-        from hermit.owl_model.class_expression import OWLDataOneOf
-        from hermit.owl_model.owl_literal import _OWLLiteralImplString as OWLLiteralString
-        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
-
-        top_data_prop = OWLDataProperty(
-            IRI.create(BuiltInPropertyManager.TOP_DATA_PROPERTY_IRI)
-        )
-
-        # Create a string literal constant for the built-in axiom
-        literal = OWLLiteralString("internal:constant")  # type: ignore[no-untyped-call]
-        one_of = OWLDataOneOf(literal)
-        some_values = OWLDataSomeValuesFrom(top_data_prop, one_of)
-
-        axiom = OWLSubClassOfAxiom(OWLThing, some_values)
-        normalized_axioms.positive_facts.append(axiom)
-
-    @staticmethod
-    def _axiomatize_bottom_data_property(
-        normalized_axioms: NormalizedAxioms,
-    ) -> None:
-        """Add axioms for bottom data property.
-
-        Axiom:
-        - ⊤ ⊑ ∀owl:bottomDataProperty.⊥_D (complement of top datatype)
-        """
-        from hermit.owl_model.owl_property import OWLDataProperty
-        from hermit.owl_model.iri import IRI
-        from hermit.owl_model.class_expression import (
-            OWLDataAllValuesFrom,
-            OWLThing,
-        )
-        from hermit.owl_model.owl_data_ranges import OWLDataComplementOf
-        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
-
-        bottom_data_prop = OWLDataProperty(
-            IRI.create(BuiltInPropertyManager.BOTTOM_DATA_PROPERTY_IRI)
-        )
-
-        # Top datatype for complementation
-        from hermit.owl_model.owl_literal import TopOWLDatatype
-        top_datatype = TopOWLDatatype
-        complement = OWLDataComplementOf(top_datatype)
-
-        all_values = OWLDataAllValuesFrom(bottom_data_prop, complement)
-        axiom = OWLSubClassOfAxiom(OWLThing, all_values)
-        normalized_axioms.positive_facts.append(axiom)
-
-
-class _BuiltInPropertyChecker:
-    """Checks which built-in properties are used in normalized axioms."""
-
-    def __init__(self, normalized_axioms: NormalizedAxioms) -> None:
-        """Initialize and scan normalized axioms."""
-        self.uses_top_object = False
-        self.uses_bottom_object = False
-        self.uses_top_data = False
-        self.uses_bottom_data = False
-
-        self._check_axioms(normalized_axioms)
-
-    def _check_axioms(self, normalized_axioms: NormalizedAxioms) -> None:
-        """Scan axioms for uses of built-in properties."""
-        # Check concept inclusions (they contain class expressions)
-        for inclusion in normalized_axioms.concept_inclusions:
-            if isinstance(inclusion, list):
-                for expr in inclusion:
-                    self._check_class_expression(expr)
-            else:
-                self._check_class_expression(inclusion)
-
-        # Check property inclusions (each item is a (sub, super) Role tuple)
-        for sub_prop, sup_prop in normalized_axioms.simple_object_property_inclusions:
-            self._check_object_property(sub_prop)
-            self._check_object_property(sup_prop)
-
-        # Check data property inclusions
-        for data_inclusion in normalized_axioms.data_property_inclusions:
-            for data_prop in data_inclusion:
-                self._check_data_property(data_prop)
-
-        # Check unclassified positive facts for OWL property axioms
-        for fact in normalized_axioms.positive_facts:
-            self._check_axiom(fact)
-
-    def _check_axiom(self, axiom: object) -> None:
-        """Check an axiom for built-in property usage."""
-        from hermit.owl_model.owl_axiom import (
-            OWLObjectPropertyAssertionAxiom,
-            OWLDataPropertyAssertionAxiom,
-            OWLSubObjectPropertyOfAxiom,
-            OWLObjectPropertyDomainAxiom,
-            OWLObjectPropertyRangeAxiom,
-            OWLSubDataPropertyOfAxiom,
-        )
-
-        if isinstance(axiom, OWLObjectPropertyAssertionAxiom):
-            self._check_object_property(axiom.get_property())
-        elif isinstance(axiom, OWLDataPropertyAssertionAxiom):
-            self._check_data_property(axiom.get_property())
-        elif isinstance(axiom, OWLSubObjectPropertyOfAxiom):
-            self._check_object_property(axiom.get_sub_property())
-            self._check_object_property(axiom.get_super_property())
-        elif isinstance(axiom, OWLObjectPropertyDomainAxiom):
-            self._check_object_property(axiom.get_property())
-            self._check_class_expression(axiom.get_domain())
-        elif isinstance(axiom, OWLObjectPropertyRangeAxiom):
-            self._check_object_property(axiom.get_property())
-            self._check_class_expression(axiom.get_range())
-        elif isinstance(axiom, OWLSubDataPropertyOfAxiom):
-            self._check_data_property(axiom.get_sub_property())
-            self._check_data_property(axiom.get_super_property())
-
-    def _check_class_expression(self, expr: object) -> None:
-        """Recursively check a class expression for built-in properties."""
-        from hermit.owl_model.class_expression import (
-            OWLObjectComplementOf,
-            OWLObjectIntersectionOf,
-            OWLObjectUnionOf,
             OWLObjectSomeValuesFrom,
+            OWLThing,
+        )
+        from hermit.owl_model.owl_axiom import (
+            OWLSubClassOfAxiom,
+            OWLSymmetricObjectPropertyAxiom,
+            OWLTransitiveObjectPropertyAxiom,
+        )
+        from hermit.owl_model.iri import IRI
+        from hermit.owl_model.owl_individual import OWLNamedIndividual
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        top_prop = OWLObjectProperty(self.TOP_OBJECT_PROPERTY_IRI)
+        top_individual = OWLNamedIndividual(IRI("internal:nam#", "topIndividual"))
+        has_top_individual = OWLObjectSomeValuesFrom(
+            top_prop, OWLObjectOneOf(top_individual)
+        )
+        return [
+            OWLTransitiveObjectPropertyAxiom(top_prop),
+            OWLSymmetricObjectPropertyAxiom(top_prop),
+            OWLSubClassOfAxiom(OWLThing, has_top_individual),
+        ]
+
+    def _bottom_object_property_axiom(self) -> OWLAxiom:
+        """bottomObjectProperty has an empty extension: ⊤ ⊑ ∀bot.⊥."""
+        from hermit.owl_model.class_expression import (
+            OWLNothing,
             OWLObjectAllValuesFrom,
-            OWLObjectHasValue,
-            OWLObjectHasSelf,
-            OWLObjectMinCardinality,
-            OWLObjectMaxCardinality,
-            OWLObjectExactCardinality,
-            OWLDataSomeValuesFrom,
-            OWLDataAllValuesFrom,
-            OWLDataHasValue,
-            OWLDataMinCardinality,
-            OWLDataMaxCardinality,
-            OWLDataExactCardinality,
+            OWLThing,
+        )
+        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        bottom_prop = OWLObjectProperty(self.BOTTOM_OBJECT_PROPERTY_IRI)
+        return OWLSubClassOfAxiom(
+            OWLThing, OWLObjectAllValuesFrom(bottom_prop, OWLNothing)
         )
 
-        if isinstance(expr, OWLObjectComplementOf):
-            self._check_class_expression(expr.get_operand())
-        elif isinstance(expr, OWLObjectIntersectionOf):
-            for operand in expr.operands():
-                self._check_class_expression(operand)
-        elif isinstance(expr, OWLObjectUnionOf):
-            for operand in expr.operands():
-                self._check_class_expression(operand)
-        elif isinstance(expr, OWLObjectSomeValuesFrom):
-            self._check_object_property(expr.get_property())
-            self._check_class_expression(expr.get_filler())
-        elif isinstance(expr, OWLObjectAllValuesFrom):
-            self._check_object_property(expr.get_property())
-            self._check_class_expression(expr.get_filler())
-        elif isinstance(expr, OWLObjectHasValue):
-            self._check_object_property(expr.get_property())
-        elif isinstance(expr, OWLObjectHasSelf):
-            self._check_object_property(expr.get_property())
-        elif isinstance(expr, OWLObjectMinCardinality):
-            self._check_object_property(expr.get_property())
-            self._check_class_expression(expr.get_filler())
-        elif isinstance(expr, OWLObjectMaxCardinality):
-            self._check_object_property(expr.get_property())
-            self._check_class_expression(expr.get_filler())
-        elif isinstance(expr, OWLObjectExactCardinality):
-            self._check_object_property(expr.get_property())
-            self._check_class_expression(expr.get_filler())
-        elif isinstance(expr, OWLDataSomeValuesFrom):
-            self._check_data_property(expr.get_property())
-        elif isinstance(expr, OWLDataAllValuesFrom):
-            self._check_data_property(expr.get_property())
-        elif isinstance(expr, OWLDataHasValue):
-            self._check_data_property(expr.get_property())
-        elif isinstance(expr, OWLDataMinCardinality):
-            self._check_data_property(expr.get_property())
-        elif isinstance(expr, OWLDataMaxCardinality):
-            self._check_data_property(expr.get_property())
-        elif isinstance(expr, OWLDataExactCardinality):
-            self._check_data_property(expr.get_property())
+    def _top_data_property_axiom(self) -> OWLAxiom:
+        """topDataProperty is universal: ⊤ ⊑ ∃top.{anonymous constant}."""
+        from hermit.owl_model.class_expression import OWLThing
+        from hermit.owl_model.class_expression.restriction import (
+            OWLDataOneOf,
+            OWLDataSomeValuesFrom,
+        )
+        from hermit.owl_model.iri import IRI
+        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
+        from hermit.owl_model.owl_datatype import OWLDatatype
+        from hermit.owl_model.owl_literal import OWLLiteral
+        from hermit.owl_model.owl_property import OWLDataProperty
 
-    def _check_object_property(self, prop: object) -> None:
-        """Check if an object property is a built-in property."""
-        if prop is None:
-            return
+        top_prop = OWLDataProperty(self.TOP_DATA_PROPERTY_IRI)
+        new_constant = OWLLiteral(  # type: ignore[abstract]
+            "internal:constant",
+            OWLDatatype(IRI("internal:", "anonymous-constants")),
+        )
+        has_top_constant = OWLDataSomeValuesFrom(
+            top_prop, OWLDataOneOf([new_constant])
+        )
+        return OWLSubClassOfAxiom(OWLThing, has_top_constant)
 
+    def _bottom_data_property_axiom(self) -> OWLAxiom:
+        """bottomDataProperty has an empty extension: ⊤ ⊑ ∀bot.¬⊤D."""
+        from hermit.owl_model.class_expression import OWLThing
+        from hermit.owl_model.class_expression.restriction import (
+            OWLDataAllValuesFrom,
+        )
+        from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
+        from hermit.owl_model.owl_data_ranges import OWLDataComplementOf
+        from hermit.owl_model.owl_literal import TopOWLDatatype
+        from hermit.owl_model.owl_property import OWLDataProperty
+
+        bottom_prop = OWLDataProperty(self.BOTTOM_DATA_PROPERTY_IRI)
+        return OWLSubClassOfAxiom(
+            OWLThing,
+            OWLDataAllValuesFrom(bottom_prop, OWLDataComplementOf(TopOWLDatatype)),
+        )
+
+
+_CHILD_GETTERS = (
+    "get_property",
+    "get_properties",
+    "get_sub_property",
+    "get_super_property",
+    "get_inverse",
+    "get_inverse_property",
+    "get_first_property",
+    "get_second_property",
+    "get_filler",
+    "get_operand",
+    "get_sub_class",
+    "get_super_class",
+    "get_class_expression",
+    "get_domain",
+    "get_range",
+)
+_CHILD_ITERATORS = (
+    "operands",
+    "properties",
+    "class_expressions",
+    "property_chain",
+)
+
+
+def _collect_property_iris(node: object, used: set[str]) -> None:
+    """Recursively collect property IRIs from an OWL axiom or expression."""
+    from hermit.owl_model.owl_property import OWLDataProperty, OWLObjectProperty
+
+    if isinstance(node, (OWLObjectProperty, OWLDataProperty)):
+        iri = node.iri
+        used.add(iri.as_str() if hasattr(iri, "as_str") else str(iri))
+        return
+    for getter_name in _CHILD_GETTERS:
+        getter = getattr(node, getter_name, None)
+        if getter is None:
+            continue
         try:
-            prop_iri = prop.iri.as_str() if hasattr(prop, "iri") else str(prop)
-        except Exception:
-            return
-
-        if BuiltInPropertyManager.TOP_OBJECT_PROPERTY_IRI in prop_iri:
-            self.uses_top_object = True
-        elif BuiltInPropertyManager.BOTTOM_OBJECT_PROPERTY_IRI in prop_iri:
-            self.uses_bottom_object = True
-
-    def _check_data_property(self, prop: object) -> None:
-        """Check if a data property is a built-in property."""
-        if prop is None:
-            return
-
+            child = getter()
+        except Exception:  # noqa: BLE001 - probe-style traversal
+            continue
+        if child is not None:
+            _collect_property_iris(child, used)
+    for iterator_name in _CHILD_ITERATORS:
+        iterator = getattr(node, iterator_name, None)
+        if iterator is None:
+            continue
         try:
-            prop_iri = prop.iri.as_str() if hasattr(prop, "iri") else str(prop)
-        except Exception:
-            return
-
-        if BuiltInPropertyManager.TOP_DATA_PROPERTY_IRI in prop_iri:
-            self.uses_top_data = True
-        elif BuiltInPropertyManager.BOTTOM_DATA_PROPERTY_IRI in prop_iri:
-            self.uses_bottom_data = True
+            children = list(iterator())
+        except Exception:  # noqa: BLE001 - probe-style traversal
+            continue
+        for child in children:
+            _collect_property_iris(child, used)

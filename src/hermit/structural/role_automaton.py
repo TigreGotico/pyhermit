@@ -445,7 +445,13 @@ class RoleAutomataBuilder:
                     )
                 ):
                     raise ValueError("The given property hierarchy is not regular.")
-                if sub_property.get_inverse() == super_property:
+                if (
+                    sub_property != super_property
+                    and sub_property.get_inverse() == super_property
+                ):
+                    # Self-inverse built-in roles (owl:topObjectProperty) have
+                    # inverse(R) == R, so their transitivity inclusion
+                    # (R, R) ⊑ R must not be flagged as irregular.
                     raise ValueError("The given property hierarchy is not regular.")
                 if sub_property != super_property:
                     dependency_graph.add_edge(sub_property, super_property)
