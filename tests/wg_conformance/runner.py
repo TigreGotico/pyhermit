@@ -31,9 +31,11 @@ from hermit.owl_model.class_expression import (
     OWLObjectAllValuesFrom,
     OWLObjectComplementOf,
 )
+from hermit.owl_model.class_expression.restriction import OWLDataSomeValuesFrom
 from hermit.owl_model.owl_axiom import (
     OWLClassAssertionAxiom,
     OWLDataPropertyAssertionAxiom,
+    OWLDataPropertyRangeAxiom,
     OWLDifferentIndividualsAxiom,
     OWLDisjointClassesAxiom,
     OWLEquivalentClassesAxiom,
@@ -395,6 +397,18 @@ def _entails_axiom(premise_axioms: list, axiom, udl: bool) -> bool:
                 OWLSubClassOfAxiom(q, OWLObjectComplementOf(axiom.get_range())),
                 OWLClassAssertionAxiom(b, q),
             ],
+            udl,
+        )
+    if isinstance(axiom, OWLDataPropertyRangeAxiom):
+        # entailed iff some individual may carry a p-value outside the range:
+        # assert ∃p.(¬DR) on a fresh individual and check for refutation.
+        from hermit.owl_model.owl_data_ranges import OWLDataComplementOf
+        p = axiom.get_property()
+        (a,) = _fresh_individuals(1)
+        witness = OWLDataSomeValuesFrom(p, OWLDataComplementOf(axiom.get_range()))
+        return _refutes(
+            premise_axioms,
+            [OWLClassAssertionAxiom(a, witness)],
             udl,
         )
     if isinstance(axiom, OWLObjectPropertyDomainAxiom):
