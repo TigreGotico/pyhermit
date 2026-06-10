@@ -325,8 +325,9 @@ def _owl_data_range_to_internal(data_range: object) -> DataRange | None:
     """Convert an OWL data range to an internal model DataRange.
 
     Supports named datatypes (rdfs:Literal maps to the internal top datatype),
-    complements of supported ranges, and literal enumerations. Returns ``None``
-    for unsupported forms so callers can fail loudly instead of weakening.
+    facet-restricted datatypes, complements of supported ranges, and literal
+    enumerations. Returns ``None`` for unsupported forms so callers can fail
+    loudly instead of weakening.
     """
     from hermit.model import (
         ConstantEnumeration,
@@ -335,7 +336,10 @@ def _owl_data_range_to_internal(data_range: object) -> DataRange | None:
     )
     from hermit.owl_model.owl_datatype import OWLDatatype
     from hermit.owl_model.owl_data_ranges import OWLDataComplementOf
-    from hermit.owl_model.class_expression.restriction import OWLDataOneOf
+    from hermit.owl_model.class_expression.restriction import (
+        OWLDataOneOf,
+        OWLDatatypeRestriction,
+    )
 
     if isinstance(data_range, OWLDatatype):
         iri = data_range.iri.as_str()
@@ -347,6 +351,26 @@ def _owl_data_range_to_internal(data_range: object) -> DataRange | None:
             iri,
             DatatypeRestriction.NO_FACET_URIS,
             DatatypeRestriction.NO_FACET_VALUES,
+        )
+    if isinstance(data_range, OWLDatatypeRestriction):
+        dt_iri = data_range.get_datatype().iri.as_str()
+        facet_uris: list[str] = []
+        facet_values: list[Constant] = []
+        for facet_restriction in data_range.get_facet_restrictions():
+            facet_iri_obj = facet_restriction.get_facet().iri
+            facet_uris.append(
+                facet_iri_obj.as_str()
+                if hasattr(facet_iri_obj, "as_str")
+                else str(facet_iri_obj)
+            )
+            facet_value = _owl_literal_to_constant(
+                facet_restriction.get_facet_value()
+            )
+            if facet_value is None:
+                return None
+            facet_values.append(facet_value)
+        return DatatypeRestriction.create(
+            dt_iri, tuple(facet_uris), tuple(facet_values)
         )
     if isinstance(data_range, OWLDataComplementOf):
         inner = _owl_data_range_to_internal(data_range.get_data_range())
@@ -370,6 +394,20 @@ def _owl_literal_to_constant(literal: object) -> Constant | None:
     if get_literal is None:
         return None
     lexical_form = get_literal()
+    # Date/time literals are stored as Python datetime objects whose str()
+    # is not an XSD lexical form; serialize them back to ISO-8601 so the
+    # datatype registry can parse the constant.
+    try:
+        if getattr(literal, "is_datetime", lambda: False)():
+            value = literal.parse_datetime()  # type: ignore[attr-defined]
+            timespec = "milliseconds" if value.microsecond else "seconds"
+            lexical_form = value.isoformat(timespec=timespec)
+        elif getattr(literal, "is_date", lambda: False)():
+            lexical_form = literal.parse_date().isoformat()  # type: ignore[attr-defined]
+        elif getattr(literal, "is_time", lambda: False)():
+            lexical_form = literal.parse_time().isoformat()  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001 - keep the raw lexical form
+        pass
     datatype = getattr(literal, "get_datatype", lambda: None)()
     dt_iri_obj = getattr(datatype, "iri", None)
     if dt_iri_obj is None:
