@@ -166,6 +166,6 @@ The unit suite passes under `pytest` (the W3C conformance corpus is marked
 
 ## License
 
-Apache 2.0 or later. See [LICENSE](LICENSE).
+Apache 2.0. See [LICENSE](LICENSE).
 
 Based on HermiT, copyright Oxford University Computing Laboratory 2008–2014.
