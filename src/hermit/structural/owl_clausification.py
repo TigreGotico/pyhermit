@@ -478,6 +478,31 @@ def _role_atom(role: Role, first: Term, second: Term) -> Atom:
     return Atom.create(role, first, second)  # type: ignore[arg-type]
 
 
+def _fact_individual(owl_individual: object) -> Individual | None:
+    """Convert an OWL individual to an internal Individual term."""
+    from hermit.model import Individual as _Individual
+
+    if getattr(owl_individual, "is_anonymous", lambda: False)():
+        get_id = getattr(owl_individual, "get_id", None)
+        if get_id is None:
+            return None
+        return _Individual.create_anonymous(str(get_id()))
+    iri_obj = getattr(owl_individual, "iri", None)
+    if iri_obj is None:
+        return None
+    iri = iri_obj.as_str() if hasattr(iri_obj, "as_str") else str(iri_obj)
+    return _Individual.create(iri)
+
+
+def _fact_atomic_role(owl_property: object) -> AtomicRole | None:
+    """Convert a named OWL property expression to an internal AtomicRole."""
+    iri_obj = getattr(owl_property, "iri", None)
+    if iri_obj is None:
+        return None
+    iri = iri_obj.as_str() if hasattr(iri_obj, "as_str") else str(iri_obj)
+    return AtomicRole.create(iri)
+
+
 # ===========================================================================
 # NormalizedAxiomClausifier
 # ===========================================================================
@@ -1009,6 +1034,47 @@ class FactClausifier:
         # Negative data facts: not P(i, v)
         for individual, prop, value in axioms.negative_data_facts:
             self._negative_facts.add(Atom.create(prop, individual, value))
+
+        # Negative property assertions kept as OWL axioms (simple roles only;
+        # complex-role assertions were rewritten by the inclusion manager).
+        for owl_axiom in axioms.negative_facts:
+            negative_atom = self._negative_assertion_atom(owl_axiom)
+            if negative_atom is not None:
+                self._negative_facts.add(negative_atom)
+
+    def _negative_assertion_atom(self, owl_axiom: object) -> Atom | None:
+        """Convert a negative property assertion axiom into a ground atom."""
+        from hermit.owl_model.owl_axiom import (
+            OWLNegativeDataPropertyAssertionAxiom,
+            OWLNegativeObjectPropertyAssertionAxiom,
+        )
+        from hermit.owl_model.owl_property import OWLObjectInverseOf
+        from hermit.structural.normalized_axioms import (
+            _owl_literal_to_constant,
+        )
+
+        if isinstance(owl_axiom, OWLNegativeObjectPropertyAssertionAxiom):
+            prop = owl_axiom.get_property()
+            subject = _fact_individual(owl_axiom.get_subject())
+            target = _fact_individual(owl_axiom.get_object())
+            if subject is None or target is None:
+                return None
+            if isinstance(prop, OWLObjectInverseOf):
+                role = _fact_atomic_role(prop.get_inverse())
+                subject, target = target, subject
+            else:
+                role = _fact_atomic_role(prop)
+            if role is None:
+                return None
+            return Atom.create(role, subject, target)
+        if isinstance(owl_axiom, OWLNegativeDataPropertyAssertionAxiom):
+            role = _fact_atomic_role(owl_axiom.get_property())
+            subject = _fact_individual(owl_axiom.get_subject())
+            constant = _owl_literal_to_constant(owl_axiom.get_object())
+            if role is None or subject is None or constant is None:
+                return None
+            return Atom.create(role, subject, constant)
+        return None
 
 
 # ===========================================================================
