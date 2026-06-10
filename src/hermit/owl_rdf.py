@@ -63,6 +63,13 @@ class _Graph:
                 out.append(s)
         return out
 
+    def predicate_objects(self, subj: Term) -> list[tuple[str, Term]]:
+        return [
+            (pred, obj)
+            for pred, objs in self._spo.get(subj, {}).items()
+            for obj in objs
+        ]
+
 
 def map_triples_to_axioms(triples: list[Triple]) -> list[OWLAxiom]:
     """Convert RDF triples into OWL axioms."""
@@ -105,7 +112,11 @@ class _Mapper:
                     self._object_props.add(s)
 
     def _is_data_prop(self, iri: Term) -> bool:
-        return isinstance(iri, str) and iri in self._data_props
+        if not isinstance(iri, str):
+            return False
+        if iri in (OWL + "topDataProperty", OWL + "bottomDataProperty"):
+            return True
+        return iri in self._data_props
 
     def _is_annotation_prop(self, iri: Term) -> bool:
         return isinstance(iri, str) and iri in self._annotation_props
@@ -357,6 +368,10 @@ class _Mapper:
             )
             return
 
+        if o == OWL + "NegativePropertyAssertion":
+            self._negative_property_assertion(s)
+            return
+
         if o == OWL + "AllDifferent":
             from hermit.owl_model.owl_axiom import OWLDifferentIndividualsAxiom
             members = self._rdf_list_or_value(s, OWL + "distinctMembers") or \
@@ -562,6 +577,39 @@ class _Mapper:
                 )
             )
 
+    def _negative_property_assertion(self, s: Term) -> None:
+        """Map an owl:NegativePropertyAssertion reification node."""
+        from hermit.owl_model.owl_axiom import (
+            OWLNegativeDataPropertyAssertionAxiom,
+            OWLNegativeObjectPropertyAssertionAxiom,
+        )
+
+        source = self.g.value(s, OWL + "sourceIndividual")
+        prop = self.g.value(s, OWL + "assertionProperty")
+        if source is None or prop is None:
+            return
+        subj = self._individual(source)
+        if subj is None:
+            return
+        target_value = self.g.value(s, OWL + "targetValue")
+        if isinstance(target_value, Literal):
+            self._add(
+                OWLNegativeDataPropertyAssertionAxiom(
+                    subj, self._data_prop(prop), self._literal(target_value)
+                )
+            )
+            return
+        target = self.g.value(s, OWL + "targetIndividual")
+        if target is None:
+            return
+        obj = self._individual(target)
+        if obj is not None:
+            self._add(
+                OWLNegativeObjectPropertyAssertionAxiom(
+                    subj, self._object_prop(prop), obj
+                )
+            )
+
     # ------------------------------------------------------------------
     # class expressions
     # ------------------------------------------------------------------
@@ -745,8 +793,21 @@ class _Mapper:
         return None
 
     def _data_range(self, term: Term):  # type: ignore[no-untyped-def]
-        """Map an RDF term to an OWL data range (named datatype or literal enumeration)."""
-        from hermit.owl_model.class_expression.restriction import OWLDataOneOf
+        """Map an RDF term to an OWL data range.
+
+        Supports named datatypes, literal enumerations (owl:oneOf), facet
+        restrictions (owl:onDatatype + owl:withRestrictions), complements
+        (owl:datatypeComplementOf), and intersections/unions of data ranges.
+        """
+        from hermit.owl_model.class_expression.restriction import (
+            OWLDataOneOf,
+            OWLDatatypeRestriction,
+        )
+        from hermit.owl_model.owl_data_ranges import (
+            OWLDataComplementOf,
+            OWLDataIntersectionOf,
+            OWLDataUnionOf,
+        )
         from hermit.owl_model.owl_datatype import OWLDatatype
 
         if isinstance(term, str):
@@ -761,7 +822,51 @@ class _Mapper:
                 ]
                 if literals:
                     return OWLDataOneOf(literals)
+            on_datatype = self.g.value(term, OWL + "onDatatype")
+            if isinstance(on_datatype, str):
+                with_restrictions = self.g.value(term, OWL + "withRestrictions")
+                if with_restrictions is None:
+                    return OWLDatatype(on_datatype)
+                facets = self._facet_restrictions(with_restrictions)
+                if facets is None:
+                    return None
+                return OWLDatatypeRestriction(OWLDatatype(on_datatype), facets)
+            complement = self.g.value(term, OWL + "datatypeComplementOf")
+            if complement is not None:
+                inner = self._data_range(complement)
+                return OWLDataComplementOf(inner) if inner is not None else None
+            for pred, ctor in (
+                (OWL + "intersectionOf", OWLDataIntersectionOf),
+                (OWL + "unionOf", OWLDataUnionOf),
+            ):
+                members = self.g.value(term, pred)
+                if members is not None:
+                    operands = [
+                        self._data_range(m) for m in self._rdf_list(members)
+                    ]
+                    if any(op is None for op in operands):
+                        return None
+                    return ctor(operands)
         return None
+
+    def _facet_restrictions(self, term: Term):  # type: ignore[no-untyped-def]
+        """Map an owl:withRestrictions list to OWLFacetRestriction objects."""
+        from hermit.owl_model.class_expression.restriction import (
+            OWLFacetRestriction,
+        )
+        from hermit.owl_model.vocab import OWLFacet
+
+        facets_by_iri = {f.iri.as_str(): f for f in OWLFacet}
+        restrictions = []
+        for member in self._rdf_list(term):
+            for pred, obj in self.g.predicate_objects(member):
+                if not isinstance(obj, Literal):
+                    continue
+                facet = facets_by_iri.get(pred)
+                if facet is None:
+                    return None
+                restrictions.append(OWLFacetRestriction(facet, self._literal(obj)))
+        return restrictions if restrictions else None
 
     def _cardinality(self, term: Term, prop: Term) -> OWLClassExpression | None:
         from hermit.owl_model.class_expression import (
