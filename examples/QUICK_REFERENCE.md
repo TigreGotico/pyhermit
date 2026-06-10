@@ -31,7 +31,7 @@ reasoner = Reasoner(ontology)
 
 # 3. Ask questions
 is_consistent = reasoner.is_consistent()
-subclasses = reasoner.get_sub_classes(my_class)
+is_sub = reasoner.is_sub_class_of(sub_class, super_class)
 
 # 4. Clean up
 reasoner.dispose()
@@ -74,7 +74,7 @@ DLClause.create(
 # Means: if dog(X) then animal(X) = Dog ⊑ Animal
 ```
 
-### Existential Restriction: A ⊓ ∃R.B ⊑ C
+### Existential Implication: A ⊑ ∃R.B
 ```python
 DLClause.create(
     (Atom.create(has_owner, X, Y), Atom.create(person, Y)),  # then
@@ -146,11 +146,10 @@ is_same = reasoner.is_same_individual(alice, alice)
 
 ### Hierarchies
 ```python
-reasoner.precompute_inferences(class_hierarchy=True)
+import sys
 
-class_hierarchy = reasoner.get_class_hierarchy()
-for node in class_hierarchy:
-    print(node)
+reasoner.precompute_inferences(class_hierarchy=True)
+reasoner.dump_hierarchies(sys.stdout, classes=True)  # inferred SubClassOf lines
 ```
 
 ## Configuration
@@ -160,7 +159,7 @@ config = Configuration()
 
 # Blocking strategy
 config.blocking_strategy_type = BlockingStrategyType.ANCESTOR
-# Options: ANCESTOR, PAIRWISE_DIRECT, ANYWHERE
+# Options: ANYWHERE, ANCESTOR, COMPLEX_CORE, SIMPLE_CORE, OPTIMAL
 
 # Timeout (milliseconds)
 config.individual_task_timeout = 10000  # 10 seconds
@@ -183,14 +182,12 @@ finally:
     reasoner.dispose()
 ```
 
-### Get all subclasses
+### Print the inferred class hierarchy
 ```python
-from hermit.owl_model.class_expression import OWLThing
+import sys
 
 reasoner.precompute_inferences(class_hierarchy=True)
-all_classes = reasoner.get_sub_classes(OWLThing)
-for cls in all_classes:
-    print(cls.iri)
+reasoner.dump_hierarchies(sys.stdout, classes=True)
 ```
 
 ### Classify individuals
@@ -279,7 +276,7 @@ reasoner.is_sub_class_of(E, F)
 ```python
 if not reasoner.is_consistent():
     # Find what's satisfiable and what's not
-    for cls in ontology.all_classes:
+    for cls in ontology.all_atomic_concepts:
         if not reasoner.is_satisfiable(cls):
             print(f"Unsatisfiable: {cls.iri}")
 ```
@@ -291,7 +288,8 @@ ontology = DLOntology(...)
 # Check if ontology uses specific features
 has_inverse = ontology.has_inverse_roles()
 has_nominals = ontology.has_nominals()
-has_complex_roles = ontology.has_complex_roles()
+has_at_most = ontology.has_at_most_restrictions()
+is_horn = ontology.is_horn()
 ```
 
 ## Performance Tuning
@@ -299,11 +297,11 @@ has_complex_roles = ontology.has_complex_roles()
 ```python
 # For large ontologies
 config = Configuration()
-config.blocking_strategy_type = BlockingStrategyType.ANCESTOR  # faster
+config.blocking_strategy_type = BlockingStrategyType.ANCESTOR  # can be faster
 config.individual_task_timeout = 30000  # 30 seconds
 
-# For maximum correctness
-config.blocking_strategy_type = BlockingStrategyType.PAIRWISE_DIRECT  # slower but complete
+# Let HermiT pick the strategy (default behaviour)
+config.blocking_strategy_type = BlockingStrategyType.OPTIMAL
 config.individual_task_timeout = 600000  # 10 minutes
 
 reasoner = Reasoner(ontology, config)
@@ -312,11 +310,15 @@ reasoner = Reasoner(ontology, config)
 ## Loading Files
 
 ```python
-from pathlib import Path
+from hermit.parser import load_ontology
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
 
-# Load OWL file
-ontology = load_ontology(Path("ontology.owl"))
-reasoner = Reasoner(ontology)
+# Load OWL file (RDF/XML, OWL/XML, or Functional-Style Syntax)
+axioms = load_ontology("ontology.owl")
+normalized = OWLNormalization().process_ontology(axioms)
+dl_ontology = OWLClausification().clausify(normalized)
+reasoner = Reasoner(dl_ontology)
 ```
 
 ## Quick IRIs
@@ -347,8 +349,9 @@ Reasoner(ontology).is_equivalent(A, B)
 Reasoner(ontology).is_consistent()
 
 # Get all instances of class C
-Reasoner(ontology).precompute_inferences() or \
-Reasoner(ontology).get_instances(C)
+reasoner = Reasoner(ontology)
+reasoner.precompute_inferences()
+instances = reasoner.get_instances(C)
 ```
 
 ---

@@ -1,6 +1,6 @@
 # PyHermit Examples — Learning Through Tutorial Progression
 
-Welcome to the comprehensive PyHermit examples collection. This folder contains 15 self-contained, runnable examples that progressively teach you how to use the Python OWL 2 DL reasoner.
+Welcome to the comprehensive PyHermit examples collection. This folder contains 25 self-contained, runnable examples that progressively teach you how to use the Python OWL 2 DL reasoner.
 
 ## Overview
 
@@ -58,14 +58,13 @@ python examples/03_object_properties.py > output.txt 2>&1
 - **Learning Time:** 10 minutes
 - **Difficulty:** ⭐⭐
 
-#### 03_object_properties.py ⭐ (FIXED)
+#### 03_object_properties.py
 **Purpose:** Object properties and role relationships
 - Define roles/properties connecting individuals
-- Query role relationships (now working correctly!)
+- Query role relationships
 - Type inference from role assertions
 - **Key Concepts:** Roles, relationships, object properties
 - **Learning Time:** 10 minutes
-- **Status:** Role relationship queries now return correct results ✓
 
 #### 04_instance_retrieval.py
 **Purpose:** Working with instances and type checking
@@ -108,12 +107,11 @@ python examples/03_object_properties.py > output.txt 2>&1
 
 #### 08_loading_owl_files.py
 **Purpose:** Integration with OWL file format
-- Shows how to load external OWL ontologies
-- Example workflow for loading Pizza ontology
-- Enables use of real-world ontologies
-- **Key Concepts:** OWL integration, external resources
+- Loads `resources/example.owl` with the stdlib `load_ontology` reader
+- Full pipeline: load → normalize → clausify → reason
+- Demonstrates an inferred classification (margherita pizzas are vegetarian)
+- **Key Concepts:** OWL file loading, RDF/XML, OWL/XML, Functional-Style Syntax
 - **Learning Time:** 10 minutes
-- **Note:** Requires downloading OWL files
 
 #### 09_configuration_and_performance.py
 **Purpose:** Performance tuning and configuration
@@ -349,11 +347,11 @@ reasoner.dispose()
 
 ### Pattern 2: Query the Class Hierarchy
 ```python
+import sys
+
 reasoner = Reasoner(ontology)
 reasoner.precompute_inferences(class_hierarchy=True)
-subclasses = reasoner.get_sub_classes(my_class)
-for sub in subclasses:
-    print(sub.iri)
+reasoner.dump_hierarchies(sys.stdout, classes=True)  # inferred SubClassOf lines
 reasoner.dispose()
 ```
 
@@ -422,15 +420,14 @@ When `is_consistent()` returns `False`, it means your ontology has contradictory
 
 1. **Did you call `precompute_inferences()`?** Some queries require the class hierarchy
 2. **Check the IRI format:** Ensure your class IRIs match what's in the ontology
-3. **Verify the ontology loaded:** Check `ontology.all_classes`, `ontology.all_individuals`
+3. **Verify the ontology loaded:** Check `ontology.all_atomic_concepts`, `ontology.all_individuals`
 
 ## Frequently Asked Questions
 
 ### Q: Can I load ontologies from files?
-**A:** Yes! Example 8 shows this. You need `owlready2` installed:
-```bash
-pip install owlready2
-```
+**A:** Yes! Example 8 shows this. The loader is part of PyHermit itself —
+`hermit.parser.load_ontology` reads RDF/XML, OWL/XML, and Functional-Style
+Syntax with the standard library only; no extra packages are needed.
 
 ### Q: What's the difference between TBox and ABox?
 **A:**

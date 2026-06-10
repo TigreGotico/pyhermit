@@ -22,7 +22,7 @@ Having problems with PyHermit? This guide covers common issues and solutions.
 ```python
 if not reasoner.is_consistent():
     print("Unsatisfiable concepts:")
-    for cls in ontology.all_classes:
+    for cls in ontology.all_atomic_concepts:
         if not reasoner.is_satisfiable(cls):
             print(f"  - {cls.iri}")
 ```
@@ -89,7 +89,7 @@ for fact in ontology.positive_facts:
 2. Check that disjointness is properly expressed:
 ```python
 # Verify class hierarchy includes disjoint declarations
-for cls in ontology.all_classes:
+for cls in ontology.all_atomic_concepts:
     print(f"  {cls.iri}")
 ```
 
@@ -227,7 +227,7 @@ if elapsed > 5:
 2. Is the class actually in the ontology?
    ```python
    my_iri = "http://example.org#Dog"
-   all_classes = [c.iri for c in ontology.all_classes]
+   all_classes = [c.iri for c in ontology.all_atomic_concepts]
    if my_iri in all_classes:
        print("Class exists")
    else:
@@ -260,7 +260,7 @@ if elapsed > 5:
            print(f"  - {t.iri}")
    ```
 
-### Problem: get_sub_classes() Returns Empty List
+### Problem: Subsumption Queries Return False Unexpectedly
 
 **Similar checklist as above, but for classes.**
 
@@ -293,8 +293,8 @@ print(f"B satisfiable: {b_satisfiable}")
 
 1. **Verify the ontology is what you think**
    ```python
-   print(f"Classes: {len(ontology.all_classes)}")
-   print(f"Roles: {len(ontology.all_roles)}")
+   print(f"Classes: {len(ontology.all_atomic_concepts)}")
+   print(f"Clauses: {len(ontology.dl_clauses)}")
    print(f"Individuals: {len(ontology.all_individuals)}")
    print(f"Facts: {len(ontology.positive_facts)}")
    ```
@@ -354,20 +354,15 @@ print(f"B satisfiable: {b_satisfiable}")
        print(f"File not found: {file.absolute()}")
    ```
 
-2. **Install owlready2**
-   ```bash
-   pip install owlready2
-   ```
-
-3. **Check file format**
+2. **Check file format**
    ```python
-   # Supported formats:
-   # - RDF/XML (.owl)
-   # - Functional Syntax (.fss)
-   # - OWL/XML (.xml)
+   # Supported formats (stdlib reader, no extra packages):
+   # - RDF/XML (.owl, .rdf)
+   # - OWL/XML (.owx, .owl)
+   # - Functional-Style Syntax (.ofn)
    ```
 
-4. **Use absolute paths**
+3. **Use absolute paths**
    ```python
    from pathlib import Path
    
@@ -515,14 +510,14 @@ reasoner2.dispose()
 
 ```python
 # Check ontology structure
-print(f"Classes: {len(ontology.all_classes)}")
+print(f"Classes: {len(ontology.all_atomic_concepts)}")
 print(f"Individuals: {len(ontology.all_individuals)}")
 print(f"Facts: {len(ontology.positive_facts)}")
 print(f"Clauses: {len(ontology.dl_clauses)}")
 
 # Sample elements
 print("\nFirst 5 classes:")
-for cls in list(ontology.all_classes)[:5]:
+for cls in list(ontology.all_atomic_concepts)[:5]:
     print(f"  {cls.iri}")
 
 print("\nFirst 5 facts:")
