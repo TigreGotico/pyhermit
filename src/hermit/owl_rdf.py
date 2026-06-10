@@ -24,6 +24,10 @@ if TYPE_CHECKING:
 OWL = "http://www.w3.org/2002/07/owl#"
 XSD = "http://www.w3.org/2001/XMLSchema#"
 
+#: IRI prefix under which blank nodes are skolemized into named individuals.
+#: Consumers (e.g. the entailment harness) detect anonymous individuals by it.
+ANONYMOUS_INDIVIDUAL_PREFIX = "http://pyhermit.invalid/anon/"
+
 RDF_TYPE = RDF + "type"
 RDF_FIRST = RDF + "first"
 RDF_REST = RDF + "rest"
@@ -72,6 +76,10 @@ class _Mapper:
         # IRIs declared as object vs data properties (best-effort typing).
         self._data_props: set[str] = set()
         self._object_props: set[str] = set()
+        # Declared annotation properties: their assertions are non-logical
+        # (the OWL API maps them to OWLAnnotationAssertionAxiom etc., which
+        # carry no logical content for reasoning).
+        self._annotation_props: set[str] = set()
         self._classify_properties()
 
     # ------------------------------------------------------------------
@@ -83,6 +91,8 @@ class _Mapper:
             if p == RDF_TYPE and isinstance(o, str) and isinstance(s, str):
                 if o in (OWL + "DatatypeProperty",):
                     self._data_props.add(s)
+                elif o == OWL + "AnnotationProperty":
+                    self._annotation_props.add(s)
                 elif o in (
                     OWL + "ObjectProperty",
                     OWL + "TransitiveProperty",
@@ -96,6 +106,9 @@ class _Mapper:
 
     def _is_data_prop(self, iri: Term) -> bool:
         return isinstance(iri, str) and iri in self._data_props
+
+    def _is_annotation_prop(self, iri: Term) -> bool:
+        return isinstance(iri, str) and iri in self._annotation_props
 
     # ------------------------------------------------------------------
     # entry
@@ -233,6 +246,8 @@ class _Mapper:
             return
 
         if p == RDFS + "domain" and isinstance(s, str):
+            if self._is_annotation_prop(s):
+                return  # AnnotationPropertyDomain is non-logical
             dom = self._class_expr(o)
             if dom is not None:
                 if self._is_data_prop(s):
@@ -242,6 +257,8 @@ class _Mapper:
             return
 
         if p == RDFS + "range" and isinstance(s, str):
+            if self._is_annotation_prop(s):
+                return  # AnnotationPropertyRange is non-logical
             if self._is_data_prop(s):
                 from hermit.owl_model.owl_axiom import OWLDataPropertyRangeAxiom
                 dr = self._data_range(o)
@@ -435,6 +452,9 @@ class _Mapper:
             OWLSubPropertyChainAxiom,
         )
 
+        if self._is_annotation_prop(s) or self._is_annotation_prop(o):
+            return  # SubAnnotationPropertyOf is non-logical
+
         # Property chain axiom: subject is a bnode with owl:propertyChain /
         # rdf:List, super-property is o.
         chain = self.g.value(s, OWL + "propertyChain")
@@ -474,6 +494,8 @@ class _Mapper:
             OWLEquivalentObjectPropertiesAxiom,
         )
 
+        if self._is_annotation_prop(s) or self._is_annotation_prop(o):
+            return
         if isinstance(s, str) and isinstance(o, str):
             if self._is_data_prop(s) or self._is_data_prop(o):
                 self._add(
@@ -519,6 +541,8 @@ class _Mapper:
             OWLObjectPropertyAssertionAxiom,
         )
 
+        if self._is_annotation_prop(p):
+            return  # AnnotationAssertion is non-logical
         subj = self._individual(s)
         if subj is None:
             return
@@ -859,7 +883,7 @@ _STRUCTURAL_TYPES = {
 
 def _anon_iri(term: Term) -> str:
     if isinstance(term, BNode):
-        return f"http://pyhermit.invalid/anon/{term.id}"
+        return f"{ANONYMOUS_INDIVIDUAL_PREFIX}{term.id}"
     return str(term)
 
 
