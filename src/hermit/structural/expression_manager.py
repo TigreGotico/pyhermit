@@ -163,6 +163,17 @@ class ExpressionManager:
             return OWLObjectComplementOf(self._get_class_nnf(expr))
         elif isinstance(expr, OWLObjectHasSelf):
             return OWLObjectComplementOf(self._get_class_nnf(expr))
+        elif isinstance(expr, OWLObjectOneOf):
+            # ¬{a1,…,an} = ¬{a1} ⊓ … ⊓ ¬{an}
+            individuals = list(expr.operands())
+            if len(individuals) <= 1:
+                return OWLObjectComplementOf(expr)
+            return OWLObjectIntersectionOf(
+                tuple(
+                    OWLObjectComplementOf(OWLObjectOneOf([individual]))
+                    for individual in individuals
+                )
+            )
         elif isinstance(expr, OWLObjectMinCardinality):
             # ¬(≥n R.A) = ≤(n-1) R.A
             if expr.get_cardinality() == 0:

@@ -246,6 +246,38 @@ class TestEquivalentObjectProperties:
         assert (q_role, p_role) in inclusions
 
 
+class TestComplementOfEnumeration:
+    """¬{a1,…,an} must exclude every listed individual."""
+
+    def test_complement_of_enumeration_excludes_members(self):
+        from hermit.owl_model.class_expression.restriction import OWLObjectOneOf
+
+        a = OWLNamedIndividual(NS + "a")
+        b = OWLNamedIndividual(NS + "b")
+        c = OWLNamedIndividual(NS + "c")
+        q = OWLClass(NS + "q")
+        axioms = [
+            OWLSubClassOfAxiom(
+                q, OWLObjectComplementOf(OWLObjectOneOf([a, b, c]))
+            ),
+            OWLClassAssertionAxiom(b, q),
+        ]
+        assert not _consistent(axioms)
+
+    def test_complement_of_enumeration_allows_non_members(self):
+        from hermit.owl_model.class_expression.restriction import OWLObjectOneOf
+
+        a = OWLNamedIndividual(NS + "a")
+        b = OWLNamedIndividual(NS + "b")
+        d = OWLNamedIndividual(NS + "d")
+        q = OWLClass(NS + "q")
+        axioms = [
+            OWLSubClassOfAxiom(q, OWLObjectComplementOf(OWLObjectOneOf([a, b]))),
+            OWLClassAssertionAxiom(d, q),
+        ]
+        assert _consistent(axioms)
+
+
 class TestSymmetricTransitiveInterplay:
     """Symmetric + transitive roles propagate universals in both directions."""
 
