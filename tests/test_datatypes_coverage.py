@@ -384,7 +384,8 @@ class TestXMLLiteralHandler:
         assert "http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral" in self.h.get_datatype_iris()
 
     def test_parse(self):
-        assert self.h.parse_literal("<tag/>", "") == "<tag/>"
+        # parse_literal canonicalizes: empty-element tags expand.
+        assert self.h.parse_literal("<tag/>", "") == "<tag></tag>"
 
     def test_entire_not_empty(self):
         assert not self.h.entire_space("").is_empty()

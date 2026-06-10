@@ -1,14 +1,36 @@
 """rdf:XMLLiteral datatype handler."""
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from typing import Any
 
 from hermit.datatypes.registry import (
     DatatypeHandler,
     DatatypeRegistry,
+    MalformedLiteralException,
     UnsupportedFacetException,
     ValueSpaceSubset,
 )
+
+_WRAPPER_OPEN = "<arbitraryTag>"
+_WRAPPER_CLOSE = "</arbitraryTag>"
+
+
+def _canonicalize_xml(lexical_form: str) -> str:
+    """Canonicalize an rdf:XMLLiteral lexical form.
+
+    Mirrors the Java ``XMLLiteral.parse``: the XML content (a document
+    fragment) is wrapped in an arbitrary element, canonicalized with comments
+    preserved, and unwrapped, so that equality of XMLLiteral values is
+    equality of their canonical form (attribute order, self-closing tags,
+    and whitespace in tags do not matter).
+    """
+    canonical = ET.canonicalize(
+        _WRAPPER_OPEN + lexical_form + _WRAPPER_CLOSE, with_comments=True
+    )
+    assert canonical.startswith(_WRAPPER_OPEN)
+    assert canonical.endswith(_WRAPPER_CLOSE)
+    return canonical[len(_WRAPPER_OPEN):-len(_WRAPPER_CLOSE)]
 
 
 class XMLLiteralValue:
@@ -72,10 +94,15 @@ class XMLLiteralDatatypeHandler(DatatypeHandler):
         return self.IRIS
 
     def parse_literal(self, lexical_form: str, datatype_iri: str) -> Any:
-        return lexical_form
+        try:
+            return _canonicalize_xml(lexical_form)
+        except ET.ParseError as error:
+            raise MalformedLiteralException(
+                f"Invalid rdf:XMLLiteral: {lexical_form!r}"
+            ) from error
 
     def parse_data_value(self, lexical_form: str, datatype_iri: str) -> Any:
-        return XMLLiteralValue(lexical_form)
+        return XMLLiteralValue(self.parse_literal(lexical_form, datatype_iri))
 
     def validate_datatype_restriction(self, datatype_restriction: Any) -> None:
         if datatype_restriction.number_of_facet_restrictions() > 0:
