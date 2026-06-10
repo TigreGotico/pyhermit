@@ -56,6 +56,7 @@ from hermit.model import (
     Inequality,
     InternalDatatype,
     InverseRole,
+    LiteralConcept,
     LiteralDataRange,
     Prefixes,
     Role,
@@ -362,8 +363,51 @@ class OWLClausification:
         return False
 
     @staticmethod
-    def _clausify_object_key(key: ObjectPropertyKey) -> DLClause:
-        """Clausify an object property HasKey axiom: C hasKey {R1,...,Rn}."""
+    def _key_concept_atoms(
+        concept: LiteralConcept,
+        x1: Variable,
+        x2: Variable,
+        head_atoms: list[Atom],
+        body_atoms: list[Atom],
+    ) -> None:
+        """Add the key's concept-expression atoms, as in the Java clausifyKey.
+
+        A concept name (other than owl:Thing) guards the body; a negated
+        concept name contributes the positive atoms to the head instead.
+        """
+        if isinstance(concept, AtomicConcept):
+            if not concept.is_always_true():
+                body_atoms.append(Atom.create(concept, x1))
+                body_atoms.append(Atom.create(concept, x2))
+        else:
+            assert isinstance(concept, AtomicNegationConcept)
+            head_atoms.append(Atom.create(concept.negated, x1))
+            head_atoms.append(Atom.create(concept.negated, x2))
+
+    @staticmethod
+    def _key_data_property_atoms(
+        properties: tuple[AtomicRole, ...],
+        x1: Variable,
+        x2: Variable,
+        head_atoms: list[Atom],
+        body_atoms: list[Atom],
+        y_index: int,
+    ) -> None:
+        """Add per-data-property atoms: body P(Xi,Yj), head Yj != Yk."""
+        for prop in properties:
+            y_var = Variable.create(f"Y{y_index}")
+            y_index += 1
+            body_atoms.append(Atom.create(prop, x1, y_var))
+
+            y2_var = Variable.create(f"Y{y_index}")
+            y_index += 1
+            body_atoms.append(Atom.create(prop, x2, y2_var))
+
+            head_atoms.append(Atom.create(Inequality.INSTANCE, y_var, y2_var))
+
+    @classmethod
+    def _clausify_object_key(cls, key: ObjectPropertyKey) -> DLClause:
+        """Clausify a HasKey axiom with object (and optional data) properties."""
         head_atoms: list[Atom] = []
         body_atoms: list[Atom] = []
 
@@ -378,10 +422,7 @@ class OWLClausification:
         body_atoms.append(Atom.create(AtomicConcept.INTERNAL_NAMED, x2))
 
         # Concept expression
-        concept = key.concept
-        if not concept.is_always_true():
-            body_atoms.append(Atom.create(concept, x1))
-            body_atoms.append(Atom.create(concept, x2))
+        cls._key_concept_atoms(key.concept, x1, x2, head_atoms, body_atoms)
 
         # Object properties — go to body
         y_index = 1
@@ -392,10 +433,15 @@ class OWLClausification:
             body_atoms.append(_role_atom(prop, x2, y_var))
             body_atoms.append(Atom.create(AtomicConcept.INTERNAL_NAMED, y_var))
 
+        # Data properties of a mixed key — body atoms plus head inequalities
+        cls._key_data_property_atoms(
+            key.data_properties, x1, x2, head_atoms, body_atoms, y_index
+        )
+
         return DLClause.create(tuple(head_atoms), tuple(body_atoms))
 
-    @staticmethod
-    def _clausify_data_key(key: DataPropertyKey) -> DLClause:
+    @classmethod
+    def _clausify_data_key(cls, key: DataPropertyKey) -> DLClause:
         """Clausify a data property HasKey axiom: C hasKey {P1,...,Pn}."""
         head_atoms: list[Atom] = []
         body_atoms: list[Atom] = []
@@ -411,23 +457,12 @@ class OWLClausification:
         body_atoms.append(Atom.create(AtomicConcept.INTERNAL_NAMED, x2))
 
         # Concept expression
-        concept = key.concept
-        if not concept.is_always_true():
-            body_atoms.append(Atom.create(concept, x1))
-            body_atoms.append(Atom.create(concept, x2))
+        cls._key_concept_atoms(key.concept, x1, x2, head_atoms, body_atoms)
 
         # Data properties — go to body, head gets inequality
-        y_index = 1
-        for prop in key.properties:
-            y_var = Variable.create(f"Y{y_index}")
-            y_index += 1
-            body_atoms.append(Atom.create(prop, x1, y_var))
-
-            y2_var = Variable.create(f"Y{y_index}")
-            y_index += 1
-            body_atoms.append(Atom.create(prop, x2, y2_var))
-
-            head_atoms.append(Atom.create(Inequality.INSTANCE, y_var, y2_var))
+        cls._key_data_property_atoms(
+            key.properties, x1, x2, head_atoms, body_atoms, 1
+        )
 
         return DLClause.create(tuple(head_atoms), tuple(body_atoms))
 

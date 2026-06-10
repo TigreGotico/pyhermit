@@ -47,6 +47,7 @@ from hermit.owl_model.owl_axiom import (
     OWLReflexiveObjectPropertyAxiom,
     OWLIrreflexiveObjectPropertyAxiom,
     OWLFunctionalDataPropertyAxiom,
+    OWLHasKeyAxiom,
     OWLInverseObjectPropertiesAxiom,
 )
 from hermit.owl_model.class_expression import (
@@ -312,9 +313,82 @@ class OWLNormalization:
                 # first ⊑ second⁻¹
                 result.simple_object_property_inclusions.append((first, InverseRole.create(second_atomic)))
             result.positive_facts.append(axiom)
+        elif isinstance(axiom, OWLHasKeyAxiom):
+            self._process_has_key(axiom, result)
         else:
             # Unknown axiom type: pass through
             result.positive_facts.append(axiom)
+
+    def _process_has_key(
+        self, axiom: OWLHasKeyAxiom, result: NormalizedAxioms
+    ) -> None:
+        """Process a HasKey axiom, as in the Java visit(OWLHasKeyAxiom).
+
+        The class expression is brought to NNF; a complex expression gets a
+        definition Q with Q ⊑ C. The normalized key is stored for clausification
+        into ``X1 == X2 :- NAMED(X1), NAMED(X2), C(X1), C(X2), key atoms``.
+        """
+        from hermit.model import (
+            AtomicConcept,
+            AtomicRole,
+            InverseRole,
+            LiteralConcept,
+        )
+        from hermit.owl_model.class_expression.class_expression import (
+            OWLObjectComplementOf,
+        )
+        from hermit.owl_model.owl_property import OWLDataProperty
+        from hermit.structural.normalized_axioms import (
+            DataPropertyKey,
+            ObjectPropertyKey,
+        )
+
+        description = self._expression_manager.get_nnf(
+            axiom.get_class_expression()
+        )
+        assert isinstance(description, OWLClassExpression)
+        if not self._is_literal_expression(description):
+            description = self._get_definition_for(description, result)
+
+        concept: LiteralConcept
+        if isinstance(description, OWLClass):
+            iri = _iri_str(description)
+            assert iri is not None
+            concept = AtomicConcept.create(iri)
+        else:
+            assert isinstance(description, OWLObjectComplementOf)
+            operand = description.get_operand()
+            assert isinstance(operand, OWLClass)
+            operand_iri = _iri_str(operand)
+            assert operand_iri is not None
+            concept = AtomicConcept.create(operand_iri).get_negation()
+
+        object_properties: list[Role] = []
+        data_properties: list[AtomicRole] = []
+        for prop in axiom.get_property_expressions():
+            if isinstance(prop, OWLDataProperty):
+                prop_iri = _iri_str(prop)
+                if prop_iri is not None:
+                    data_properties.append(AtomicRole.create(prop_iri))
+            else:
+                role = _owl_prop_to_role(prop)
+                if role is not None:
+                    object_properties.append(role)
+                    if isinstance(role, InverseRole):
+                        result.object_roles_in_owl_axioms.add(role.inverse_of)
+                    elif isinstance(role, AtomicRole):
+                        result.object_roles_in_owl_axioms.add(role)
+
+        if object_properties:
+            result.object_property_keys.append(
+                ObjectPropertyKey(
+                    concept, tuple(object_properties), tuple(data_properties)
+                )
+            )
+        elif data_properties:
+            result.data_property_keys.append(
+                DataPropertyKey(concept, tuple(data_properties))
+            )
 
     def _process_sub_class_of(
         self, axiom: OWLSubClassOfAxiom, result: NormalizedAxioms

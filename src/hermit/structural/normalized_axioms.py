@@ -28,6 +28,7 @@ if TYPE_CHECKING:
         DataRange,
         DLClause,
         Individual,
+        LiteralConcept,
         Role,
     )
 
@@ -670,19 +671,26 @@ class DisjunctiveRule:
 
 @dataclass(frozen=True)
 class ObjectPropertyKey:
-    """A HasKey axiom with object properties: C hasKey {R1, ..., Rn}."""
+    """A HasKey axiom with object properties: C hasKey {R1, ..., Rn}.
 
-    concept: AtomicConcept
-    """The concept C."""
+    May additionally carry data properties so that a mixed key
+    ``HasKey(C (R1 ... Rn) (P1 ... Pm))`` clausifies into a single DL clause,
+    as in the Java ``clausifyKey``.
+    """
+
+    concept: LiteralConcept
+    """The concept C (a concept name or a negated concept name)."""
     properties: tuple[Role, ...]
-    """The object property chain."""
+    """The object properties of the key."""
+    data_properties: tuple[AtomicRole, ...] = ()
+    """The data properties of the key (for mixed keys)."""
 
 
 @dataclass(frozen=True)
 class DataPropertyKey:
-    """A HasKey axiom with data properties: C hasKey {P1, ..., Pn}."""
+    """A HasKey axiom with data properties only: C hasKey {P1, ..., Pn}."""
 
-    concept: AtomicConcept
-    """The concept C."""
+    concept: LiteralConcept
+    """The concept C (a concept name or a negated concept name)."""
     properties: tuple[AtomicRole, ...]
-    """The data property chain."""
+    """The data properties of the key."""
