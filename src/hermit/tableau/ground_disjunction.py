@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, cast
 from collections.abc import Mapping
 
 if TYPE_CHECKING:
-    from hermit.model import Concept, DLPredicate, Role
+    from hermit.model import Concept, DLPredicate
     from hermit.model import Prefixes
     from hermit.tableau.dependency_set import DependencySet
     from hermit.tableau.ground_disjunction_header import GroundDisjunctionHeader
@@ -193,8 +193,8 @@ class GroundDisjunction:
             dependency_set = arg1.add_canonical_node_dependency_set(dependency_set)
             arg0_node = arg0.get_canonical_node()
             arg1_node = arg1.get_canonical_node()
-            return tableau.m_extension_manager.add_role_assertion(
-                cast("Role", dl_predicate),
+            return tableau.m_extension_manager.add_assertion_binary(
+                dl_predicate,
                 arg0_node,
                 arg1_node,
                 dependency_set,

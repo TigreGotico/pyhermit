@@ -1278,7 +1278,7 @@ class TestGroundDisjunctionSatisfied:
     def test_add_disjunct_arity2(self):
         gd = self._make_gd_with_arity([2])
         tableau = MagicMock()
-        tableau.m_extension_manager.add_role_assertion.return_value = True
+        tableau.m_extension_manager.add_assertion_binary.return_value = True
         result = gd.add_disjunct_to_tableau(tableau, 0, MagicMock())
         assert result is True
 
