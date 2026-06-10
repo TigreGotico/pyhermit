@@ -19,10 +19,10 @@ Basic usage::
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
 __all__ = [
     "Configuration",
     "Reasoner",
+    "__version__",
     "load_ontology",
     "load_ontology_from_string",
 ]
@@ -30,3 +30,4 @@ __all__ = [
 from hermit.configuration import Configuration
 from hermit.reasoner import Reasoner
 from hermit.parser import load_ontology, load_ontology_from_string
+from hermit.version import __version__

@@ -236,7 +236,7 @@ As you progress, check off these milestones:
 **Solutions:**
 - [ ] Always precompute before instance queries
 - [ ] Double-check IRI strings (use print statements)
-- [ ] List all classes: `ontology.all_classes`
+- [ ] List all classes: `ontology.all_atomic_concepts`
 - [ ] Verify facts were added to ABox
 
 ### Pitfall 4: "I changed the ontology but reasoner still gives old results"

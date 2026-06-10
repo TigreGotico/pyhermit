@@ -9,40 +9,54 @@ Learn how to construct ontologies from scratch with classes, properties, and axi
 - Writing subsumption and disjointness axioms
 - Building increasingly complex ontologies
 
+All tutorials use the helper from [First Program](../first-program.md):
+
+```python
+from hermit import Reasoner
+from hermit.model import AtomicConcept, AtomicRole, Individual
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
+
+
+def reasoner_from_axioms(axioms, ontology_iri="urn:example:onto"):
+    """Compile OWL axioms into a Reasoner (normalize -> clausify)."""
+    normalized = OWLNormalization().process_ontology(axioms)
+    return Reasoner(OWLClausification().clausify(normalized, ontology_iri=ontology_iri))
+```
+
 ## Part 1: Simple Class Hierarchy
 
 Let's model a basic organizational structure:
 
 ```python
-from hermit import Reasoner
-from hermit.model import (
-    DLOntology, OWLClass, SubClassOf,
-    ClassAssertion, OWLNamedIndividual
-)
+from hermit.owl_model.class_expression import OWLClass
+from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
 
-# Step 1: Create an ontology
-onto = DLOntology()
+NS = "http://example.org/"
 
-# Step 2: Define classes (concepts)
-Person = OWLClass("http://example.org/Person")
-Employee = OWLClass("http://example.org/Employee")
-Manager = OWLClass("http://example.org/Manager")
+# Step 1: Define classes (concepts)
+Person = OWLClass(NS + "Person")
+Employee = OWLClass(NS + "Employee")
+Manager = OWLClass(NS + "Manager")
 
-# Step 3: Add rules (axioms) to define the hierarchy
-# Every Employee is a Person
-onto.add_axiom(SubClassOf(Employee, Person))
+# Step 2: Add rules (axioms) to define the hierarchy
+axioms = [
+    OWLSubClassOfAxiom(Employee, Person),   # Every Employee is a Person
+    OWLSubClassOfAxiom(Manager, Employee),  # Every Manager is an Employee
+]
 
-# Every Manager is an Employee
-onto.add_axiom(SubClassOf(Manager, Employee))
-
-# Step 4: Create reasoner and run inference
-reasoner = Reasoner(onto)
+# Step 3: Create reasoner and run inference
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-# Step 5: Query the reasoner
-print("Is Manager a Person?", reasoner.is_subclass_of(Manager, Person))  # True
-print("Is Employee a Person?", reasoner.is_subclass_of(Employee, Person))  # True
-print("Is Person an Employee?", reasoner.is_subclass_of(Person, Employee))  # False
+# Step 4: Query the reasoner (hermit.model handles)
+person = AtomicConcept.create(NS + "Person")
+employee = AtomicConcept.create(NS + "Employee")
+manager = AtomicConcept.create(NS + "Manager")
+
+print("Is Manager a Person?", reasoner.is_sub_class_of(manager, person))    # True
+print("Is Employee a Person?", reasoner.is_sub_class_of(employee, person))  # True
+print("Is Person an Employee?", reasoner.is_sub_class_of(person, employee)) # False
 
 reasoner.dispose()
 ```
@@ -57,9 +71,9 @@ Is Person an Employee? False
 ### What Just Happened?
 
 The reasoner automatically inferred that **Manager is a subclass of Person** by following the chain:
-- Manager ⊆ Employee (you stated)
-- Employee ⊆ Person (you stated)
-- Therefore: Manager ⊆ Person (the reasoner inferred)
+- Manager ⊑ Employee (you stated)
+- Employee ⊑ Person (you stated)
+- Therefore: Manager ⊑ Person (the reasoner inferred)
 
 This is **transitivity** of subsumption.
 
@@ -68,31 +82,37 @@ This is **transitivity** of subsumption.
 Now let's add actual people:
 
 ```python
-from hermit.model import ClassAssertion, OWLNamedIndividual
+from hermit.owl_model.owl_individual import OWLNamedIndividual
+from hermit.owl_model.owl_axiom import OWLClassAssertionAxiom
 
 # Create instances
-alice = OWLNamedIndividual("http://example.org/alice")
-bob = OWLNamedIndividual("http://example.org/bob")
-charlie = OWLNamedIndividual("http://example.org/charlie")
+alice = OWLNamedIndividual(NS + "alice")
+bob = OWLNamedIndividual(NS + "bob")
+charlie = OWLNamedIndividual(NS + "charlie")
 
-# Add facts
-onto.add_axiom(ClassAssertion(Employee, alice))
-onto.add_axiom(ClassAssertion(Manager, bob))
-onto.add_axiom(ClassAssertion(Person, charlie))
+# Add facts (individual first, class second)
+axioms += [
+    OWLClassAssertionAxiom(alice, Employee),
+    OWLClassAssertionAxiom(bob, Manager),
+    OWLClassAssertionAxiom(charlie, Person),
+]
 
 # Rebuild reasoner
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
+alice_h = Individual.create(NS + "alice")
+bob_h = Individual.create(NS + "bob")
+
 # Query instance types
-print("Is alice an Employee?", reasoner.has_type(alice, Employee))  # True
-print("Is alice a Person?", reasoner.has_type(alice, Person))  # True (inferred!)
-print("Is bob a Manager?", reasoner.has_type(bob, Manager))  # True
-print("Is bob an Employee?", reasoner.has_type(bob, Employee))  # True (inferred!)
-print("Is bob a Person?", reasoner.has_type(bob, Person))  # True (inferred!)
+print("Is alice an Employee?", reasoner.has_type(alice_h, employee))  # True
+print("Is alice a Person?", reasoner.has_type(alice_h, person))       # True (inferred!)
+print("Is bob a Manager?", reasoner.has_type(bob_h, manager))         # True
+print("Is bob an Employee?", reasoner.has_type(bob_h, employee))      # True (inferred!)
+print("Is bob a Person?", reasoner.has_type(bob_h, person))           # True (inferred!)
 
 # Get all instances of Person
-persons = reasoner.get_instances(Person)
+persons = reasoner.get_instances(person)
 print(f"All persons: {len(persons)}")  # 3 (alice, bob, charlie)
 
 reasoner.dispose()
@@ -113,31 +133,31 @@ All persons: 3
 Let's model mutually exclusive concepts:
 
 ```python
-from hermit.model import DisjointClasses
+from hermit.owl_model.owl_axiom import OWLDisjointClassesAxiom
 
-# Additional classes
-Student = OWLClass("http://example.org/Student")
+# Additional class
+Student = OWLClass(NS + "Student")
 
-# Add to ontology
-onto.add_axiom(SubClassOf(Student, Person))
-
-# Define that an Employee cannot be a Student
-onto.add_axiom(DisjointClasses(Employee, Student))
+axioms += [
+    OWLSubClassOfAxiom(Student, Person),
+    # An Employee cannot be a Student
+    OWLDisjointClassesAxiom([Employee, Student]),
+]
 
 # Test consistency
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 print("Is ontology consistent?", reasoner.is_consistent())  # True
+reasoner.dispose()
 
 # Create a contradiction
-alice_student = OWLNamedIndividual("http://example.org/alice_student")
-onto.add_axiom(ClassAssertion(Employee, alice_student))
-onto.add_axiom(ClassAssertion(Student, alice_student))
+dana = OWLNamedIndividual(NS + "dana")
+contradictory = axioms + [
+    OWLClassAssertionAxiom(dana, Employee),
+    OWLClassAssertionAxiom(dana, Student),
+]
 
-# Test again
-reasoner2 = Reasoner(onto)
+reasoner2 = reasoner_from_axioms(contradictory)
 print("Is ontology consistent (with contradiction)?", reasoner2.is_consistent())  # False
-
-reasoner.dispose()
 reasoner2.dispose()
 ```
 
@@ -152,25 +172,32 @@ Is ontology consistent (with contradiction)? False
 Add relationships between individuals:
 
 ```python
-from hermit.model import OWLObjectProperty, ObjectPropertyAssertion
+from hermit.owl_model.owl_property import OWLObjectProperty
+from hermit.owl_model.owl_axiom import OWLObjectPropertyAssertionAxiom
 
-# Define a property
-manages = OWLObjectProperty("http://example.org/manages")
-worksFor = OWLObjectProperty("http://example.org/worksFor")
+# Define properties
+manages = OWLObjectProperty(NS + "manages")
+worksFor = OWLObjectProperty(NS + "worksFor")
 
-# Add property relationships
-onto.add_axiom(ObjectPropertyAssertion(manages, bob, alice))
-onto.add_axiom(ObjectPropertyAssertion(worksFor, alice, bob))
+# Add property relationships (subject, property, object)
+axioms += [
+    OWLObjectPropertyAssertionAxiom(bob, manages, alice),
+    OWLObjectPropertyAssertionAxiom(alice, worksFor, bob),
+]
 
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
 # Query relationships
-managers_of_alice = reasoner.get_object_property_values(manages, bob)
-alice_works_for = reasoner.get_object_property_values(worksFor, alice)
+manages_h = AtomicRole.create(NS + "manages")
+works_for_h = AtomicRole.create(NS + "worksFor")
 
-print(f"Bob manages: {managers_of_alice}")
-print(f"Alice works for: {alice_works_for}")
+print("Does bob manage alice?",
+      reasoner.has_role_relationship(bob_h, manages_h, alice_h))    # True
+print("Does alice work for bob?",
+      reasoner.has_role_relationship(alice_h, works_for_h, bob_h))  # True
+print("Does alice manage bob?",
+      reasoner.has_role_relationship(alice_h, manages_h, bob_h))    # False
 
 reasoner.dispose()
 ```
@@ -178,8 +205,8 @@ reasoner.dispose()
 ## Key Takeaways
 
 1. **Class hierarchies** are the foundation of ontologies
-2. **Subsumption** (SubClassOf) establishes "is-a" relationships
-3. **Instances** (ClassAssertion) are the actual data
+2. **Subsumption** (`OWLSubClassOfAxiom`) establishes "is-a" relationships
+3. **Instances** (`OWLClassAssertionAxiom`) are the actual data
 4. **Reasoning** automatically infers new facts from rules
 5. **Disjointness** rules enforce consistency
 6. **Properties** represent relationships between individuals
@@ -189,11 +216,10 @@ reasoner.dispose()
 Extend the ontology with:
 - More employee types (CEO, TeamLead, Intern)
 - Properties like `salary`, `department`
-- Property restrictions (e.g., Managers have at least 2 employees)
-- Transitivity rules (if A manages B and B manages C, does A indirectly manage C?)
+- Property restrictions (e.g., Managers manage at least 2 employees)
 
 ## Next Steps
 
 - **[Tutorial 2: Restrictions and Cardinality](./02-restrictions.md)** — Learn about at-least and at-most restrictions
-- **[Tutorial 3: Rules and Queries](./03-rules-and-queries.md)** — Write complex rules like SWRL
+- **[Tutorial 3: Rules and Queries](./03-rules-and-queries.md)** — Write complex rules
 - **[API Reference](../api/core.md)** — Complete API documentation

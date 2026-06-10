@@ -1,141 +1,159 @@
-# Tutorial 3: Rules and Complex Queries
+# Tutorial 3b: Rules and Complex Queries
 
-Learn to write SWRL-like rules and perform advanced queries over your ontology.
+Learn to express rule-like axioms and perform advanced queries over your ontology.
 
 ## What You'll Learn
 
 - Writing rule-based axioms
-- Complex class expressions (Union, Intersection)
+- Complex class expressions (`OWLObjectUnionOf`, `OWLObjectIntersectionOf`)
 - Performing advanced queries
 - Understanding inference chains
 - Debugging reasoning
 
-## Part 1: Rule-Based Axioms
-
-Rules in OWL 2 DL are expressed through class definitions:
+Standard setup:
 
 ```python
 from hermit import Reasoner
-from hermit.model import (
-    DLOntology, OWLClass, OWLObjectProperty,
-    SubClassOf, Union, Intersection,
-    ClassAssertion, OWLNamedIndividual
+from hermit.model import AtomicConcept, AtomicRole, Individual
+from hermit.owl_model.class_expression import (
+    OWLClass,
+    OWLObjectComplementOf,
+    OWLObjectIntersectionOf,
+    OWLObjectSomeValuesFrom,
+    OWLObjectUnionOf,
 )
+from hermit.owl_model.owl_individual import OWLNamedIndividual
+from hermit.owl_model.owl_property import OWLObjectProperty
+from hermit.owl_model.owl_axiom import (
+    OWLClassAssertionAxiom,
+    OWLDisjointClassesAxiom,
+    OWLEquivalentClassesAxiom,
+    OWLObjectPropertyAssertionAxiom,
+    OWLSubClassOfAxiom,
+)
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
 
-onto = DLOntology()
 
-# Define classes
-Person = OWLClass("http://example.org/Person")
-Teacher = OWLClass("http://example.org/Teacher")
-Student = OWLClass("http://example.org/Student")
-Staff = OWLClass("http://example.org/Staff")
-UniversityMember = OWLClass("http://example.org/UniversityMember")
+def reasoner_from_axioms(axioms, ontology_iri="urn:example:onto"):
+    normalized = OWLNormalization().process_ontology(axioms)
+    return Reasoner(OWLClausification().clausify(normalized, ontology_iri=ontology_iri))
 
-# Rule: Everyone at the university is either a teacher or a student
-# This is expressed as: UniversityMember ⊆ Teacher ⊔ Student
-onto.add_axiom(SubClassOf(
-    UniversityMember,
-    Union(Teacher, Student)
-))
 
-# Rule: Staff is a union of Teacher and other staff
-AdminStaff = OWLClass("http://example.org/AdminStaff")
-onto.add_axiom(SubClassOf(Staff, Union(Teacher, AdminStaff)))
+NS = "http://example.org/"
+```
+
+## Part 1: Rule-Based Axioms
+
+Rules in OWL 2 DL are expressed through class axioms. "Every teacher or
+student is a university member" becomes a subclass axiom with a **union on
+the left-hand side**:
+
+```python
+Teacher = OWLClass(NS + "Teacher")
+Student = OWLClass(NS + "Student")
+UniversityMember = OWLClass(NS + "UniversityMember")
+
+# Rule: Teacher ⊔ Student ⊑ UniversityMember
+axioms = [
+    OWLSubClassOfAxiom(OWLObjectUnionOf([Teacher, Student]), UniversityMember),
+]
 
 # Test reasoning
-person1 = OWLNamedIndividual("http://example.org/alice")
-onto.add_axiom(ClassAssertion(Teacher, person1))
+alice = OWLNamedIndividual(NS + "alice")
+axioms.append(OWLClassAssertionAxiom(alice, Teacher))
 
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-print("Is alice a UniversityMember?", reasoner.has_type(person1, UniversityMember))  # Can infer through rules
+member = AtomicConcept.create(NS + "UniversityMember")
+alice_h = Individual.create(NS + "alice")
+
+print("Is alice a UniversityMember?", reasoner.has_type(alice_h, member))  # True (inferred!)
 
 reasoner.dispose()
+```
+
+**Output:**
+```
+Is alice a UniversityMember? True
 ```
 
 ## Part 2: Complex Class Expressions
 
-Combine multiple concepts to express complex rules:
+Combine multiple concepts. An **equivalence** axiom makes the rule
+bidirectional: anyone who is Young and Single is *recognized* as Eligible:
 
 ```python
-onto = DLOntology()
+Young = OWLClass(NS + "Young")
+Single = OWLClass(NS + "Single")
+Eligible = OWLClass(NS + "Eligible")
 
-# Define classes
-Person = OWLClass("http://example.org/Person")
-Young = OWLClass("http://example.org/Young")
-Single = OWLClass("http://example.org/Single")
-Eligible = OWLClass("http://example.org/Eligible")
+# Rule: Eligible ≡ Young ⊓ Single
+axioms = [
+    OWLEquivalentClassesAxiom([Eligible, OWLObjectIntersectionOf([Young, Single])]),
+]
 
-# Rule: Eligible people are Young AND Single
-# Eligible ⊆ Young ⊓ Single
-onto.add_axiom(SubClassOf(
-    Eligible,
-    Intersection(Young, Single)
-))
+john = OWLNamedIndividual(NS + "john")
+axioms += [
+    OWLClassAssertionAxiom(john, Young),
+    OWLClassAssertionAxiom(john, Single),
+]
 
-# Create an individual
-person = OWLNamedIndividual("http://example.org/john")
-onto.add_axiom(ClassAssertion(Young, person))
-onto.add_axiom(ClassAssertion(Single, person))
-onto.add_axiom(ClassAssertion(Person, person))
-
-# Now they're eligible (can infer)
-onto.add_axiom(ClassAssertion(Eligible, person))
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-print("Is john eligible?", reasoner.has_type(person, Eligible))  # True
+eligible = AtomicConcept.create(NS + "Eligible")
+john_h = Individual.create(NS + "john")
+
+print("Is john eligible?", reasoner.has_type(john_h, eligible))  # True (inferred!)
 
 reasoner.dispose()
 ```
+
+**Output:**
+```
+Is john eligible? True
+```
+
+With `OWLSubClassOfAxiom(Eligible, ...)` instead, the rule would only work
+top-down (every Eligible is Young and Single) — the reasoner could never
+*conclude* that john is Eligible.
 
 ## Part 3: Implicit Rules Through Restrictions
 
 Property restrictions create implicit rules:
 
 ```python
-from hermit.model import AtLeast, ForAll, Complement
+Person = OWLClass(NS + "Person")
+Parent = OWLClass(NS + "Parent")
+Childless = OWLClass(NS + "Childless")
+hasChild = OWLObjectProperty(NS + "hasChild")
 
-onto = DLOntology()
+axioms = [
+    # Rule 1: Parent ≡ ∃hasChild.Person — having a child makes you a Parent
+    OWLEquivalentClassesAxiom([Parent, OWLObjectSomeValuesFrom(hasChild, Person)]),
+    # Rule 2: Childless ⊑ ¬Parent
+    OWLSubClassOfAxiom(Childless, OWLObjectComplementOf(Parent)),
+]
 
-# Define classes and properties
-Person = OWLClass("http://example.org/Person")
-Parent = OWLClass("http://example.org/Parent")
-Childless = OWLClass("http://example.org/Childless")
-hasChild = OWLObjectProperty("http://example.org/hasChild")
+mary = OWLNamedIndividual(NS + "mary")
+junior = OWLNamedIndividual(NS + "junior")
+ivy = OWLNamedIndividual(NS + "ivy")
 
-# Rule 1: Parents have at least one child
-# Parent ⊆ ∃hasChild.Person
-onto.add_axiom(SubClassOf(
-    Parent,
-    AtLeast(1, hasChild, Person)
-))
+axioms += [
+    OWLClassAssertionAxiom(junior, Person),
+    OWLObjectPropertyAssertionAxiom(mary, hasChild, junior),
+    OWLClassAssertionAxiom(ivy, Childless),
+]
 
-# Rule 2: Childless people have no children
-# This is more complex - we'd need to express it differently
-# For now, we define it as the negation of Parent
-onto.add_axiom(SubClassOf(
-    Childless,
-    Complement(Parent)
-))
-
-# The reasoner can now infer who is not a parent
-person = OWLNamedIndividual("http://example.org/alice")
-onto.add_axiom(ClassAssertion(Person, person))
-
-# If alice is childless, she's not a parent
-onto.add_axiom(ClassAssertion(Childless, person))
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-# Query to verify
-parents = reasoner.get_instances(Parent)
-childless = reasoner.get_instances(Childless)
-print(f"Parents: {len(parents)}")
-print(f"Childless: {len(childless)}")
+parent = AtomicConcept.create(NS + "Parent")
+print("Is mary a Parent?", reasoner.has_type(Individual.create(NS + "mary"), parent))  # True
+print("Is ivy a Parent?", reasoner.has_type(Individual.create(NS + "ivy"), parent))    # False
+print(f"Parents found: {len(reasoner.get_instances(parent))}")  # 1
 
 reasoner.dispose()
 ```
@@ -145,62 +163,56 @@ reasoner.dispose()
 Query the ontology in sophisticated ways:
 
 ```python
-onto = DLOntology()
+Employee = OWLClass(NS + "Employee")
+Manager = OWLClass(NS + "Manager")
+Executive = OWLClass(NS + "Executive")
+Department = OWLClass(NS + "Department")
 
-# Build a small organization hierarchy
-Person = OWLClass("http://example.org/Person")
-Employee = OWLClass("http://example.org/Employee")
-Manager = OWLClass("http://example.org/Manager")
-Executive = OWLClass("http://example.org/Executive")
-Department = OWLClass("http://example.org/Department")
+manages = OWLObjectProperty(NS + "manages")
+worksIn = OWLObjectProperty(NS + "worksIn")
 
-manages = OWLObjectProperty("http://example.org/manages")
-worksIn = OWLObjectProperty("http://example.org/worksIn")
+alice = OWLNamedIndividual(NS + "alice")
+bob = OWLNamedIndividual(NS + "bob")
+charlie = OWLNamedIndividual(NS + "charlie")
+sales_dept = OWLNamedIndividual(NS + "sales_dept")
 
-# Add hierarchy
-onto.add_axiom(SubClassOf(Employee, Person))
-onto.add_axiom(SubClassOf(Manager, Employee))
-onto.add_axiom(SubClassOf(Executive, Manager))
+axioms = [
+    # Hierarchy
+    OWLSubClassOfAxiom(Employee, Person),
+    OWLSubClassOfAxiom(Manager, Employee),
+    OWLSubClassOfAxiom(Executive, Manager),
+    # Individuals
+    OWLClassAssertionAxiom(alice, Executive),
+    OWLClassAssertionAxiom(bob, Manager),
+    OWLClassAssertionAxiom(charlie, Employee),
+    OWLClassAssertionAxiom(sales_dept, Department),
+    # Relationships
+    OWLObjectPropertyAssertionAxiom(alice, manages, bob),
+    OWLObjectPropertyAssertionAxiom(bob, manages, charlie),
+    OWLObjectPropertyAssertionAxiom(charlie, worksIn, sales_dept),
+]
 
-# Create individuals
-alice = OWLNamedIndividual("http://example.org/alice")
-bob = OWLNamedIndividual("http://example.org/bob")
-charlie = OWLNamedIndividual("http://example.org/charlie")
-sales_dept = OWLNamedIndividual("http://example.org/sales_dept")
-
-onto.add_axiom(ClassAssertion(Executive, alice))
-onto.add_axiom(ClassAssertion(Manager, bob))
-onto.add_axiom(ClassAssertion(Employee, charlie))
-onto.add_axiom(ClassAssertion(Department, sales_dept))
-
-# Add relationships
-from hermit.model import ObjectPropertyAssertion
-onto.add_axiom(ObjectPropertyAssertion(manages, alice, bob))
-onto.add_axiom(ObjectPropertyAssertion(manages, bob, charlie))
-onto.add_axiom(ObjectPropertyAssertion(worksIn, charlie, sales_dept))
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-# Query 1: Get all employees (includes managers and executives)
-all_employees = reasoner.get_instances(Employee)
-print(f"All employees: {len(all_employees)}")  # 3 (alice, bob, charlie)
+employee = AtomicConcept.create(NS + "Employee")
+executive = AtomicConcept.create(NS + "Executive")
+manages_h = AtomicRole.create(NS + "manages")
 
-# Query 2: Get all executives
-executives = reasoner.get_instances(Executive)
-print(f"Executives: {len(executives)}")  # 1 (alice)
+# Query 1: All employees (includes managers and executives)
+print(f"All employees: {len(reasoner.get_instances(employee))}")  # 3
 
-# Query 3: Get what bob manages
-bobs_direct_reports = reasoner.get_object_property_values(manages, bob)
-print(f"Bob manages: {bobs_direct_reports}")
+# Query 2: All executives
+print(f"Executives: {len(reasoner.get_instances(executive))}")  # 1
 
-# Query 4: Get what department charlie works in
-charlies_dept = reasoner.get_object_property_values(worksIn, charlie)
-print(f"Charlie works in: {charlies_dept}")
+# Query 3: Does bob manage charlie?
+bob_h = Individual.create(NS + "bob")
+charlie_h = Individual.create(NS + "charlie")
+print("Bob manages charlie:", reasoner.has_role_relationship(bob_h, manages_h, charlie_h))  # True
 
-# Query 5: Class hierarchy
-hierarchy = reasoner.get_class_hierarchy()
-print(f"Class hierarchy depth: {hierarchy}")
+# Query 4: Print the inferred class hierarchy
+import sys
+reasoner.dump_hierarchies(sys.stdout, classes=True)
 
 reasoner.dispose()
 ```
@@ -209,9 +221,10 @@ reasoner.dispose()
 ```
 All employees: 3
 Executives: 1
-Bob manages: [<OWLNamedIndividual 'http://example.org/charlie'>]
-Charlie works in: [<OWLNamedIndividual 'http://example.org/sales_dept'>]
-Class hierarchy depth: [<HierarchyNode>...]
+Bob manages charlie: True
+SubClassOf( <http://example.org/Employee> <http://example.org/Person> )
+SubClassOf( <http://example.org/Executive> <http://example.org/Manager> )
+SubClassOf( <http://example.org/Manager> <http://example.org/Employee> )
 ```
 
 ## Part 5: Reasoning Chains
@@ -219,40 +232,42 @@ Class hierarchy depth: [<HierarchyNode>...]
 Understanding how the reasoner derives facts:
 
 ```python
-onto = DLOntology()
+Animal = OWLClass(NS + "Animal")
+Mammal = OWLClass(NS + "Mammal")
+Dog = OWLClass(NS + "Dog")
+Poodle = OWLClass(NS + "Poodle")
 
-# Create a reasoning chain
-Animal = OWLClass("http://example.org/Animal")
-Mammal = OWLClass("http://example.org/Mammal")
-Dog = OWLClass("http://example.org/Dog")
-Poodle = OWLClass("http://example.org/Poodle")
+fido = OWLNamedIndividual(NS + "fido")
 
-onto.add_axiom(SubClassOf(Mammal, Animal))
-onto.add_axiom(SubClassOf(Dog, Mammal))
-onto.add_axiom(SubClassOf(Poodle, Dog))
+axioms = [
+    OWLSubClassOfAxiom(Mammal, Animal),
+    OWLSubClassOfAxiom(Dog, Mammal),
+    OWLSubClassOfAxiom(Poodle, Dog),
+    OWLClassAssertionAxiom(fido, Poodle),
+]
 
-# Create individual
-fido = OWLNamedIndividual("http://example.org/fido")
-onto.add_axiom(ClassAssertion(Poodle, fido))
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
+animal = AtomicConcept.create(NS + "Animal")
+fido_h = Individual.create(NS + "fido")
+
 # Query: Is fido an animal?
-print("Is fido an Animal?", reasoner.has_type(fido, Animal))  # True
+print("Is fido an Animal?", reasoner.has_type(fido_h, animal))  # True
 
 # The chain:
 # Fido is a Poodle (asserted)
-# → Fido is a Dog (from Poodle ⊆ Dog)
-# → Fido is a Mammal (from Dog ⊆ Mammal)
-# → Fido is an Animal (from Mammal ⊆ Animal)
+# → Fido is a Dog (from Poodle ⊑ Dog)
+# → Fido is a Mammal (from Dog ⊑ Mammal)
+# → Fido is an Animal (from Mammal ⊑ Animal)
 
-# Get immediate type
-print("Fido's direct type:", reasoner.get_direct_types(fido))  # {Poodle}
+# Most specific type only
+direct = reasoner.get_types(fido_h, direct=True)
+print("Fido's direct type:", sorted(c.iri.split('/')[-1] for c in direct))  # ['Poodle']
 
-# Get all inferred types
-all_types = reasoner.get_types(fido)
-print(f"All of Fido's types: {all_types}")
+# All inferred types
+all_types = reasoner.get_types(fido_h)
+print(f"All of Fido's types: {sorted(c.iri.split('/')[-1] for c in all_types)}")
 
 reasoner.dispose()
 ```
@@ -262,24 +277,15 @@ reasoner.dispose()
 When your ontology has contradictions:
 
 ```python
-onto = DLOntology()
+axioms = [
+    OWLDisjointClassesAxiom([Parent, Childless]),
+    # Contradiction: alice is both
+    OWLClassAssertionAxiom(alice, Parent),
+    OWLClassAssertionAxiom(alice, Childless),
+]
 
-Person = OWLClass("http://example.org/Person")
-Parent = OWLClass("http://example.org/Parent")
-Childless = OWLClass("http://example.org/Childless")
+reasoner = reasoner_from_axioms(axioms)
 
-# Define disjointness
-from hermit.model import DisjointClasses
-onto.add_axiom(DisjointClasses(Parent, Childless))
-
-# Create individual with contradiction
-alice = OWLNamedIndividual("http://example.org/alice")
-onto.add_axiom(ClassAssertion(Parent, alice))
-onto.add_axiom(ClassAssertion(Childless, alice))
-
-reasoner = Reasoner(onto)
-
-# Check consistency
 is_consistent = reasoner.is_consistent()
 print(f"Ontology is consistent: {is_consistent}")  # False
 
@@ -293,43 +299,40 @@ reasoner.dispose()
 ## Query API Reference
 
 ```python
+# doc-sample: skip (signature reference)
 # Get all instances of a class
-instances = reasoner.get_instances(MyClass)
+instances = reasoner.get_instances(concept)
 
-# Get direct instances (not inferred through hierarchy)
-direct = reasoner.get_direct_instances(MyClass)
+# Get direct instances only
+direct = reasoner.get_instances(concept, direct=True)
 
 # Get types of an individual
 types = reasoner.get_types(individual)
+direct_types = reasoner.get_types(individual, direct=True)
 
-# Get direct types (immediate classification)
-direct_types = reasoner.get_direct_types(individual)
+# Subsumption / equivalence / disjointness between classes
+reasoner.is_sub_class_of(sub, sup)
+reasoner.is_equivalent(c1, c2)
+reasoner.is_disjoint(c1, c2)
 
-# Get class hierarchy
-hierarchy = reasoner.get_class_hierarchy()
+# Instance and role checks
+reasoner.has_type(individual, concept)
+reasoner.has_role_relationship(subject, role, obj)
 
-# Check subclass relationships
-is_subclass = reasoner.is_subclass_of(Class1, Class2)
+# Consistency and satisfiability
+reasoner.is_consistent()
+reasoner.is_satisfiable(concept)
 
-# Check instance types
-is_instance = reasoner.has_type(individual, MyClass)
-
-# Get property values
-values = reasoner.get_object_property_values(property, individual)
-
-# Check consistency
-consistent = reasoner.is_consistent()
-
-# Get unsatisfiable classes
-unsatisfiable = reasoner.get_unsatisfiable_classes()
+# Hierarchy output
+reasoner.dump_hierarchies(sys.stdout, classes=True)
 ```
 
 ## Key Takeaways
 
-1. **Rules** are expressed through class definitions and restrictions
-2. **Complex expressions** (Union, Intersection) model OR/AND logic
-3. **Queries** reveal inferred facts
-4. **Reasoning chains** show how conclusions are derived
+1. **Rules** are expressed through class axioms and restrictions
+2. **Union on the left** of ⊑ means "any of these implies…"
+3. **Equivalence axioms** make definitions bidirectional — required for the reasoner to *recognize* members
+4. **Queries** reveal inferred facts
 5. **Consistency checking** validates your ontology
 
 ## Try This!
@@ -337,9 +340,8 @@ unsatisfiable = reasoner.get_unsatisfiable_classes()
 Create a medical ontology with:
 - Symptoms (fever, cough, headache)
 - Diseases (flu, cold, pneumonia)
-- Diagnostic rules (flu = fever ∧ cough)
-- Treatment rules (flu → antiviral medication)
-- Query to diagnose a patient based on symptoms
+- A definition `FluCandidate ≡ ∃hasSymptom.Fever ⊓ ∃hasSymptom.Cough`
+- A patient with fever and cough — is the patient a FluCandidate?
 
 ## Next Steps
 

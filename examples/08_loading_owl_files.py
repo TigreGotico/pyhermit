@@ -2,52 +2,49 @@
 Loading OWL Files: Working with Real Ontologies
 
 This example demonstrates:
-1. Loading OWL ontologies from files
-2. Working with existing ontologies (e.g., Pizza, Koala)
-3. Exploring ontologies programmatically
-4. Handling different OWL syntaxes (RDF/XML, Functional Syntax, TTL)
-5. Performance considerations with large ontologies
+1. Loading OWL ontologies from files with the stdlib reader
+2. Compiling loaded axioms into a Reasoner (normalize -> clausify)
+3. Exploring a loaded ontology programmatically
+4. The OWL syntaxes the loader understands (RDF/XML, OWL/XML,
+   Functional-Style Syntax)
 
-NOTE: This example requires an OWL file to be present.
-The Pizza ontology (a classic example) can be downloaded from:
-  http://protege.stanford.edu/ontologies/pizza/pizza.owl
+The loader is `hermit.parser.load_ontology` — pure standard library, no
+external dependencies. It returns the same `hermit.owl_model` axiom objects
+you would build by hand, so loaded and hand-built ontologies go through the
+identical pipeline.
+
+A small pizza ontology ships in examples/resources/example.owl. Classic
+public test ontologies work the same way, e.g. the Pizza ontology from
+https://protege.stanford.edu/ontologies/pizza/pizza.owl
 """
 
+import sys
 from pathlib import Path
-from hermit import Reasoner, load_ontology
+
+from hermit import Reasoner
+from hermit.model import AtomicConcept, Individual
+from hermit.parser import load_ontology
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
+
+
+def reasoner_from_file(path):
+    """Load an OWL document and compile it into a Reasoner.
+
+    Pipeline: load_ontology -> OWLNormalization -> OWLClausification -> Reasoner
+    """
+    axioms = load_ontology(path)
+    print(f"✓ Loaded {len(axioms)} axioms from {Path(path).name}")
+
+    normalized = OWLNormalization().process_ontology(axioms)
+    dl_ontology = OWLClausification().clausify(
+        normalized, ontology_iri=Path(path).stem
+    )
+    return Reasoner(dl_ontology)
 
 
 def main():
-    # Path to an OWL file
-    # You can download example ontologies:
-    # - Pizza: http://protege.stanford.edu/ontologies/pizza/pizza.owl
-    # - Koala: http://protege.stanford.edu/ontologies/koala.owl
-
     ontology_path = Path(__file__).parent / "resources" / "example.owl"
-
-    if not ontology_path.exists():
-        print("=" * 60)
-        print("OWL File Not Found")
-        print("=" * 60)
-        print()
-        print(f"Expected file: {ontology_path}")
-        print()
-        print("To use this example, you need to:")
-        print()
-        print("1. Download an OWL ontology:")
-        print("   • Pizza: http://protege.stanford.edu/ontologies/pizza/pizza.owl")
-        print("   • Koala: http://protege.stanford.edu/ontologies/koala.owl")
-        print()
-        print("2. Place it in the 'resources' folder (examples/resources/)")
-        print()
-        print("3. Update the 'ontology_path' variable in this script")
-        print()
-        print("=" * 60)
-        print()
-        print("For now, showing how you would use the library with OWL files...")
-        print()
-        show_usage_example()
-        return
 
     print("=" * 60)
     print(f"Loading Ontology: {ontology_path.name}")
@@ -55,113 +52,74 @@ def main():
     print()
 
     try:
-        # Load the ontology from file
-        # The load_ontology function supports RDF/XML and Functional Syntax
-        ontology = load_ontology(ontology_path)
-        print(f"✓ Ontology loaded successfully")
+        reasoner = reasoner_from_file(ontology_path)
+    except FileNotFoundError:
+        print(f"✗ File not found: {ontology_path}")
+        return
+    except ValueError as e:
+        print(f"✗ Error parsing ontology: {e}")
+        print()
+        print("Supported formats:")
+        print("  • RDF/XML (.owl, .rdf)")
+        print("  • OWL/XML (.owx, .owl)")
+        print("  • Functional-Style Syntax (.ofn)")
+        return
+
+    try:
+        print()
+        print("Performing initial consistency check...")
+        is_consistent = reasoner.is_consistent()
+        print(f"Ontology is consistent: {is_consistent}")
         print()
 
-        # Create a reasoner for the ontology
-        reasoner = Reasoner(ontology)
+        if not is_consistent:
+            print("⚠️  Ontology is INCONSISTENT")
+            print("The ontology contains contradictory axioms.")
+            return
 
-        try:
-            print("Performing initial consistency check...")
-            is_consistent = reasoner.is_consistent()
-            print(f"Ontology is consistent: {is_consistent}")
-            print()
-
-            if is_consistent:
-                print("Computing class hierarchy (this may take a moment)...")
-                reasoner.precompute_inferences(class_hierarchy=True)
-                print("✓ Hierarchy computed")
-                print()
-
-                # Get all classes
-                from hermit.owl_model.class_expression import OWLThing
-                all_classes = reasoner.get_sub_classes(OWLThing)
-                print(f"Total classes in ontology: {len(all_classes)}")
-                print()
-
-                # Show first 10 classes
-                print("Sample classes:")
-                for cls in list(all_classes)[:10]:
-                    print(f"  - {cls.iri}")
-                print()
-
-                # Explore specific relationships
-                print("Class Hierarchy Examples:")
-                print("-" * 40)
-                if len(all_classes) >= 2:
-                    classes_list = list(all_classes)
-                    for i, cls in enumerate(classes_list[:3]):
-                        subclasses = reasoner.get_sub_classes(cls)
-                        if subclasses:
-                            print(f"\nSubclasses of {cls.iri.split('#')[-1]}:")
-                            for sub in list(subclasses)[:3]:
-                                print(f"  ⊑ {sub.iri.split('#')[-1]}")
-
-            else:
-                print("⚠️  Ontology is INCONSISTENT")
-                print("The ontology contains contradictory axioms.")
-                print()
-
-        finally:
-            reasoner.dispose()
-
-    except ImportError:
-        print("⚠️  OWL API not available")
-        print()
-        print("To load OWL files, you need to install owlready2:")
-        print("  pip install owlready2")
-        print()
-        show_usage_example()
-
-    except Exception as e:
-        print(f"✗ Error loading ontology: {e}")
-        print()
-        print("Make sure the file is a valid OWL ontology in one of these formats:")
-        print("  • RDF/XML (.owl)")
-        print("  • Functional Syntax (.fss)")
-        print("  • Turtle (.ttl)")
-
-
-def show_usage_example():
-    """Show example code for loading and using OWL files."""
-    print("Example usage (once owlready2 is installed):")
-    print("=" * 60)
-    print("""
-# Python code to load and reason about an OWL ontology:
-
-from pathlib import Path
-from hermit import load_ontology, Reasoner
-
-# Load an OWL file
-ontology = load_ontology("pizza.owl")
-reasoner = Reasoner(ontology)
-
-try:
-    # Check consistency
-    if reasoner.is_consistent():
-        print("Ontology is consistent")
-
-        # Compute inferences
+        print("Computing class hierarchy...")
         reasoner.precompute_inferences(class_hierarchy=True)
+        print("✓ Hierarchy computed")
+        print()
 
-        # Get the class hierarchy
-        from hermit.owl_model.class_expression import OWLThing
-        classes = reasoner.get_sub_classes(OWLThing)
-        for cls in classes:
-            print(f"Class: {cls.iri}")
+        # Basic statistics about the compiled ontology
+        stats = reasoner.stats
+        print(f"Atomic concepts: {stats['atomic_concepts']}")
+        print(f"DL clauses:      {stats['clauses']}")
+        print(f"Individuals:     {stats['individuals']}")
+        print()
 
-        # Query specific classes
-        # Example: Find all Pizza classes
-        # pizza_class = ...
-        # pizza_instances = reasoner.get_instances(pizza_class)
+        # Print the inferred class hierarchy
+        print("Inferred class hierarchy:")
+        print("-" * 40)
+        reasoner.dump_hierarchies(sys.stdout, classes=True)
+        print()
 
-finally:
-    reasoner.dispose()
-    """)
-    print("=" * 60)
+        # Query specific relationships from the pizza ontology
+        ns = "http://example.org/pizza#"
+        margherita = AtomicConcept.create(ns + "MargheritaPizza")
+        vegetarian = AtomicConcept.create(ns + "VegetarianPizza")
+        food = AtomicConcept.create(ns + "Food")
+
+        print("Sample queries:")
+        print("-" * 40)
+
+        # Subsumption chain through the hierarchy
+        print(f"MargheritaPizza ⊑ Food: "
+              f"{reasoner.is_sub_class_of(margherita, food)}")
+
+        # A non-trivial inference: Margherita pizzas only have cheese or
+        # vegetable toppings, so they are vegetarian.
+        print(f"MargheritaPizza ⊑ VegetarianPizza: "
+              f"{reasoner.is_sub_class_of(margherita, vegetarian)}")
+
+        # ABox: the individual inherits the inferred classification
+        my_pizza = Individual.create(ns + "myMargherita")
+        print(f"myMargherita is a VegetarianPizza: "
+              f"{reasoner.has_type(my_pizza, vegetarian)}")
+
+    finally:
+        reasoner.dispose()
 
 
 if __name__ == "__main__":

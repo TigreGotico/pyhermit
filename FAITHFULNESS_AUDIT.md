@@ -161,6 +161,20 @@ order of magnitude slower on large Horn TBoxes. (The Tarjan-SCC
 `build_hierarchy`/`_visit` helpers in this file *are* used, by the quasi-order
 classifier.)
 
+A consequence of this delegation: Java only ever runs
+`QuasiOrderClassification` on non-deterministic tableaux, where the binary
+extension table tracks real dependency sets and
+`readKnownSubsumersFromRootNode`'s empty-dependency-set filter is meaningful.
+pyhermit also runs it on deterministic (Horn) tableaux, whose
+`DeterministicDependencySetManager` reports every tuple as dependency-free.
+The Python port therefore adds one guard Java does not need: the
+known-subsumer read-off after an *unsatisfiable* test run
+(`_ClassificationRelation.does_subsume`,
+`_is_every_possible_subsumer_non_subsumer`) is skipped when
+`Tableau.is_deterministic()`, since labels of a clashed deterministic run
+would otherwise be mistaken for genuine subsumptions. Read-offs from
+satisfiable models are kept in both modes.
+
 ## 4. Representation differences forced by the language
 
 Correct, but they change the shape of the code; relevant to anyone cross-reading
@@ -249,7 +263,7 @@ conservative (unknown-restriction semantics).
 | Description graphs | `tableau/description_graph_manager.py` | Faithful; full-index table scans linearly (§3.1) |
 | Datatype manager | `tableau/datatype_manager.py`, `datatypes/` | Faithful machinery; narrower value-space coverage (§6.2) |
 | Normalization / clausification | `structural/` | Faithful |
-| Quasi-order classification | `hierarchy/quasi_order_classification.py` | Faithful |
+| Quasi-order classification | `hierarchy/quasi_order_classification.py` | Faithful; extra deterministic-tableau guard on unsat read-offs (§3.2) |
 | Deterministic classification | `hierarchy/deterministic_classification.py` | Delegates to quasi-order (§3.2) |
 | Datalog / query evaluation | `datalog/` | Nested-loop join (§6.1) |
 | Ontology loading | `parser.py`, `rdfxml.py`, `owl_rdf.py`, `fss.py`, `owlxml.py` | Stdlib RDF/XML + OWL/XML + FSS reader; no owlready2 (§5) |

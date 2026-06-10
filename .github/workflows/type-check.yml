@@ -10,5 +10,4 @@ jobs:
     uses: OpenVoiceOS/gh-automations/.github/workflows/type-check.yml@dev
     with:
       mypy_args: 'src/hermit --strict'
-      test_extras: 'dev,owlready2'
       fail_on_errors: true

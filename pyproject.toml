@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "hermit-reasoner"
-version = "0.3.0"
+dynamic = ["version"]
 description = "A conformant OWL 2 DL tableau reasoner — Python port of HermiT"
 readme = "README.md"
 license = "Apache-2.0"
@@ -18,7 +18,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -28,8 +27,14 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Text Processing :: Indexing",
+    "Typing :: Typed",
 ]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/TigreGotico/pyhermit"
+Source = "https://github.com/TigreGotico/pyhermit"
+Issues = "https://github.com/TigreGotico/pyhermit/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -46,8 +51,14 @@ docs = [
 [project.scripts]
 hermit = "hermit.cli:main"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/hermit"]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+hermit = ["py.typed"]
+
+[tool.setuptools.dynamic]
+version = {attr = "hermit.version.__version__"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

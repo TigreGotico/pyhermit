@@ -13,40 +13,63 @@ Manager ⊆ Employee     Bob is a Manager
                        Alice manages Bob
 ```
 
-## Part 1: Creating and Adding Instances
+We use the standard helper and imports throughout:
 
 ```python
 from hermit import Reasoner
-from hermit.model import (
-    DLOntology, OWLClass, OWLNamedIndividual,
-    ClassAssertion, SubClassOf
+from hermit.model import AtomicConcept, AtomicRole, Individual
+from hermit.owl_model.class_expression import OWLClass
+from hermit.owl_model.owl_individual import OWLNamedIndividual
+from hermit.owl_model.owl_property import OWLDataProperty, OWLObjectProperty
+from hermit.owl_model.owl_literal import OWLLiteral
+from hermit.owl_model.owl_axiom import (
+    OWLClassAssertionAxiom,
+    OWLDataPropertyAssertionAxiom,
+    OWLDisjointClassesAxiom,
+    OWLObjectPropertyAssertionAxiom,
+    OWLSubClassOfAxiom,
 )
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
 
-onto = DLOntology()
 
+def reasoner_from_axioms(axioms, ontology_iri="urn:example:onto"):
+    normalized = OWLNormalization().process_ontology(axioms)
+    return Reasoner(OWLClausification().clausify(normalized, ontology_iri=ontology_iri))
+
+
+NS = "http://example.org/"
+```
+
+## Part 1: Creating and Adding Instances
+
+```python
 # Schema (TBox)
-Person = OWLClass("http://example.org/Person")
-Employee = OWLClass("http://example.org/Employee")
-onto.add_axiom(SubClassOf(Employee, Person))
+Person = OWLClass(NS + "Person")
+Employee = OWLClass(NS + "Employee")
 
-# Data (ABox) - Create individuals
-alice = OWLNamedIndividual("http://example.org/alice")
-bob = OWLNamedIndividual("http://example.org/bob")
+# Data (ABox) — create individuals
+alice = OWLNamedIndividual(NS + "alice")
+bob = OWLNamedIndividual(NS + "bob")
 
-# Add facts: alice is an Employee
-onto.add_axiom(ClassAssertion(Employee, alice))
+axioms = [
+    OWLSubClassOfAxiom(Employee, Person),
+    OWLClassAssertionAxiom(alice, Employee),  # alice is an Employee
+    OWLClassAssertionAxiom(bob, Person),      # bob is a Person
+]
 
-# Add facts: bob is a Person
-onto.add_axiom(ClassAssertion(Person, bob))
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
+employee = AtomicConcept.create(NS + "Employee")
+person = AtomicConcept.create(NS + "Person")
+alice_h = Individual.create(NS + "alice")
+
 # Query: Is alice an Employee?
-print(reasoner.has_type(alice, Employee))  # True
+print(reasoner.has_type(alice_h, employee))  # True
 
 # Query: Is alice a Person? (inferred!)
-print(reasoner.has_type(alice, Person))  # True
+print(reasoner.has_type(alice_h, person))  # True
 
 reasoner.dispose()
 ```
@@ -56,85 +79,89 @@ reasoner.dispose()
 Connect instances using properties:
 
 ```python
-from hermit.model import OWLObjectProperty, ObjectPropertyAssertion
+Company = OWLClass(NS + "Company")
+worksFor = OWLObjectProperty(NS + "worksFor")
 
-onto = DLOntology()
+company_a = OWLNamedIndividual(NS + "CompanyA")
 
-# Classes
-Person = OWLClass("http://example.org/Person")
-Company = OWLClass("http://example.org/Company")
+axioms = [
+    OWLClassAssertionAxiom(alice, Person),
+    OWLClassAssertionAxiom(company_a, Company),
+    # subject, property, object
+    OWLObjectPropertyAssertionAxiom(alice, worksFor, company_a),
+]
 
-# Properties
-worksFor = OWLObjectProperty("http://example.org/worksFor")
-employs = OWLObjectProperty("http://example.org/employs")
-
-# Individuals
-alice = OWLNamedIndividual("http://example.org/alice")
-company_a = OWLNamedIndividual("http://example.org/CompanyA")
-
-# Add facts
-onto.add_axiom(ClassAssertion(Person, alice))
-onto.add_axiom(ClassAssertion(Company, company_a))
-
-# Add relationships
-onto.add_axiom(ObjectPropertyAssertion(worksFor, alice, company_a))
-onto.add_axiom(ObjectPropertyAssertion(employs, company_a, alice))
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-# Query relationships
-companies = reasoner.get_object_property_values(worksFor, alice)
-print(f"Alice works for: {companies}")  # [CompanyA]
+works_for_h = AtomicRole.create(NS + "worksFor")
+company_a_h = Individual.create(NS + "CompanyA")
 
-employees = reasoner.get_object_property_values(employs, company_a)
-print(f"CompanyA employs: {employees}")  # [alice]
+print("Does alice work for CompanyA?",
+      reasoner.has_role_relationship(alice_h, works_for_h, company_a_h))  # True
 
 reasoner.dispose()
 ```
 
 ## Part 3: Data Properties (Attributes)
 
-Add typed data values:
+Data properties attach typed values. `OWLLiteral` infers the datatype from
+the Python value (`str` → `xsd:string`, `int` → `xsd:integer`, `bool` →
+`xsd:boolean`, `float` → `xsd:double`):
 
 ```python
-from hermit.model import OWLDataProperty, DataPropertyAssertion, Literal
+hasName = OWLDataProperty(NS + "hasName")
+hasAge = OWLDataProperty(NS + "hasAge")
 
-onto = DLOntology()
+axioms = [
+    OWLClassAssertionAxiom(alice, Person),
+    OWLDataPropertyAssertionAxiom(alice, hasName, OWLLiteral("Alice Smith")),
+    OWLDataPropertyAssertionAxiom(alice, hasAge, OWLLiteral(30)),
+]
 
-Person = OWLClass("http://example.org/Person")
+reasoner = reasoner_from_axioms(axioms)
+print("Consistent with data values?", reasoner.is_consistent())  # True
+reasoner.dispose()
+```
 
-# Data properties
-hasName = OWLDataProperty("http://example.org/hasName")
-hasAge = OWLDataProperty("http://example.org/hasAge")
-hasEmail = OWLDataProperty("http://example.org/hasEmail")
+Data ranges let the reasoner *classify* individuals by their values:
 
-alice = OWLNamedIndividual("http://example.org/alice")
+```python
+from hermit.owl_model.class_expression import (
+    OWLDataSomeValuesFrom, OWLDatatypeRestriction, OWLFacetRestriction,
+)
+from hermit.owl_model.owl_literal import IntegerOWLDatatype
+from hermit.owl_model.vocab import OWLFacet
+from hermit.owl_model.owl_axiom import OWLEquivalentClassesAxiom
 
-onto.add_axiom(ClassAssertion(Person, alice))
+Adult = OWLClass(NS + "Adult")
+kid = OWLNamedIndividual(NS + "kid")
 
-# Add data values
-onto.add_axiom(DataPropertyAssertion(
-    hasName, alice, Literal("Alice Smith", "string")
-))
-onto.add_axiom(DataPropertyAssertion(
-    hasAge, alice, Literal(30, "integer")
-))
-onto.add_axiom(DataPropertyAssertion(
-    hasEmail, alice, Literal("alice@example.org", "string")
-))
+# Adult ≡ ∃hasAge.integer[≥ 18]
+adult_range = OWLDatatypeRestriction(
+    IntegerOWLDatatype,
+    [OWLFacetRestriction(OWLFacet.MIN_INCLUSIVE, OWLLiteral(18))],
+)
+axioms = [
+    OWLEquivalentClassesAxiom([Adult, OWLDataSomeValuesFrom(hasAge, adult_range)]),
+    OWLDataPropertyAssertionAxiom(alice, hasAge, OWLLiteral(30)),
+    OWLDataPropertyAssertionAxiom(kid, hasAge, OWLLiteral(7)),
+]
 
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-# Query data properties
-names = reasoner.get_data_property_values(hasName, alice)
-print(f"Name: {names}")  # ['Alice Smith']
-
-ages = reasoner.get_data_property_values(hasAge, alice)
-print(f"Age: {ages}")  # [30]
+adult = AtomicConcept.create(NS + "Adult")
+print("Is alice an Adult?", reasoner.has_type(alice_h, adult))                    # True (inferred!)
+print("Is kid an Adult?", reasoner.has_type(Individual.create(NS + "kid"), adult))  # False
 
 reasoner.dispose()
+```
+
+**Output:**
+```
+Is alice an Adult? True
+Is kid an Adult? False
 ```
 
 ## Part 4: Type Checking and Querying
@@ -142,49 +169,51 @@ reasoner.dispose()
 Query what instances belong to a class:
 
 ```python
-onto = DLOntology()
+Manager = OWLClass(NS + "Manager")
+charlie = OWLNamedIndividual(NS + "charlie")
 
-# Classes
-Person = OWLClass("http://example.org/Person")
-Employee = OWLClass("http://example.org/Employee")
-Manager = OWLClass("http://example.org/Manager")
+axioms = [
+    OWLSubClassOfAxiom(Employee, Person),
+    OWLSubClassOfAxiom(Manager, Employee),
+    OWLClassAssertionAxiom(alice, Manager),
+    OWLClassAssertionAxiom(bob, Employee),
+    OWLClassAssertionAxiom(charlie, Person),
+]
 
-# Rules
-onto.add_axiom(SubClassOf(Employee, Person))
-onto.add_axiom(SubClassOf(Manager, Employee))
-
-# Create instances
-alice = OWLNamedIndividual("http://example.org/alice")
-bob = OWLNamedIndividual("http://example.org/bob")
-charlie = OWLNamedIndividual("http://example.org/charlie")
-
-onto.add_axiom(ClassAssertion(Manager, alice))
-onto.add_axiom(ClassAssertion(Employee, bob))
-onto.add_axiom(ClassAssertion(Person, charlie))
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
+manager = AtomicConcept.create(NS + "Manager")
+
 # Query 1: Get all instances of a class
-all_persons = reasoner.get_instances(Person)
+all_persons = reasoner.get_instances(person)
 print(f"All persons: {len(all_persons)}")  # 3 (alice, bob, charlie)
 
-all_employees = reasoner.get_instances(Employee)
+all_employees = reasoner.get_instances(employee)
 print(f"All employees: {len(all_employees)}")  # 2 (alice, bob)
 
-# Query 2: Get direct instances (not including inferred)
-direct_managers = reasoner.get_direct_instances(Manager)
-print(f"Direct managers: {len(direct_managers)}")  # 1 (alice)
+# Query 2: Get only direct instances (most-specific class)
+direct_employees = reasoner.get_instances(employee, direct=True)
+print(f"Direct employees: {len(direct_employees)}")  # 1 (bob; alice is a Manager)
 
-# Query 3: Get types of an individual
-alice_types = reasoner.get_types(alice)
-print(f"Alice's types: {alice_types}")  # {Manager, Employee, Person}
+# Query 3: Get all types of an individual
+alice_types = reasoner.get_types(alice_h)
+print(f"Alice's types: {sorted(c.iri.split('/')[-1] for c in alice_types)}")
 
-# Query 4: Get only direct types
-alice_direct_types = reasoner.get_direct_types(alice)
-print(f"Alice's direct type: {alice_direct_types}")  # {Manager}
+# Query 4: Get only the most specific types
+alice_direct = reasoner.get_types(alice_h, direct=True)
+print(f"Alice's direct type: {sorted(c.iri.split('/')[-1] for c in alice_direct)}")
 
 reasoner.dispose()
+```
+
+**Output:**
+```
+All persons: 3
+All employees: 2
+Direct employees: 1
+Alice's types: ['Employee', 'Manager', 'Person', 'owl#Thing']
+Alice's direct type: ['Manager']
 ```
 
 ## Part 5: Negative Facts (Negation)
@@ -192,25 +221,19 @@ reasoner.dispose()
 Assert what is NOT true:
 
 ```python
-from hermit.model import Complement
+from hermit.owl_model.class_expression import OWLObjectComplementOf
 
-onto = DLOntology()
+axioms = [
+    OWLClassAssertionAxiom(alice, Person),
+    # alice is NOT an Employee
+    OWLClassAssertionAxiom(alice, OWLObjectComplementOf(Employee)),
+]
 
-Person = OWLClass("http://example.org/Person")
-NotEmployee = Complement(OWLClass("http://example.org/Employee"))
-
-alice = OWLNamedIndividual("http://example.org/alice")
-
-onto.add_axiom(ClassAssertion(Person, alice))
-onto.add_axiom(ClassAssertion(NotEmployee, alice))
-
-# Now alice is a Person but not an Employee
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-Employee = OWLClass("http://example.org/Employee")
-print(f"Is alice an Employee? {reasoner.has_type(alice, Employee)}")  # False
+print(f"Is alice an Employee? {reasoner.has_type(alice_h, employee)}")  # False
+print(f"Consistent? {reasoner.is_consistent()}")  # True
 
 reasoner.dispose()
 ```
@@ -220,28 +243,20 @@ reasoner.dispose()
 Efficiently add many instances:
 
 ```python
-onto = DLOntology()
-
-Person = OWLClass("http://example.org/Person")
-hasAge = OWLDataProperty("http://example.org/hasAge")
-
-# Add 1000 people
-people = []
+axioms = []
 for i in range(1000):
-    person = OWLNamedIndividual(f"http://example.org/person{i}")
-    onto.add_axiom(ClassAssertion(Person, person))
-    onto.add_axiom(DataPropertyAssertion(
-        hasAge, person, Literal(20 + (i % 50), "integer")
+    individual = OWLNamedIndividual(f"{NS}person{i}")
+    axioms.append(OWLClassAssertionAxiom(individual, Person))
+    axioms.append(OWLDataPropertyAssertionAxiom(
+        individual, hasAge, OWLLiteral(20 + (i % 50)),
     ))
-    people.append(person)
 
 # Reason once
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-# Query
-all_persons = reasoner.get_instances(Person)
-print(f"Total persons: {len(all_persons)}")
+all_persons = reasoner.get_instances(person)
+print(f"Total persons: {len(all_persons)}")  # 1000
 
 reasoner.dispose()
 ```
@@ -251,105 +266,95 @@ reasoner.dispose()
 Adding contradictory data:
 
 ```python
-from hermit.model import DisjointClasses
+Student = OWLClass(NS + "Student")
 
-onto = DLOntology()
+base = [
+    # Students and employees are disjoint
+    OWLDisjointClassesAxiom([Student, Employee]),
+    OWLClassAssertionAxiom(alice, Student),
+]
 
-Student = OWLClass("http://example.org/Student")
-Employee = OWLClass("http://example.org/Employee")
-
-# Students and employees are disjoint
-onto.add_axiom(DisjointClasses(Student, Employee))
-
-alice = OWLNamedIndividual("http://example.org/alice")
-
-# Consistent scenario
-onto.add_axiom(ClassAssertion(Student, alice))
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(base)
 print(f"Consistent? {reasoner.is_consistent()}")  # True
-
-# Inconsistent scenario
-onto.add_axiom(ClassAssertion(Employee, alice))
-
-reasoner2 = Reasoner(onto)
-print(f"Consistent? {reasoner2.is_consistent()}")  # False
-
 reasoner.dispose()
+
+# Inconsistent scenario: alice is both
+reasoner2 = reasoner_from_axioms(base + [OWLClassAssertionAxiom(alice, Employee)])
+print(f"Consistent? {reasoner2.is_consistent()}")  # False
 reasoner2.dispose()
 ```
 
 ## Query API Cheat Sheet
 
+All query methods take `hermit.model` handles
+(`AtomicConcept.create(iri)`, `Individual.create(iri)`, `AtomicRole.create(iri)`):
+
 ```python
+# doc-sample: skip (signature reference)
 # Type checking
-reasoner.has_type(individual, class_)  # bool
+reasoner.has_type(individual, concept)             # bool
+reasoner.has_type(individual, concept, direct=True)  # most-specific only
 
 # Get instances
-reasoner.get_instances(class_)  # Set of individuals
-reasoner.get_direct_instances(class_)  # Only direct instances
+reasoner.get_instances(concept)                    # set of Individual
+reasoner.get_instances(concept, direct=True)       # only direct instances
 
 # Get types
-reasoner.get_types(individual)  # All types (inferred)
-reasoner.get_direct_types(individual)  # Only asserted types
-
-# Get property values
-reasoner.get_object_property_values(property, individual)  # Set of individuals
-reasoner.get_data_property_values(property, individual)  # Set of data values
+reasoner.get_types(individual)                     # set of AtomicConcept
+reasoner.get_types(individual, direct=True)        # only most-specific types
 
 # Check relationships
-reasoner.get_related_individuals(property, individual)  # Connected individuals
+reasoner.has_role_relationship(subject, role, obj) # bool
+
+# Same-individual check
+reasoner.is_same_individual(ind1, ind2)            # bool
 
 # Check consistency
-reasoner.is_consistent()  # bool
+reasoner.is_consistent()                           # bool
 ```
 
 ## Real-World Example: Library System
 
 ```python
-onto = DLOntology()
-
 # Classes
-Book = OWLClass("http://example.org/Book")
-Author = OWLClass("http://example.org/Author")
-Patron = OWLClass("http://example.org/Patron")
+Book = OWLClass(NS + "Book")
+Author = OWLClass(NS + "Author")
+Patron = OWLClass(NS + "Patron")
 
 # Properties
-writtenBy = OWLObjectProperty("http://example.org/writtenBy")
-borrowedBy = OWLObjectProperty("http://example.org/borrowedBy")
-hasISBN = OWLDataProperty("http://example.org/hasISBN")
-hasTitle = OWLDataProperty("http://example.org/hasTitle")
+writtenBy = OWLObjectProperty(NS + "writtenBy")
+borrowedBy = OWLObjectProperty(NS + "borrowedBy")
+hasISBN = OWLDataProperty(NS + "hasISBN")
+hasTitle = OWLDataProperty(NS + "hasTitle")
 
 # Data
-python_book = OWLNamedIndividual("http://example.org/python-book")
-guido = OWLNamedIndividual("http://example.org/guido")
-alice_patron = OWLNamedIndividual("http://example.org/alice")
+python_book = OWLNamedIndividual(NS + "python-book")
+guido = OWLNamedIndividual(NS + "guido")
+alice_patron = OWLNamedIndividual(NS + "alice")
 
-# Schema
-onto.add_axiom(SubClassOf(Book, OWLClass("http://www.w3.org/2002/07/owl#Thing")))
+axioms = [
+    OWLClassAssertionAxiom(python_book, Book),
+    OWLClassAssertionAxiom(guido, Author),
+    OWLClassAssertionAxiom(alice_patron, Patron),
+    OWLObjectPropertyAssertionAxiom(python_book, writtenBy, guido),
+    OWLObjectPropertyAssertionAxiom(python_book, borrowedBy, alice_patron),
+    OWLDataPropertyAssertionAxiom(python_book, hasTitle, OWLLiteral("Python Essentials")),
+    OWLDataPropertyAssertionAxiom(python_book, hasISBN, OWLLiteral("123-456-789")),
+]
 
-# Add facts
-onto.add_axiom(ClassAssertion(Book, python_book))
-onto.add_axiom(ClassAssertion(Author, guido))
-onto.add_axiom(ClassAssertion(Patron, alice_patron))
-
-onto.add_axiom(ObjectPropertyAssertion(writtenBy, python_book, guido))
-onto.add_axiom(ObjectPropertyAssertion(borrowedBy, python_book, alice_patron))
-
-onto.add_axiom(DataPropertyAssertion(hasTitle, python_book, Literal("Python Essentials", "string")))
-onto.add_axiom(DataPropertyAssertion(hasISBN, python_book, Literal("123-456-789", "string")))
-
-# Query
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms, ontology_iri="urn:example:library")
 reasoner.precompute_inferences()
 
-# Who wrote this book?
-authors = reasoner.get_object_property_values(writtenBy, python_book)
-print(f"Authors: {authors}")
+book_h = Individual.create(NS + "python-book")
+written_by_h = AtomicRole.create(NS + "writtenBy")
+guido_h = Individual.create(NS + "guido")
 
-# Who borrowed this book?
-borrowers = reasoner.get_object_property_values(borrowedBy, python_book)
-print(f"Borrowers: {borrowers}")
+# Who wrote this book?
+print("Written by guido?", reasoner.has_role_relationship(book_h, written_by_h, guido_h))  # True
+
+# All books in the library
+books = reasoner.get_instances(AtomicConcept.create(NS + "Book"))
+print(f"Books: {sorted(b.iri for b in books)}")
 
 reasoner.dispose()
 ```
@@ -358,9 +363,9 @@ reasoner.dispose()
 
 1. **Instances** are the data that belongs to classes
 2. **Object properties** connect individuals to each other
-3. **Data properties** add typed attributes
-4. **Type checking** verifies class membership
-5. **Queries** retrieve instances and related data
+3. **Data properties** add typed attributes; data ranges drive classification
+4. **Type checking** verifies class membership (asserted *and* inferred)
+5. **`direct=True`** restricts queries to most-specific results
 6. **Consistency** ensures contradictions are caught
 
 ## Try This!
@@ -368,8 +373,8 @@ reasoner.dispose()
 Create an ontology for:
 - A person with multiple addresses
 - A product with ratings from multiple users
-- A student enrolled in multiple courses with grades
-- Query for all students in a course with grade > 8.0
+- A student enrolled in multiple courses
+- A `Senior` class defined by `hasAge ≥ 65`, recognized automatically
 
 ## Next Steps
 

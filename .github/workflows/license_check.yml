@@ -1,0 +1,15 @@
+name: License Check
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  license_check:
+    uses: OpenVoiceOS/gh-automations/.github/workflows/license-check.yml@dev
+    secrets: inherit
+    with:
+      # The dependency audit cannot read this package's PEP 639 license
+      # expression; the project's own license is declared in pyproject.toml.
+      exclude_packages: '^hermit-reasoner$'

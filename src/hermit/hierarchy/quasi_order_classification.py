@@ -248,7 +248,7 @@ class QuasiOrderClassification:
     def _read_known_subsumers_from_root_node(
         self, subconcept: AtomicConcept, checked_node: Node
     ) -> None:
-        if not checked_node.get_canonical_node_dependency_set():
+        if checked_node.get_canonical_node_dependency_set().is_empty():
             checked_node = checked_node.get_canonical_node()
             extension_manager = self.m_tableau.get_extension_manager()
             retrieval = extension_manager.get_binary_extension_table().create_retrieval(
@@ -258,9 +258,10 @@ class QuasiOrderClassification:
             retrieval.open()
             while not retrieval.after_last():
                 concept_object = retrieval.get_tuple_buffer()[0]
+                dependency_set = retrieval.get_dependency_set()
                 if (
                     isinstance(concept_object, AtomicConcept)
-                    and retrieval.get_dependency_set() is None
+                    and (dependency_set is None or dependency_set.is_empty())
                     and concept_object in self.m_elements
                 ):
                     self._add_known_subsumption(
@@ -456,8 +457,13 @@ class QuasiOrderClassification:
             if not is_subsumed_by:
                 self._prune_possible_subsumers()
             else:
+                # Read subsumers from the clashed run only when the extension
+                # table tracks real dependency sets; a deterministic (Horn)
+                # tableau reports every tuple as dependency-free, so facts
+                # derived from the test-only negative assertions would be
+                # mistaken for genuine subsumptions.
                 root = checked_node[fresh_individual]
-                if root is not None:
+                if root is not None and not self.m_tableau.is_deterministic():
                     self._read_known_subsumers_from_root_node(
                         picked_element, root
                     )
@@ -554,15 +560,20 @@ class _ClassificationRelation(Relation[AtomicConcept]):
             False,
             {AtomCls.create(child, fresh_individual)},
             None,
-            {AtomCls.create(parent, fresh_individual)},
             None,
+            {AtomCls.create(parent, fresh_individual)},
             cast(dict[Any, Any], checked_node),
             self._qoc._get_subsumption_test_description(child, parent),
         )
         if not is_subsumed_by:
             self._qoc._prune_possible_subsumers()
+        # In a deterministic (Horn) tableau the extension table reports every
+        # tuple as dependency-free, so labels of a clashed (subsumed) run must
+        # not be mistaken for genuine subsumptions; only read from real models.
         root = checked_node[fresh_individual]
-        if root is not None:
+        if root is not None and (
+            not is_subsumed_by or not self._qoc.m_tableau.is_deterministic()
+        ):
             self._qoc._read_known_subsumers_from_root_node(child, root)
         self._qoc.m_possible_subsumptions.get_successors(child).difference_update(
             self._qoc._get_all_known_subsumers(child)

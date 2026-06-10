@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+          ontologyIRI="http://example.org/pizza">
+  <Declaration><Class IRI="#Food"/></Declaration>
+  <Declaration><Class IRI="#Pizza"/></Declaration>
+  <Declaration><Class IRI="#PizzaTopping"/></Declaration>
+  <Declaration><Class IRI="#CheeseTopping"/></Declaration>
+  <Declaration><Class IRI="#MeatTopping"/></Declaration>
+  <Declaration><Class IRI="#VegetableTopping"/></Declaration>
+  <Declaration><Class IRI="#MargheritaPizza"/></Declaration>
+  <Declaration><Class IRI="#VegetarianPizza"/></Declaration>
+  <Declaration><ObjectProperty IRI="#hasTopping"/></Declaration>
+  <Declaration><NamedIndividual IRI="#myMargherita"/></Declaration>
+  <SubClassOf>
+    <Class IRI="#Pizza"/>
+    <Class IRI="#Food"/>
+  </SubClassOf>
+  <SubClassOf>
+    <Class IRI="#PizzaTopping"/>
+    <Class IRI="#Food"/>
+  </SubClassOf>
+  <SubClassOf>
+    <Class IRI="#CheeseTopping"/>
+    <Class IRI="#PizzaTopping"/>
+  </SubClassOf>
+  <SubClassOf>
+    <Class IRI="#MeatTopping"/>
+    <Class IRI="#PizzaTopping"/>
+  </SubClassOf>
+  <SubClassOf>
+    <Class IRI="#VegetableTopping"/>
+    <Class IRI="#PizzaTopping"/>
+  </SubClassOf>
+  <SubClassOf>
+    <Class IRI="#MargheritaPizza"/>
+    <Class IRI="#Pizza"/>
+  </SubClassOf>
+  <SubClassOf>
+    <Class IRI="#MargheritaPizza"/>
+    <ObjectSomeValuesFrom>
+      <ObjectProperty IRI="#hasTopping"/>
+      <Class IRI="#CheeseTopping"/>
+    </ObjectSomeValuesFrom>
+  </SubClassOf>
+  <SubClassOf>
+    <Class IRI="#MargheritaPizza"/>
+    <ObjectAllValuesFrom>
+      <ObjectProperty IRI="#hasTopping"/>
+      <ObjectUnionOf>
+        <Class IRI="#CheeseTopping"/>
+        <Class IRI="#VegetableTopping"/>
+      </ObjectUnionOf>
+    </ObjectAllValuesFrom>
+  </SubClassOf>
+  <EquivalentClasses>
+    <Class IRI="#VegetarianPizza"/>
+    <ObjectIntersectionOf>
+      <Class IRI="#Pizza"/>
+      <ObjectAllValuesFrom>
+        <ObjectProperty IRI="#hasTopping"/>
+        <ObjectComplementOf>
+          <Class IRI="#MeatTopping"/>
+        </ObjectComplementOf>
+      </ObjectAllValuesFrom>
+    </ObjectIntersectionOf>
+  </EquivalentClasses>
+  <DisjointClasses>
+    <Class IRI="#CheeseTopping"/>
+    <Class IRI="#MeatTopping"/>
+  </DisjointClasses>
+  <DisjointClasses>
+    <Class IRI="#CheeseTopping"/>
+    <Class IRI="#VegetableTopping"/>
+  </DisjointClasses>
+  <DisjointClasses>
+    <Class IRI="#MeatTopping"/>
+    <Class IRI="#VegetableTopping"/>
+  </DisjointClasses>
+  <ClassAssertion>
+    <Class IRI="#MargheritaPizza"/>
+    <NamedIndividual IRI="#myMargherita"/>
+  </ClassAssertion>
+</Ontology>

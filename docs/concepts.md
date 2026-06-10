@@ -95,33 +95,43 @@ Define the world:
 
 ```python
 from hermit import Reasoner
-from hermit.model import DLOntology, OWLClass, SubClassOf, ClassAssertion
-from hermit.model import OWLNamedIndividual
+from hermit.model import AtomicConcept, Individual
+from hermit.owl_model.class_expression import OWLClass
+from hermit.owl_model.owl_individual import OWLNamedIndividual
+from hermit.owl_model.owl_axiom import OWLClassAssertionAxiom, OWLSubClassOfAxiom
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
 
 # Define classes (concepts)
-Animal = OWLClass("http://example.org/Animal")
-Dog = OWLClass("http://example.org/Dog")
-Cat = OWLClass("http://example.org/Cat")
+NS = "http://example.org/"
+Animal = OWLClass(NS + "Animal")
+Dog = OWLClass(NS + "Dog")
+Cat = OWLClass(NS + "Cat")
 
-# Create ontology
-onto = DLOntology()
+# Define data (an individual)
+fido = OWLNamedIndividual(NS + "fido")
 
-# Add rules (axioms)
-onto.add_axiom(SubClassOf(Dog, Animal))  # "Dogs are Animals"
-onto.add_axiom(SubClassOf(Cat, Animal))  # "Cats are Animals"
+# Collect rules and facts as axioms
+axioms = [
+    OWLSubClassOfAxiom(Dog, Animal),       # "Dogs are Animals"
+    OWLSubClassOfAxiom(Cat, Animal),       # "Cats are Animals"
+    OWLClassAssertionAxiom(fido, Dog),     # "Fido is a Dog"
+]
 
-# Add data (facts)
-fido = OWLNamedIndividual("http://example.org/fido")
-onto.add_axiom(ClassAssertion(Dog, fido))  # "Fido is a Dog"
-
-# Reason
-reasoner = Reasoner(onto)
+# Compile and reason
+normalized = OWLNormalization().process_ontology(axioms)
+dl_ontology = OWLClausification().clausify(normalized)
+reasoner = Reasoner(dl_ontology)
 reasoner.precompute_inferences()
 
-# Query
-print(reasoner.has_type(fido, Animal))  # True (inferred!)
-print(reasoner.has_type(fido, Dog))     # True (asserted)
-print(reasoner.is_consistent())         # True (no contradictions)
+# Query with hermit.model handles
+animal = AtomicConcept.create(NS + "Animal")
+dog = AtomicConcept.create(NS + "Dog")
+fido_h = Individual.create(NS + "fido")
+
+print(reasoner.has_type(fido_h, animal))  # True (inferred!)
+print(reasoner.has_type(fido_h, dog))     # True (asserted)
+print(reasoner.is_consistent())           # True (no contradictions)
 
 reasoner.dispose()
 ```
@@ -144,7 +154,7 @@ The reasoner inferred that Fido is an Animal even though we only asserted that F
 
 **In code:**
 ```python
-Person = OWLClass("http://example.org/Person")
+Person = OWLClass("http://example.org/Person")  # hermit.owl_model
 ```
 
 ### Properties
@@ -154,6 +164,8 @@ Person = OWLClass("http://example.org/Person")
 
 **In code:**
 ```python
+from hermit.owl_model.owl_property import OWLDataProperty, OWLObjectProperty
+
 worksFor = OWLObjectProperty("http://example.org/worksFor")
 hasAge = OWLDataProperty("http://example.org/hasAge")
 ```
@@ -165,7 +177,7 @@ hasAge = OWLDataProperty("http://example.org/hasAge")
 
 **In code:**
 ```python
-john = OWLNamedIndividual("http://example.org/john")
+john = OWLNamedIndividual("http://example.org/john")  # hermit.owl_model
 ```
 
 ### Axioms
@@ -178,7 +190,7 @@ john = OWLNamedIndividual("http://example.org/john")
 
 **In code:**
 ```python
-onto.add_axiom(SubClassOf(Dog, Animal))
+axioms.append(OWLSubClassOfAxiom(Dog, Animal))
 ```
 
 ### Hierarchy
@@ -199,17 +211,23 @@ Thing
 
 Bad ontology:
 ```python
-onto.add_axiom(SubClassOf(Dog, Animal))
-onto.add_axiom(SubClassOf(Dog, NotAnimal))  # Contradiction!
+from hermit.owl_model.class_expression import OWLObjectComplementOf
+
+bad_axioms = [
+    OWLSubClassOfAxiom(Dog, Animal),
+    OWLSubClassOfAxiom(Dog, OWLObjectComplementOf(Animal)),  # Dog ⊑ ¬Animal: Dog is unsatisfiable
+]
 ```
 
 **Reasoning:** "What can we infer from the rules?"
 
 Good ontology:
 ```python
-onto.add_axiom(SubClassOf(Dog, Animal))
-into.add_axiom(ClassAssertion(Dog, fido))
-# Can infer: ClassAssertion(Animal, fido)
+good_axioms = [
+    OWLSubClassOfAxiom(Dog, Animal),
+    OWLClassAssertionAxiom(fido, Dog),
+]
+# The reasoner infers: fido is an Animal
 ```
 
 ## When to Use OWL Reasoning
@@ -229,7 +247,7 @@ into.add_axiom(ClassAssertion(Dog, fido))
 ## Next Steps
 
 1. **Read [Your First Program](./first-program.md)** — Run code and see it in action
-2. **Explore [Building Your First Ontology](./tutorials/02-build-ontology.md)** — Create real ontologies
+2. **Explore [Building Your First Ontology](./tutorials/01-build-ontology.md)** — Create real ontologies
 3. **Check the [API Reference](./api/core.md)** — Understand all available tools
 
 ---
