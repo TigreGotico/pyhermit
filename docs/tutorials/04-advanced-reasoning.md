@@ -4,47 +4,75 @@ Learn about optimization, performance tuning, and advanced reasoning techniques.
 
 ## What You'll Learn
 
-- When to use precompute vs on-demand reasoning
-- Understanding blocking strategies
-- Optimizing large ontologies
-- Reasoning over ABox (assertional facts)
+- When to precompute inferences
+- TBox vs ABox reasoning
+- Property characteristics (inverse, transitive, symmetric)
+- Handling large ontologies
 - Performance profiling
 
-## Part 1: Precompute vs On-Demand Reasoning
-
-PyHermit offers two reasoning modes:
+Standard setup:
 
 ```python
 from hermit import Reasoner
-from hermit.model import DLOntology, OWLClass, SubClassOf
+from hermit.model import AtomicConcept, Individual
+from hermit.owl_model.class_expression import (
+    OWLClass, OWLObjectIntersectionOf, OWLObjectSomeValuesFrom, OWLThing,
+)
+from hermit.owl_model.owl_individual import OWLNamedIndividual
+from hermit.owl_model.owl_property import OWLObjectProperty
+from hermit.owl_model.owl_axiom import (
+    OWLClassAssertionAxiom,
+    OWLDisjointClassesAxiom,
+    OWLEquivalentClassesAxiom,
+    OWLInverseObjectPropertiesAxiom,
+    OWLObjectPropertyAssertionAxiom,
+    OWLSubClassOfAxiom,
+    OWLTransitiveObjectPropertyAxiom,
+)
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
 
-onto = DLOntology()
 
-# Build a small ontology
-Animal = OWLClass("http://example.org/Animal")
-Dog = OWLClass("http://example.org/Dog")
-Cat = OWLClass("http://example.org/Cat")
+def reasoner_from_axioms(axioms, ontology_iri="urn:example:onto"):
+    normalized = OWLNormalization().process_ontology(axioms)
+    return Reasoner(OWLClausification().clausify(normalized, ontology_iri=ontology_iri))
 
-onto.add_axiom(SubClassOf(Dog, Animal))
-onto.add_axiom(SubClassOf(Cat, Animal))
 
-reasoner = Reasoner(onto)
+NS = "http://example.org/"
+```
 
-# Mode 1: Precompute (Recommended for repeated queries)
+## Part 1: Precompute vs On-Demand Reasoning
+
+`Reasoner` answers queries either way; `precompute_inferences()` classifies
+everything up front so subsequent queries hit a cached hierarchy:
+
+```python
+Animal = OWLClass(NS + "Animal")
+Dog = OWLClass(NS + "Dog")
+Cat = OWLClass(NS + "Cat")
+
+axioms = [
+    OWLSubClassOfAxiom(Dog, Animal),
+    OWLSubClassOfAxiom(Cat, Animal),
+]
+
+dog = AtomicConcept.create(NS + "Dog")
+cat = AtomicConcept.create(NS + "Cat")
+animal = AtomicConcept.create(NS + "Animal")
+
+# Mode 1: Precompute (recommended for repeated queries)
 print("=== Precompute Mode ===")
-reasoner.precompute_inferences()  # Does all work upfront
-print("Is Dog a subclass of Animal?", reasoner.is_subclass_of(Dog, Animal))  # Instant
-print("Is Cat a subclass of Animal?", reasoner.is_subclass_of(Cat, Animal))  # Instant
-
+reasoner = reasoner_from_axioms(axioms)
+reasoner.precompute_inferences()           # does all classification upfront
+print("Is Dog a subclass of Animal?", reasoner.is_sub_class_of(dog, animal))
+print("Is Cat a subclass of Animal?", reasoner.is_sub_class_of(cat, animal))
 reasoner.dispose()
 
-# Mode 2: On-Demand (Good for one-off queries or memory constraints)
+# Mode 2: On-demand (good for one-off queries)
 print("\n=== On-Demand Mode ===")
-reasoner2 = Reasoner(onto)
-# Don't call precompute_inferences()
-# Instead, query directly
-print("Is Dog a subclass of Animal?", reasoner2.is_subclass_of(Dog, Animal))  # Work on-demand
-
+reasoner2 = reasoner_from_axioms(axioms)
+# No precompute_inferences() — the subsumption test runs on demand
+print("Is Dog a subclass of Animal?", reasoner2.is_sub_class_of(dog, animal))
 reasoner2.dispose()
 ```
 
@@ -52,37 +80,44 @@ reasoner2.dispose()
 
 | Mode | Best For | Trade-offs |
 |------|----------|-----------|
-| Precompute | Multiple queries, cached results, class hierarchy | Slower startup, more memory |
-| On-Demand | Single queries, memory-constrained, dynamic changes | Slower per-query |
+| Precompute | Multiple queries, instance retrieval, hierarchies | Slower startup |
+| On-Demand | A single satisfiability or subsumption test | Each query may trigger tableau work |
+
+`precompute_inferences` takes keyword flags for what to classify:
+
+```python
+reasoner = reasoner_from_axioms(axioms)
+reasoner.precompute_inferences(
+    class_hierarchy=True,
+    object_property_hierarchy=False,
+    data_property_hierarchy=False,
+)
+reasoner.dispose()
+```
 
 ## Part 2: TBox vs ABox Reasoning
 
 TBox (schema) reasoning vs ABox (data) reasoning:
 
 ```python
-from hermit.model import ClassAssertion, OWLNamedIndividual
+fido = OWLNamedIndividual(NS + "fido")
 
-onto = DLOntology()
+axioms = [
+    # === TBox (Terminological): class definitions and rules ===
+    OWLSubClassOfAxiom(Dog, Animal),
+    # === ABox (Assertional): facts about individuals ===
+    OWLClassAssertionAxiom(fido, Dog),
+]
 
-# === TBox (Terminological) ===
-# Class definitions and rules
-Animal = OWLClass("http://example.org/Animal")
-Dog = OWLClass("http://example.org/Dog")
-onto.add_axiom(SubClassOf(Dog, Animal))
-
-# === ABox (Assertional) ===
-# Facts about individuals
-fido = OWLNamedIndividual("http://example.org/fido")
-onto.add_axiom(ClassAssertion(Dog, fido))
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
 # TBox query: Is Dog a subclass of Animal?
-print("TBox: Is Dog ⊆ Animal?", reasoner.is_subclass_of(Dog, Animal))
+print("TBox: Is Dog ⊑ Animal?", reasoner.is_sub_class_of(dog, animal))
 
 # ABox query: Is fido an animal?
-print("ABox: Is fido an Animal?", reasoner.has_type(fido, Animal))  # Inferred!
+fido_h = Individual.create(NS + "fido")
+print("ABox: Is fido an Animal?", reasoner.has_type(fido_h, animal))  # Inferred!
 
 reasoner.dispose()
 ```
@@ -92,137 +127,132 @@ reasoner.dispose()
 Important reasoning tasks:
 
 ```python
-from hermit.model import Intersection, DisjointClasses, ForAll
+Person = OWLClass(NS + "Person")
+Employee = OWLClass(NS + "Employee")
+Unemployed = OWLClass(NS + "Unemployed")
 
-onto = DLOntology()
+# Task 1: Consistency — is the entire ontology contradiction-free?
+axioms = [
+    OWLSubClassOfAxiom(Employee, Person),
+    OWLSubClassOfAxiom(Unemployed, Person),
+    OWLDisjointClassesAxiom([Employee, Unemployed]),
+]
 
-Person = OWLClass("http://example.org/Person")
-Employee = OWLClass("http://example.org/Employee")
-Unemployed = OWLClass("http://example.org/Unemployed")
-
-# Task 1: Consistency Checking
-# Is the entire ontology consistent?
-onto.add_axiom(SubClassOf(Employee, Person))
-onto.add_axiom(SubClassOf(Unemployed, Person))
-onto.add_axiom(DisjointClasses(Employee, Unemployed))
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 print("Is ontology consistent?", reasoner.is_consistent())  # True
+reasoner.dispose()
 
-# Task 2: Satisfiability Checking
-# Can a class have any instances?
-Contradiction = OWLClass("http://example.org/Contradiction")
-onto.add_axiom(SubClassOf(
+# Task 2: Satisfiability — can a class have any instances?
+Contradiction = OWLClass(NS + "Contradiction")
+axioms.append(OWLSubClassOfAxiom(
     Contradiction,
-    Intersection(Employee, Unemployed)  # Impossible!
+    OWLObjectIntersectionOf([Employee, Unemployed]),  # Impossible!
 ))
 
-reasoner2 = Reasoner(onto)
-print("Is Contradiction satisfiable?", reasoner2.is_satisfiable(Contradiction))  # False
+reasoner2 = reasoner_from_axioms(axioms)
+contradiction = AtomicConcept.create(NS + "Contradiction")
+print("Is Contradiction satisfiable?", reasoner2.is_satisfiable(contradiction))  # False
 
-# Task 3: Find Unsatisfiable Classes
-unsatisfiable = reasoner2.get_unsatisfiable_classes()
-print(f"Unsatisfiable classes: {len(unsatisfiable)}")
-
-reasoner.dispose()
-reasoner2.dispose()
-```
-
-## Part 4: Handling Large Ontologies
-
-Strategies for scaling to large datasets:
-
-```python
-# Strategy 1: Incremental Reasoning
-print("=== Incremental Reasoning ===")
-
-onto = DLOntology()
-reasoner = Reasoner(onto)
-
-# Add and reason incrementally
-Animal = OWLClass("http://example.org/Animal")
-Dog = OWLClass("http://example.org/Dog")
-onto.add_axiom(SubClassOf(Dog, Animal))
-
-reasoner = Reasoner(onto)  # Re-create reasoner for new facts
-reasoner.precompute_inferences()
-
-# Add more facts
-Cat = OWLClass("http://example.org/Cat")
-onto.add_axiom(SubClassOf(Cat, Animal))
-
-reasoner2 = Reasoner(onto)  # Re-create reasoner
+# Task 3: Find all unsatisfiable classes
 reasoner2.precompute_inferences()
+unsatisfiable = [
+    ac for ac in reasoner2.dl_ontology.all_atomic_concepts
+    if not ac.iri.startswith("internal:") and not reasoner2.is_satisfiable(ac)
+]
+print(f"Unsatisfiable classes: {[c.iri for c in unsatisfiable]}")
 
-reasoner.dispose()
 reasoner2.dispose()
-
-# Strategy 2: Filtering by Relevant Classes
-print("\n=== Filtering Large Results ===")
-
-onto2 = DLOntology()
-# ... build large ontology ...
-
-reasoner3 = Reasoner(onto2)
-reasoner3.precompute_inferences()
-
-# Instead of getting ALL instances (might be millions)
-# Only get instances of specific classes
-important_class = OWLClass("http://example.org/ImportantClass")
-instances = reasoner3.get_instances(important_class)
-print(f"Instances of ImportantClass: {len(instances)}")
-
-reasoner3.dispose()
 ```
 
-## Part 5: Reasoning About Properties
+**Output:**
+```
+Is ontology consistent? True
+Is Contradiction satisfiable? False
+Unsatisfiable classes: ['http://example.org/Contradiction']
+```
 
-Advanced property reasoning:
+## Part 4: Property Characteristics
+
+Property axioms feed class-level inference:
 
 ```python
-from hermit.model import InverseOf, Transitive, Symmetric
+hasChild = OWLObjectProperty(NS + "hasChild")
+hasParent = OWLObjectProperty(NS + "hasParent")
+manages = OWLObjectProperty(NS + "manages")
 
-onto = DLOntology()
+Child = OWLClass(NS + "Child")
+alice = OWLNamedIndividual(NS + "alice")
+bob = OWLNamedIndividual(NS + "bob")
 
-# Define properties with characteristics
-hasParent = OWLObjectProperty("http://example.org/hasParent")
-hasChild = OWLObjectProperty("http://example.org/hasChild")
-hasFriend = OWLObjectProperty("http://example.org/hasFriend")
-manages = OWLObjectProperty("http://example.org/manages")
+# Inverse properties: hasChild(alice, bob) implies hasParent(bob, alice),
+# so a class defined by hasParent recognizes bob:
+axioms = [
+    OWLInverseObjectPropertiesAxiom(hasChild, hasParent),
+    OWLEquivalentClassesAxiom([Child, OWLObjectSomeValuesFrom(hasParent, OWLThing)]),
+    OWLObjectPropertyAssertionAxiom(alice, hasChild, bob),
+]
 
-Person = OWLClass("http://example.org/Person")
+reasoner = reasoner_from_axioms(axioms)
+reasoner.precompute_inferences()
+child = AtomicConcept.create(NS + "Child")
+print("Is bob a Child?", reasoner.has_type(Individual.create(NS + "bob"), child))  # True
+reasoner.dispose()
 
-# Property 1: Inverse relationship
-# hasChild is the inverse of hasParent
-onto.add_axiom(InverseOf(hasParent, hasChild))
+# Transitivity at the TBox level: managers reach everyone below them
+Mgr = OWLClass(NS + "Mgr")
+Mid = OWLClass(NS + "Mid")
+Eng = OWLClass(NS + "Eng")
+ReachesEng = OWLClass(NS + "ReachesEng")
 
-# Property 2: Transitivity
-# If A manages B and B manages C, then A manages C
-onto.add_axiom(Transitive(manages))
+axioms = [
+    OWLTransitiveObjectPropertyAxiom(manages),
+    OWLSubClassOfAxiom(Mgr, OWLObjectSomeValuesFrom(manages, Mid)),
+    OWLSubClassOfAxiom(Mid, OWLObjectSomeValuesFrom(manages, Eng)),
+    OWLEquivalentClassesAxiom([ReachesEng, OWLObjectSomeValuesFrom(manages, Eng)]),
+]
 
-# Property 3: Symmetry
-# If A is friends with B, then B is friends with A
-onto.add_axiom(Symmetric(hasFriend))
+reasoner = reasoner_from_axioms(axioms)
+mgr = AtomicConcept.create(NS + "Mgr")
+reaches = AtomicConcept.create(NS + "ReachesEng")
+print("Mgr ⊑ ReachesEng?", reasoner.is_sub_class_of(mgr, reaches))  # True (via transitivity)
+reasoner.dispose()
+```
 
-# Now create facts
-alice = OWLNamedIndividual("http://example.org/alice")
-bob = OWLNamedIndividual("http://example.org/bob")
-charlie = OWLNamedIndividual("http://example.org/charlie")
+**Output:**
+```
+Is bob a Child? True
+Mgr ⊑ ReachesEng? True
+```
 
-from hermit.model import ObjectPropertyAssertion
-onto.add_axiom(ObjectPropertyAssertion(manages, alice, bob))
-onto.add_axiom(ObjectPropertyAssertion(manages, bob, charlie))
+Note: OWL 2 restricts where transitive (non-simple) properties may appear —
+using one inside a cardinality restriction raises `ValueError` at
+clausification time.
 
-reasoner = Reasoner(onto)
+## Part 5: Handling Large Ontologies
+
+```python
+# Strategy 1: Batch your axioms, compile once
+big_axioms = []
+classes = [OWLClass(f"{NS}Class{i}") for i in range(200)]
+for i in range(1, len(classes)):
+    big_axioms.append(OWLSubClassOfAxiom(classes[i], classes[i // 2]))
+
+reasoner = reasoner_from_axioms(big_axioms)
 reasoner.precompute_inferences()
 
-# Query: Does Alice manage Charlie (through transitivity)?
-# This requires special reasoning over role chains
-print("Alice manages Charlie:", 
-      reasoner.get_object_property_values(manages, alice))
+# Strategy 2: Query only the classes you need
+c150 = AtomicConcept.create(f"{NS}Class150")
+c0 = AtomicConcept.create(f"{NS}Class0")
+print("Class150 ⊑ Class0?", reasoner.is_sub_class_of(c150, c0))
+
+# Reasoner statistics
+print(reasoner.stats)
 
 reasoner.dispose()
 ```
+
+When data changes, build a new axiom list and compile a fresh reasoner —
+`Reasoner` instances are immutable snapshots of the ontology.
 
 ## Part 6: Performance Profiling
 
@@ -230,91 +260,80 @@ Understanding where time is spent:
 
 ```python
 import time
-from hermit import Reasoner
-from hermit.model import (
-    DLOntology, OWLClass, SubClassOf,
-    ClassAssertion, OWLNamedIndividual
-)
 
-onto = DLOntology()
-
-# Build a moderately complex ontology
-classes = [OWLClass(f"http://example.org/Class{i}") for i in range(100)]
-individuals = [OWLNamedIndividual(f"http://example.org/Ind{i}") for i in range(100)]
+axioms = []
+classes = [OWLClass(f"{NS}Class{i}") for i in range(100)]
+individuals = [OWLNamedIndividual(f"{NS}Ind{i}") for i in range(100)]
 
 # Add hierarchy
 for i in range(1, len(classes)):
-    onto.add_axiom(SubClassOf(classes[i], classes[0]))
+    axioms.append(OWLSubClassOfAxiom(classes[i], classes[0]))
 
 # Add facts
 for i, ind in enumerate(individuals):
-    onto.add_axiom(ClassAssertion(classes[i % len(classes)], ind))
+    axioms.append(OWLClassAssertionAxiom(ind, classes[i % len(classes)]))
 
-# Measure precomputation time
+# Measure compile time
 start = time.time()
-reasoner = Reasoner(onto)
-onto_time = time.time() - start
-print(f"Reasoner creation: {onto_time:.3f}s")
+reasoner = reasoner_from_axioms(axioms)
+print(f"Reasoner creation: {time.time() - start:.3f}s")
 
+# Measure classification time
 start = time.time()
 reasoner.precompute_inferences()
-reasoning_time = time.time() - start
-print(f"Precompute_inferences: {reasoning_time:.3f}s")
+print(f"precompute_inferences: {time.time() - start:.3f}s")
 
 # Measure query time
+c50 = AtomicConcept.create(f"{NS}Class50")
+c0 = AtomicConcept.create(f"{NS}Class0")
 start = time.time()
 for _ in range(10):
-    reasoner.is_subclass_of(classes[50], classes[0])
-query_time = (time.time() - start) / 10
-print(f"Average query time: {query_time:.6f}s")
+    reasoner.is_sub_class_of(c50, c0)
+print(f"Average query time: {(time.time() - start) / 10:.6f}s")
 
 reasoner.dispose()
 ```
 
 ## Part 7: Error Handling
 
-Graceful error handling:
+Clausification validates OWL 2 restrictions and raises `ValueError`; always
+dispose reasoners when done:
 
 ```python
-from hermit.datatypes.registry import UnsupportedDatatypeException
+from hermit.owl_model.class_expression import OWLObjectMaxCardinality
 
-onto = DLOntology()
-
-# ... build ontology ...
+axioms = [
+    OWLTransitiveObjectPropertyAxiom(manages),
+    # OWL 2 violation: non-simple property in a cardinality restriction
+    OWLSubClassOfAxiom(Person, OWLObjectMaxCardinality(1, manages, OWLThing)),
+]
 
 try:
-    reasoner = Reasoner(onto)
-    reasoner.precompute_inferences()
-    
-    # Queries
-    result = reasoner.is_subclass_of(Class1, Class2)
-    
-except UnsupportedDatatypeException as e:
-    print(f"Unsupported datatype: {e}")
-    # Handle gracefully
-except Exception as e:
-    print(f"Reasoning failed: {e}")
-finally:
-    reasoner.dispose()
+    reasoner = reasoner_from_axioms(axioms)
+except ValueError as e:
+    print(f"Rejected at clausification: {e}")
+```
+
+**Output:**
+```
+Rejected at clausification: Non-simple property '<http://example.org/manages>' or its inverse appears in a cardinality restriction (OWL 2 violation)
 ```
 
 ## Optimization Checklist
 
-- ✅ Use precompute_inferences() for repeated queries
-- ✅ Check is_consistent() first if unsure about ontology
-- ✅ Use appropriate data structures (sets, hashmaps)
+- ✅ Use `precompute_inferences()` for repeated queries
+- ✅ Check `is_consistent()` first if unsure about the ontology
+- ✅ Compile axioms once; treat reasoners as snapshots
 - ✅ Profile before optimizing
-- ✅ Consider incremental reasoning for dynamic data
-- ✅ Filter large result sets early
-- ✅ Dispose reasoner to free memory
-- ✅ Avoid repeated reasoner creation for same ontology
+- ✅ Dispose reasoners to free resources
+- ✅ Avoid repeated reasoner creation for the same axiom set
 
 ## Key Takeaways
 
-1. **Precompute** for speed, **On-Demand** for memory
+1. **Precompute** for repeated queries; on-demand for one-off checks
 2. **TBox** reasons about classes, **ABox** about instances
-3. **Consistency** checks whole ontology, **Satisfiability** checks classes
-4. **Property characteristics** enable advanced reasoning
+3. **Consistency** checks the whole ontology, **satisfiability** checks one class
+4. **Property characteristics** (inverse, transitive) drive classification
 5. **Profiling** guides optimization efforts
 
 ## Try This!
@@ -323,11 +342,10 @@ Create a complex ontology with:
 - 1000+ classes in a hierarchy
 - 100+ individuals with properties
 - Profile reasoning time
-- Optimize by filtering results
-- Measure performance improvement
+- Measure the effect of precomputing vs on-demand queries
 
 ## Next Steps
 
 - **[API Reference](../api/core.md)** — Complete API documentation
-- **[Concepts](../concepts.md)** — Deep dive into reasoning algorithms
-- **[Examples](../examples.md)** — Real-world usage patterns
+- **[Concepts](../concepts.md)** — Deep dive into reasoning
+- **[Patterns](../recipes/patterns.md)** — Real-world usage patterns

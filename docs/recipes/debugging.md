@@ -2,92 +2,99 @@
 
 How to find and fix issues in your ontologies.
 
+All snippets use the standard setup:
+
+```python
+from hermit import Reasoner
+from hermit.model import AtomicConcept, AtomicRole, Individual
+from hermit.owl_model.class_expression import OWLClass, OWLObjectComplementOf, OWLObjectSomeValuesFrom
+from hermit.owl_model.owl_individual import OWLNamedIndividual
+from hermit.owl_model.owl_property import OWLObjectProperty
+from hermit.owl_model.owl_axiom import (
+    OWLClassAssertionAxiom,
+    OWLDisjointClassesAxiom,
+    OWLEquivalentClassesAxiom,
+    OWLObjectPropertyAssertionAxiom,
+    OWLSubClassOfAxiom,
+)
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
+
+
+def reasoner_from_axioms(axioms, ontology_iri="urn:example:onto"):
+    normalized = OWLNormalization().process_ontology(axioms)
+    return Reasoner(OWLClausification().clausify(normalized, ontology_iri=ontology_iri))
+
+
+NS = "http://example.org/"
+```
+
 ## Problem 1: Unexpected Query Results
 
 ### Symptom: Getting fewer instances than expected
 
 ```python
-# Expected: 100 instances
-# Got: 0 instances
-instances = reasoner.get_instances(MyClass)
+Person = OWLClass(NS + "Person")
+Employee = OWLClass(NS + "Employee")
+alice = OWLNamedIndividual(NS + "alice")
+
+# alice asserted as Employee, but no rule connects Employee to Person
+axioms = [OWLClassAssertionAxiom(alice, Employee)]
+
+reasoner = reasoner_from_axioms(axioms)
+reasoner.precompute_inferences()
+
+person = AtomicConcept.create(NS + "Person")
+instances = reasoner.get_instances(person)
+print(f"Persons found: {len(instances)}")  # 0 — why?
+reasoner.dispose()
 ```
 
 ### Diagnosis
 
-**Step 1: Check if class is satisfiable**
+**Step 1: Check if the class is satisfiable**
 
 ```python
-is_satisfiable = reasoner.is_satisfiable(MyClass)
-if not is_satisfiable:
-    print("ERROR: MyClass is unsatisfiable (contradictory)")
-    # Find what makes it unsatisfiable
-    unsatisfiable = reasoner.get_unsatisfiable_classes()
-    print(f"Unsatisfiable classes: {unsatisfiable}")
+reasoner = reasoner_from_axioms(axioms)
+if not reasoner.is_satisfiable(person):
+    print("ERROR: Person is unsatisfiable (contradictory definition)")
+else:
+    print("Person is satisfiable — the problem is elsewhere")
+reasoner.dispose()
 ```
 
-**Step 2: Check direct instances**
+**Step 2: Compare direct and inferred instances**
 
 ```python
-direct = reasoner.get_direct_instances(MyClass)
-print(f"Direct instances: {len(direct)}")
-
-all_instances = reasoner.get_instances(MyClass)
-print(f"All instances (including inferred): {len(all_instances)}")
-
-if len(direct) > 0 and len(all_instances) == 0:
-    print("ERROR: Direct instances exist but none inferred")
-    # The class definition might be broken
-```
-
-**Step 3: Check assertions**
-
-```python
-# Did you actually assert that individuals are of this type?
-onto = DLOntology()
-
-# Create an individual
-alice = OWLNamedIndividual("http://example.org/alice")
-
-# WRONG: Just asserting Person doesn't automatically put alice in MyClass
-onto.add_axiom(ClassAssertion(Person, alice))
-
-# RIGHT: You need to either:
-# Option 1: Directly assert alice is MyClass
-onto.add_axiom(ClassAssertion(MyClass, alice))
-
-# Option 2: Or assert a subclass
-onto.add_axiom(SubClassOf(Alice, MyClass))  # Alice class, not individual
-onto.add_axiom(ClassAssertion(Alice, alice))
-```
-
-**Step 4: Check inference rules**
-
-```python
-# Maybe there's no rule connecting the data to your class?
-
-# You have:
-onto.add_axiom(ClassAssertion(Employee, alice))
-
-# But you query:
-instances = reasoner.get_instances(Person)  # Empty!
-
-# Because there's no rule:
-# Missing: onto.add_axiom(SubClassOf(Employee, Person))
-
-# Fix it:
-onto.add_axiom(SubClassOf(Employee, Person))
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-instances = reasoner.get_instances(Person)  # Now contains alice
+employee = AtomicConcept.create(NS + "Employee")
+direct = reasoner.get_instances(employee, direct=True)
+all_instances = reasoner.get_instances(employee)
+print(f"Direct: {len(direct)}, All: {len(all_instances)}")
+reasoner.dispose()
+```
+
+**Step 3: Check the inference rules**
+
+```python
+# The missing link: nothing says Employee ⊑ Person.
+# Fix it:
+axioms.append(OWLSubClassOfAxiom(Employee, Person))
+
+reasoner = reasoner_from_axioms(axioms)
+reasoner.precompute_inferences()
+print(f"Persons found now: {len(reasoner.get_instances(person))}")  # 1 (alice)
+reasoner.dispose()
 ```
 
 ### Solution Checklist
 
-- [ ] Class is satisfiable (`is_satisfiable == True`)
-- [ ] Instances are asserted with `ClassAssertion`
-- [ ] Inference rules exist (`SubClassOf` connecting to queried class)
-- [ ] Reasoner precomputed inferences (`precompute_inferences()` called)
+- [ ] Class is satisfiable (`is_satisfiable` returns `True`)
+- [ ] Instances are asserted with `OWLClassAssertionAxiom`
+- [ ] Inference rules exist (`OWLSubClassOfAxiom` connecting to the queried class)
+- [ ] `precompute_inferences()` was called before instance queries
 
 ---
 
@@ -95,69 +102,88 @@ instances = reasoner.get_instances(Person)  # Now contains alice
 
 ### Symptom: `is_consistent()` returns False
 
-```python
-if not reasoner.is_consistent():
-    print("Ontology is inconsistent!")
-```
-
-### Diagnosis
-
 **Step 1: Find unsatisfiable classes**
 
+An inconsistent ontology answers every entailment with "true", so first find
+classes that are unsatisfiable on their own:
+
 ```python
-unsatisfiable = reasoner.get_unsatisfiable_classes()
-if unsatisfiable:
-    for cls in unsatisfiable:
-        print(f"Unsatisfiable: {cls}")
-    # These classes are the source of contradiction
+Student = OWLClass(NS + "Student")
+Teacher = OWLClass(NS + "Teacher")
+TeachingStudent = OWLClass(NS + "TeachingStudent")
+
+axioms = [
+    OWLDisjointClassesAxiom([Student, Teacher]),
+    OWLSubClassOfAxiom(TeachingStudent, Student),
+    OWLSubClassOfAxiom(TeachingStudent, Teacher),
+]
+
+reasoner = reasoner_from_axioms(axioms)
+print("Consistent?", reasoner.is_consistent())  # True — no individuals yet
+
+unsatisfiable = [
+    ac.iri for ac in reasoner.dl_ontology.all_atomic_concepts
+    if not reasoner.is_satisfiable(ac)
+]
+print(f"Unsatisfiable classes: {unsatisfiable}")  # TeachingStudent
+reasoner.dispose()
 ```
 
 **Step 2: Check disjointness violations**
 
 ```python
-# You might have asserted:
-onto.add_axiom(DisjointClasses(Student, Teacher))
+# Asserting an individual into an unsatisfiable class
+# makes the whole ontology inconsistent:
+alice = OWLNamedIndividual(NS + "alice")
+bad = axioms + [
+    OWLClassAssertionAxiom(alice, Student),
+    OWLClassAssertionAxiom(alice, Teacher),  # alice can't be both!
+]
 
-# But also said:
-onto.add_axiom(ClassAssertion(Student, alice))
-onto.add_axiom(ClassAssertion(Teacher, alice))
+reasoner = reasoner_from_axioms(bad)
+print("Consistent?", reasoner.is_consistent())  # False
+reasoner.dispose()
 
-# alice can't be both → contradiction!
-
-# Fix: Decide if disjointness or assertion is wrong
-# Option 1: Remove disjointness
-# onto.axioms.remove(DisjointClasses(Student, Teacher))
-
-# Option 2: Fix assertion
-# onto.axioms.remove(ClassAssertion(Teacher, alice))
+# Fix: decide whether the disjointness or the assertion is wrong,
+# and rebuild the axiom list without the offending axiom.
 ```
 
-**Step 3: Check circular definitions**
+**Step 3: Check circular negations**
 
 ```python
-# Circular definitions can cause contradictions:
-onto.add_axiom(SubClassOf(A, B))
-onto.add_axiom(SubClassOf(B, Complement(A)))  # B ⊆ ¬A
+A = OWLClass(NS + "A")
+B = OWLClass(NS + "B")
 
-# This means: A ⊆ B ⊆ ¬A → contradiction!
+circular = [
+    OWLSubClassOfAxiom(A, B),
+    OWLSubClassOfAxiom(B, OWLObjectComplementOf(A)),  # B ⊑ ¬A
+]
+# This means: A ⊑ B ⊑ ¬A → A is unsatisfiable
 
-# Fix: Make sure restriction chains are consistent
-# A ⊆ B ⊆ A  (circular equivalence) = OK
-# A ⊆ B ⊆ ¬A (circular negation) = NOT OK
+reasoner = reasoner_from_axioms(circular)
+print("A satisfiable?", reasoner.is_satisfiable(AtomicConcept.create(NS + "A")))  # False
+reasoner.dispose()
 ```
 
 **Step 4: Check cardinality conflicts**
 
 ```python
-# Conflicting cardinality constraints:
-onto.add_axiom(SubClassOf(Person, AtLeast(2, hasParent, Person)))
-onto.add_axiom(SubClassOf(Person, AtMost(1, hasParent, Person)))
+from hermit.owl_model.class_expression import (
+    OWLObjectMaxCardinality, OWLObjectMinCardinality, OWLThing,
+)
 
-# Person must have ≥2 but ≤1 parents → contradiction!
+hasParent = OWLObjectProperty(NS + "hasParent")
+Person = OWLClass(NS + "Person")
 
-# Fix: Make sure cardinality constraints don't conflict
-onto.add_axiom(SubClassOf(Person, AtLeast(1, hasParent, Person)))
-onto.add_axiom(SubClassOf(Person, AtMost(2, hasParent, Person)))  # ≥1 and ≤2 = OK
+conflicting = [
+    OWLSubClassOfAxiom(Person, OWLObjectMinCardinality(2, hasParent, OWLThing)),
+    OWLSubClassOfAxiom(Person, OWLObjectMaxCardinality(1, hasParent, OWLThing)),
+]
+# Person must have ≥2 but ≤1 parents → Person is unsatisfiable
+
+reasoner = reasoner_from_axioms(conflicting)
+print("Person satisfiable?", reasoner.is_satisfiable(AtomicConcept.create(NS + "Person")))  # False
+reasoner.dispose()
 ```
 
 ### Solution Checklist
@@ -171,18 +197,17 @@ onto.add_axiom(SubClassOf(Person, AtMost(2, hasParent, Person)))  # ≥1 and ≤
 
 ## Problem 3: Slow Reasoning
 
-### Symptom: `precompute_inferences()` takes > 60 seconds
+### Symptom: `precompute_inferences()` takes too long
 
 ```python
 import time
 
+reasoner = reasoner_from_axioms(axioms)
 start = time.time()
 reasoner.precompute_inferences()
 elapsed = time.time() - start
-
 print(f"Reasoning took {elapsed:.1f} seconds")
-if elapsed > 60:
-    print("Too slow! Investigating...")
+reasoner.dispose()
 ```
 
 ### Diagnosis
@@ -190,84 +215,50 @@ if elapsed > 60:
 **Step 1: Check ontology size**
 
 ```python
-classes = reasoner.get_classes()
-axioms = len(onto.logical_axioms)
-
-print(f"Classes: {len(classes)}")
-print(f"Axioms: {axioms}")
-
-# Guidelines:
-# < 1000 axioms = fast
-# 1000-10000 = moderate
-# 10000-100000 = slow
-# > 100000 = very slow (consider Java HermiT)
+reasoner = reasoner_from_axioms(axioms)
+print(reasoner.stats)  # clauses, atomic_concepts, individuals, is_horn, ...
+reasoner.dispose()
 ```
 
-**Step 2: Check for complex restrictions**
+Horn ontologies (`is_horn: True`) classify much faster — disjunctions
+(unions, max-cardinality on the right of ⊑) trigger backtracking search.
+
+**Step 2: Check for expensive constructs**
+
+The usual suspects, in rough order of cost:
+
+- large max-cardinality values in restrictions
+- deeply nested disjunctions
+- transitive properties combined with deep existential chains
+- many `OWLDifferentIndividualsAxiom` pairs with max-cardinality constraints
+
+**Step 3: Time individual queries**
 
 ```python
-# Very restrictive constraints = slow reasoning
-
-# SLOW: Many nested restrictions
-onto.add_axiom(SubClassOf(MyClass, Intersection(
-    AtLeast(5, prop1, Class1),
-    AtMost(10, prop2, Class2),
-    ForAll(prop3, Class3),
-    ForAll(prop4, Complement(Class4)),
-    # ... many more ...
-)))
-
-# FASTER: Simple restrictions
-onto.add_axiom(SubClassOf(MyClass, AtLeast(1, prop, Class)))
-```
-
-**Step 3: Check for property chains**
-
-```python
-# Transitive properties increase complexity
-onto.add_axiom(Transitive(manages))
-
-# This can lead to exponential reasoning in deep hierarchies
-
-# Better: Use only when necessary
-# Only mark properties as transitive if you truly need it
+reasoner = reasoner_from_axioms(axioms)
+start = time.time()
+reasoner.is_consistent()
+print(f"Consistency check: {time.time() - start:.3f}s")
+reasoner.dispose()
 ```
 
 ### Solution Strategies
 
-**Strategy 1: Simplify ontology**
+- Simplify or remove axioms you don't query
+- For one-off checks, skip `precompute_inferences()` and ask directly
+- Set `Configuration.individual_task_timeout` to bound each reasoning task:
 
 ```python
-# Remove unnecessary axioms
-# Merge similar classes
-# Use flatter hierarchies instead of deep ones
-```
+from hermit import Configuration
 
-**Strategy 2: Use on-demand reasoning**
+config = Configuration()
+config.individual_task_timeout = 30_000  # milliseconds per reasoning task
 
-```python
-# Instead of precomputing everything:
-reasoner = Reasoner(onto)
-# Don't call precompute_inferences()
-
-# Query as needed (slower per query, but faster startup)
-is_subclass = reasoner.is_subclass_of(Class1, Class2)
-```
-
-**Strategy 3: Filter by relevant subset**
-
-```python
-# Create a smaller ontology with only relevant classes
-relevant_classes = [ClassA, ClassB, ClassC]
-mini_onto = DLOntology()
-
-for axiom in onto.logical_axioms:
-    # Only keep axioms involving relevant classes
-    if involves_relevant_class(axiom, relevant_classes):
-        mini_onto.add_axiom(axiom)
-
-reasoner = Reasoner(mini_onto)
-reasoner.precompute_inferences()
+normalized = OWLNormalization().process_ontology(axioms)
+dl_onto = OWLClausification().clausify(normalized)
+reasoner = Reasoner(dl_onto, config)
+print(reasoner.is_consistent())
+reasoner.dispose()
 ```
 
 ---
@@ -276,158 +267,131 @@ reasoner.precompute_inferences()
 
 ### Symptom: Something that should be inferred isn't, or vice versa
 
-```python
-# Expected: reasoner.is_subclass_of(Dog, Animal) == True
-# Actual: False
-
-is_subclass = reasoner.is_subclass_of(Dog, Animal)
-assert is_subclass, "Dog should be a subclass of Animal"
-```
-
-### Diagnosis
-
 **Step 1: Check the axiom exists**
 
 ```python
-# Make sure you actually added the rule
+Dog = OWLClass(NS + "Dog")
+Animal = OWLClass(NS + "Animal")
 
-# WRONG: Forgot to add axiom
-onto = DLOntology()
-Dog = OWLClass("http://example.org/Dog")
-Animal = OWLClass("http://example.org/Animal")
-# Missing: onto.add_axiom(SubClassOf(Dog, Animal))
+# WRONG: forgot to add the axiom
+axioms = []
 
-# RIGHT: Added the axiom
-onto.add_axiom(SubClassOf(Dog, Animal))
+# Verify what you actually collected:
+expected = OWLSubClassOfAxiom(Dog, Animal)
+print("Axiom present?", expected in axioms)  # False — there's the bug
 
-# Verify in ontology
-axiom = SubClassOf(Dog, Animal)
-if axiom not in onto.logical_axioms:
-    print("ERROR: Axiom not in ontology")
+axioms.append(expected)
+print("Axiom present now?", expected in axioms)  # True
 ```
+
+(Axiom objects compare by value, so `in` works.)
 
 **Step 2: Check for typos in IRIs**
 
 ```python
-# Typo in class name:
-onto.add_axiom(SubClassOf(Dog, Animal))
+axioms = [OWLSubClassOfAxiom(Dog, Animal)]
+reasoner = reasoner_from_axioms(axioms)
 
-# But then query with wrong spelling:
-Dog_wrong = OWLClass("http://example.org/Doog")  # Typo!
-is_subclass = reasoner.is_subclass_of(Dog_wrong, Animal)  # False!
+# Typo in the query handle: different IRI = different class!
+dog_wrong = AtomicConcept.create(NS + "Doog")
+dog_right = AtomicConcept.create(NS + "Dog")
+animal_h = AtomicConcept.create(NS + "Animal")
 
-# These are different classes because IRIs don't match
-
-# Fix: Use consistent IRIs or reuse class objects
-Dog = OWLClass("http://example.org/Dog")
-onto.add_axiom(SubClassOf(Dog, Animal))
-is_subclass = reasoner.is_subclass_of(Dog, Animal)  # True
+print(reasoner.is_sub_class_of(dog_wrong, animal_h))  # False (typo)
+print(reasoner.is_sub_class_of(dog_right, animal_h))  # True
+reasoner.dispose()
 ```
 
-**Step 3: Check inference path**
+**Step 3: Check the inference path**
 
 ```python
-# Trace the inference chain manually
+Mammal = OWLClass(NS + "Mammal")
+Poodle = OWLClass(NS + "Poodle")
 
-# You have:
-onto.add_axiom(SubClassOf(Poodle, Dog))
-onto.add_axiom(SubClassOf(Dog, Mammal))
-onto.add_axiom(SubClassOf(Mammal, Animal))
+axioms = [
+    OWLSubClassOfAxiom(Poodle, Dog),
+    OWLSubClassOfAxiom(Dog, Mammal),
+    OWLSubClassOfAxiom(Mammal, Animal),
+]
+reasoner = reasoner_from_axioms(axioms)
 
-# Expected chain: Poodle ⊆ Dog ⊆ Mammal ⊆ Animal
+poodle = AtomicConcept.create(NS + "Poodle")
+mammal = AtomicConcept.create(NS + "Mammal")
 
-# Debug each step:
-print(f"Poodle ⊆ Dog? {reasoner.is_subclass_of(Poodle, Dog)}")
-print(f"Dog ⊆ Mammal? {reasoner.is_subclass_of(Dog, Mammal)}")
-print(f"Mammal ⊆ Animal? {reasoner.is_subclass_of(Mammal, Animal)}")
-print(f"Poodle ⊆ Animal? {reasoner.is_subclass_of(Poodle, Animal)}")
+# Debug each link in the chain:
+print(f"Poodle ⊑ Dog? {reasoner.is_sub_class_of(poodle, dog_right)}")
+print(f"Dog ⊑ Mammal? {reasoner.is_sub_class_of(dog_right, mammal)}")
+print(f"Mammal ⊑ Animal? {reasoner.is_sub_class_of(mammal, animal_h)}")
+print(f"Poodle ⊑ Animal? {reasoner.is_sub_class_of(poodle, animal_h)}")
+reasoner.dispose()
 
-# If chain is broken, find the broken link
+# If the chain is broken, the first False shows the missing axiom
 ```
 
 **Step 4: Check for contradicting rules**
 
 ```python
-# You might have conflicting rules:
+contradictory = [
+    OWLSubClassOfAxiom(Dog, Animal),          # Dog ⊑ Animal
+    OWLDisjointClassesAxiom([Dog, Animal]),   # Dog ⊓ Animal = ∅
+]
 
-onto.add_axiom(SubClassOf(Dog, Animal))  # Dog ⊆ Animal
-
-# But also:
-onto.add_axiom(DisjointClasses(Dog, Animal))  # Dog ⊓ Animal = ∅
-
-# These contradict each other!
-# The second rule negates the first
-
-# Fix: Keep only one or none of them
+reasoner = reasoner_from_axioms(contradictory)
+# Together these make Dog unsatisfiable:
+print("Dog satisfiable?", reasoner.is_satisfiable(dog_right))  # False
+reasoner.dispose()
 ```
 
 ### Solution Checklist
 
-- [ ] Axiom is actually in ontology
-- [ ] IRI spelling is consistent
+- [ ] Axiom is actually in the axiom list
+- [ ] IRI spelling is consistent between building and querying
 - [ ] No contradicting rules
 - [ ] Inference chain is complete
-- [ ] Reasoner was reinitialized after changes
+- [ ] A fresh reasoner was compiled after changes
 
 ---
 
 ## Debugging Tools
 
-### Tool 1: Print Ontology Structure
+### Tool 1: Print the Inferred Hierarchy
 
 ```python
-def print_hierarchy(reasoner, cls, depth=0):
-    """Print class hierarchy."""
-    indent = "  " * depth
-    print(f"{indent}{cls}")
-    
-    subclasses = reasoner.get_subclasses(cls)
-    for sub in subclasses:
-        print_hierarchy(reasoner, sub, depth + 1)
+import sys
 
-# Use it
-root = OWLClass("http://www.w3.org/2002/07/owl#Thing")
-print_hierarchy(reasoner, root)
+reasoner = reasoner_from_axioms(axioms)
+reasoner.precompute_inferences()
+reasoner.dump_hierarchies(sys.stdout, classes=True)
+reasoner.dispose()
 ```
 
-### Tool 2: Verify Axiom Presence
+### Tool 2: Inspect the Compiled Ontology
 
 ```python
-def check_axiom(onto, expected_axiom):
-    """Check if axiom is in ontology."""
-    for axiom in onto.logical_axioms:
-        if axiom == expected_axiom:
-            return True
+reasoner = reasoner_from_axioms(axioms)
+print(reasoner.stats)
+for clause in sorted(str(c) for c in reasoner.dl_ontology.dl_clauses):
+    print(clause)
+reasoner.dispose()
+```
+
+### Tool 3: Trace Subsumption
+
+```python
+def trace_subclass_path(reasoner, sub_iri, sup_iri):
+    """Report whether sub ⊑ sup holds."""
+    sub = AtomicConcept.create(sub_iri)
+    sup = AtomicConcept.create(sup_iri)
+    if reasoner.is_sub_class_of(sub, sup):
+        print(f"✓ {sub_iri} ⊑ {sup_iri} (verified)")
+        return True
+    print(f"✗ {sub_iri} ⊄ {sup_iri} (not inferred)")
     return False
 
-# Use it
-is_present = check_axiom(onto, SubClassOf(Dog, Animal))
-if not is_present:
-    print("ERROR: Dog ⊆ Animal axiom not found")
-```
 
-### Tool 3: Trace Inferences
-
-```python
-def trace_subclass_path(reasoner, sub, sup):
-    """Try to trace why sub is subclass of sup."""
-    if reasoner.is_subclass_of(sub, sup):
-        print(f"✓ {sub} ⊆ {sup} (verified)")
-        return True
-    else:
-        print(f"✗ {sub} ⊄ {sup} (not inferred)")
-        
-        # Check intermediate steps
-        subs = reasoner.get_superclasses(sub)
-        sups = reasoner.get_subclasses(sup)
-        
-        print(f"  Superclasses of {sub}: {subs}")
-        print(f"  Subclasses of {sup}: {sups}")
-        
-        return False
-
-# Use it
-trace_subclass_path(reasoner, Dog, Animal)
+reasoner = reasoner_from_axioms(axioms)
+trace_subclass_path(reasoner, NS + "Poodle", NS + "Animal")
+reasoner.dispose()
 ```
 
 ---
@@ -436,12 +400,12 @@ trace_subclass_path(reasoner, Dog, Animal)
 
 | Mistake | Symptom | Fix |
 |---------|---------|-----|
-| Forgot axiom | Query returns False | Add axiom with `onto.add_axiom()` |
-| Typo in IRI | Different classes treated | Use same class object everywhere |
+| Forgot axiom | Query returns False | Append the axiom and recompile |
+| Typo in IRI | Different classes treated | Use shared `NS` constants |
 | Circular negation | Unsatisfiable class | Remove contradicting rules |
-| Mixed IRI formats | Different classes | Standardize IRI format (http:// vs http://) |
-| Didn't call `precompute_inferences()` | Slow queries | Call once before querying |
-| Assertions on class instead of individual | No instances | Use `OWLNamedIndividual` not `OWLClass` |
+| Mixed IRI formats | Different classes | Standardize IRI prefixes |
+| Querying a disposed reasoner | `RuntimeError` | Compile a fresh reasoner |
+| Subclass instead of equivalence | Defined class never recognizes members | Use `OWLEquivalentClassesAxiom` |
 
 ---
 

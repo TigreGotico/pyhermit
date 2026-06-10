@@ -26,29 +26,44 @@ pip install hermit-reasoner
 
 ```python
 from hermit import Reasoner
-from hermit.model import (
-    DLOntology, OWLClass, OWLNamedIndividual, OWLObjectProperty,
-    SubClassOf, ClassAssertion, ObjectPropertyAssertion,
+from hermit.model import AtomicConcept, AtomicRole, Individual
+from hermit.owl_model.class_expression import OWLClass
+from hermit.owl_model.owl_individual import OWLNamedIndividual
+from hermit.owl_model.owl_property import OWLObjectProperty
+from hermit.owl_model.owl_axiom import (
+    OWLClassAssertionAxiom, OWLObjectPropertyAssertionAxiom, OWLSubClassOfAxiom,
 )
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
 
-Animal = OWLClass("http://example.org/Animal")
-Dog = OWLClass("http://example.org/Dog")
-hasOwner = OWLObjectProperty("http://example.org/hasOwner")
-fido = OWLNamedIndividual("http://example.org/fido")
-john = OWLNamedIndividual("http://example.org/john")
+NS = "http://example.org/"
+Animal = OWLClass(NS + "Animal")
+Dog = OWLClass(NS + "Dog")
+hasOwner = OWLObjectProperty(NS + "hasOwner")
+fido = OWLNamedIndividual(NS + "fido")
+john = OWLNamedIndividual(NS + "john")
 
-ontology = DLOntology()
-ontology.add_axiom(SubClassOf(Dog, Animal))
-ontology.add_axiom(ClassAssertion(Dog, fido))
-ontology.add_axiom(ObjectPropertyAssertion(hasOwner, fido, john))
+axioms = [
+    OWLSubClassOfAxiom(Dog, Animal),
+    OWLClassAssertionAxiom(fido, Dog),
+    OWLObjectPropertyAssertionAxiom(fido, hasOwner, john),
+]
 
-reasoner = Reasoner(ontology)
+normalized = OWLNormalization().process_ontology(axioms)
+dl_ontology = OWLClausification().clausify(normalized, ontology_iri="urn:example:pets")
+
+reasoner = Reasoner(dl_ontology)
 reasoner.precompute_inferences()
 
+animal = AtomicConcept.create(NS + "Animal")          # query handles
+fido_h = Individual.create(NS + "fido")
+
 assert reasoner.is_consistent()
-assert reasoner.has_type(fido, Animal)   # inferred
-hierarchy = reasoner.get_class_hierarchy()
-instances = reasoner.get_instances(Animal)
+assert reasoner.has_type(fido_h, animal)              # inferred
+assert reasoner.has_role_relationship(
+    fido_h, AtomicRole.create(NS + "hasOwner"), Individual.create(NS + "john")
+)
+instances = reasoner.get_instances(animal)            # {fido}
 reasoner.dispose()
 ```
 
@@ -62,11 +77,8 @@ from hermit import Reasoner
 
 axioms = load_ontology("path/to/ontology.owl")  # stdlib reader: RDF/XML, OWL/XML, FSS
 
-normalization = OWLNormalization()
-normalized = normalization.normalize(axioms)
-
-clausification = OWLClausification()
-dl_ontology = clausification.clausify(normalized)  # raises ValueError on OWL 2 violations
+normalized = OWLNormalization().process_ontology(axioms)
+dl_ontology = OWLClausification().clausify(normalized)  # raises ValueError on OWL 2 violations
 
 reasoner = Reasoner(dl_ontology)
 reasoner.precompute_inferences()
@@ -101,7 +113,7 @@ from hermit.structural.owl_clausification import OWLClausification
 
 clausification = OWLClausification()
 try:
-    dl_ontology = clausification.clausify(normalized_axioms)
+    dl_ontology = clausification.clausify(normalized)
 except ValueError as e:
     # e.g. "Non-simple property '...' cannot be asymmetric (OWL 2 violation)"
     print(e)
@@ -114,7 +126,7 @@ Constraints checked (per OWL 2 spec Section 11.2):
 - Cardinality restrictions (`ObjectMinCardinality`, `ObjectMaxCardinality`, `ObjectExactCardinality`)
 - `ObjectHasSelf`
 
-Source: `ObjectPropertyInclusionManager._validate_complex_property_constraints` — `src/hermit/structural/object_property_inclusion_manager.py:216`
+Source: `ObjectPropertyInclusionManager._validate_complex_property_constraints` — `src/hermit/structural/object_property_inclusion_manager.py:360`
 
 ## Project Status
 

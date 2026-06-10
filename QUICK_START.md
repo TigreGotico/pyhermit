@@ -5,41 +5,61 @@ Get started with PyHermit in 5 minutes.
 ## Installation
 
 ```bash
-pip install pyhermit
+pip install hermit-reasoner
 ```
+
+The package installs as the `hermit` module — pure Python, no JVM.
 
 ## Your First Program (5 minutes)
 
+PyHermit has two layers: **build** an ontology with `hermit.owl_model` axiom
+objects (OWL-API-style), **query** with lightweight `hermit.model` handles.
+A small helper compiles axioms into a `Reasoner`:
+
 ```python
 from hermit import Reasoner
-from hermit.model import (
-    DLOntology, OWLClass, OWLNamedIndividual,
-    SubClassOf, ClassAssertion
-)
+from hermit.model import AtomicConcept, Individual
+from hermit.owl_model.class_expression import OWLClass
+from hermit.owl_model.owl_individual import OWLNamedIndividual
+from hermit.owl_model.owl_axiom import OWLClassAssertionAxiom, OWLSubClassOfAxiom
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
 
-# Step 1: Create an ontology
-onto = DLOntology()
 
-# Step 2: Define classes
-Dog = OWLClass("http://example.org/Dog")
-Animal = OWLClass("http://example.org/Animal")
+def reasoner_from_axioms(axioms, ontology_iri="urn:example:onto"):
+    """Compile OWL axioms into a Reasoner (normalize -> clausify)."""
+    normalized = OWLNormalization().process_ontology(axioms)
+    return Reasoner(OWLClausification().clausify(normalized, ontology_iri=ontology_iri))
 
-# Step 3: Add rules
-onto.add_axiom(SubClassOf(Dog, Animal))  # Dogs are Animals
 
-# Step 4: Add data
-fido = OWLNamedIndividual("http://example.org/fido")
-onto.add_axiom(ClassAssertion(Dog, fido))  # Fido is a Dog
+NS = "http://example.org/"
 
-# Step 5: Create reasoner and reason
-reasoner = Reasoner(onto)
+# Step 1: Define classes
+Dog = OWLClass(NS + "Dog")
+Animal = OWLClass(NS + "Animal")
+
+# Step 2: Define an individual
+fido = OWLNamedIndividual(NS + "fido")
+
+# Step 3: Collect rules and data as axioms
+axioms = [
+    OWLSubClassOfAxiom(Dog, Animal),       # Dogs are Animals
+    OWLClassAssertionAxiom(fido, Dog),     # Fido is a Dog
+]
+
+# Step 4: Compile and reason
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-# Step 6: Query
-print("Is Fido an Animal?", reasoner.has_type(fido, Animal))  # True (inferred!)
-print("Is Fido a Dog?", reasoner.has_type(fido, Dog))  # True (asserted)
+# Step 5: Query with hermit.model handles
+dog = AtomicConcept.create(NS + "Dog")
+animal = AtomicConcept.create(NS + "Animal")
+fido_h = Individual.create(NS + "fido")
 
-# Step 7: Clean up
+print("Is Fido an Animal?", reasoner.has_type(fido_h, animal))  # True (inferred!)
+print("Is Fido a Dog?", reasoner.has_type(fido_h, dog))         # True (asserted)
+
+# Step 6: Clean up
 reasoner.dispose()
 ```
 
@@ -54,38 +74,43 @@ Is Fido a Dog? True
 ### Task 1: Check Subclass Relationships
 
 ```python
-is_subclass = reasoner.is_subclass_of(Dog, Animal)
-print(f"Dog ⊆ Animal? {is_subclass}")
+reasoner = reasoner_from_axioms(axioms)
+is_subclass = reasoner.is_sub_class_of(dog, animal)
+print(f"Dog ⊑ Animal? {is_subclass}")  # True
 ```
 
 ### Task 2: Get All Instances of a Class
 
 ```python
-animals = reasoner.get_instances(Animal)
-print(f"All animals: {animals}")
+animals = reasoner.get_instances(animal)
+print(f"All animals: {sorted(i.iri for i in animals)}")
 ```
 
 ### Task 3: Add Relationships Between Individuals
 
 ```python
-from hermit.model import OWLObjectProperty, ObjectPropertyAssertion
+from hermit.model import AtomicRole
+from hermit.owl_model.owl_property import OWLObjectProperty
+from hermit.owl_model.owl_axiom import OWLObjectPropertyAssertionAxiom
 
-hasOwner = OWLObjectProperty("http://example.org/hasOwner")
-john = OWLNamedIndividual("http://example.org/john")
+reasoner.dispose()
 
-onto.add_axiom(ObjectPropertyAssertion(hasOwner, fido, john))
-reasoner = Reasoner(onto)
+hasOwner = OWLObjectProperty(NS + "hasOwner")
+john = OWLNamedIndividual(NS + "john")
+
+axioms.append(OWLObjectPropertyAssertionAxiom(fido, hasOwner, john))
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-owners = reasoner.get_object_property_values(hasOwner, fido)
-print(f"Fido's owner: {owners}")
+has_owner = AtomicRole.create(NS + "hasOwner")
+john_h = Individual.create(NS + "john")
+print("Is John Fido's owner?", reasoner.has_role_relationship(fido_h, has_owner, john_h))  # True
 ```
 
 ### Task 4: Check Consistency
 
 ```python
-is_consistent = reasoner.is_consistent()
-if is_consistent:
+if reasoner.is_consistent():
     print("Ontology is consistent")
 else:
     print("Ontology has contradictions!")
@@ -94,13 +119,19 @@ else:
 ### Task 5: Add Constraints (At Least One)
 
 ```python
-from hermit.model import AtLeast
+from hermit.owl_model.class_expression import OWLObjectMinCardinality
+
+Parent = OWLClass(NS + "Parent")
+Person = OWLClass(NS + "Person")
+hasChild = OWLObjectProperty(NS + "hasChild")
 
 # Parents must have at least one child
-onto.add_axiom(SubClassOf(
+axioms.append(OWLSubClassOfAxiom(
     Parent,
-    AtLeast(1, hasChild, Person)
+    OWLObjectMinCardinality(1, hasChild, Person),
 ))
+
+reasoner.dispose()
 ```
 
 ## Learning Paths
@@ -124,7 +155,7 @@ onto.add_axiom(SubClassOf(
 4. Create: Ontology with 100+ instances and constraints
 5. Reference: [FAQ](./docs/faq.md), [Debugging](./docs/recipes/debugging.md)
 
-### Path 4: Production System (2-4 hours)
+### Path 4: Going Deeper (2-4 hours)
 1. All previous steps
 2. Read: [Rules & Queries](./docs/tutorials/03-rules-and-queries.md)
 3. Read: [Advanced Reasoning](./docs/tutorials/04-advanced-reasoning.md)
@@ -133,45 +164,41 @@ onto.add_axiom(SubClassOf(
 
 ## Common Errors
 
-### Error: `AttributeError: 'OWLClass' object has no attribute 'iri'`
+### Error: `ImportError: cannot import name 'OWLClass' from 'hermit.model'`
 
-You're using an old API. Use:
+Entity classes live in `hermit.owl_model`, not `hermit.model`:
+
 ```python
-# Current API
-my_class = OWLClass("http://example.org/MyClass")
-print(my_class)  # Prints IRI
+from hermit.owl_model.class_expression import OWLClass  # building
+from hermit.model import AtomicConcept                  # querying
 ```
 
-### Error: `UnsupportedDatatypeException`
+### Error: `RuntimeError: Tableau has been disposed.`
 
-You used an unsupported datatype. Use only:
-```python
-from hermit.model import Literal
-
-# Supported types
-Literal("text", "string")
-Literal(42, "integer")
-Literal(3.14, "double")
-Literal(True, "boolean")
-Literal("2020-01-15", "date")
-```
+You queried a reasoner after calling `dispose()`. Create a fresh reasoner
+with `reasoner_from_axioms(axioms)`.
 
 ### Error: Query returns empty set when expecting results
 
 Check:
 ```python
+reasoner = reasoner_from_axioms(axioms)
+
 # 1. Is the class satisfiable?
-if not reasoner.is_satisfiable(MyClass):
+parent = AtomicConcept.create(NS + "Parent")
+if not reasoner.is_satisfiable(parent):
     print("Class is unsatisfiable!")
 
-# 2. Do instances exist in ontology?
+# 2. Do instances exist in the ontology?
 reasoner.precompute_inferences()  # Make sure this was called
-instances = reasoner.get_instances(MyClass)
+instances = reasoner.get_instances(animal)
 print(f"Found {len(instances)} instances")
 
-# 3. Check assertions
-direct_instances = reasoner.get_direct_instances(MyClass)
+# 3. Direct vs inferred instances
+direct_instances = reasoner.get_instances(animal, direct=True)
 print(f"Direct: {len(direct_instances)}, All: {len(instances)}")
+
+reasoner.dispose()
 ```
 
 See [Debugging Guide](./docs/recipes/debugging.md) for more.
@@ -184,8 +211,8 @@ See [Debugging Guide](./docs/recipes/debugging.md) for more.
 | Build ontology | [Tutorial 1](./docs/tutorials/01-build-ontology.md) |
 | Add constraints | [Tutorial 2](./docs/tutorials/02-restrictions.md) |
 | Add data | [Tutorial 3](./docs/tutorials/03-instances.md) |
-| Write rules | [Tutorial 4](./docs/tutorials/03-rules-and-queries.md) |
-| Optimize | [Tutorial 5](./docs/tutorials/04-advanced-reasoning.md) |
+| Write rules | [Rules & Queries](./docs/tutorials/03-rules-and-queries.md) |
+| Optimize | [Advanced Reasoning](./docs/tutorials/04-advanced-reasoning.md) |
 | Find patterns | [Patterns](./docs/recipes/patterns.md) |
 | Debug issues | [Debugging](./docs/recipes/debugging.md) |
 | Look up API | [Core API](./docs/api/core.md) |
@@ -197,7 +224,7 @@ See [Debugging Guide](./docs/recipes/debugging.md) for more.
 
 ## Getting Help
 
-1. **Check [FAQ](./docs/faq.md)** — Answers to 30+ common questions
+1. **Check [FAQ](./docs/faq.md)** — Answers to common questions
 2. **Read [Debugging Guide](./docs/recipes/debugging.md)** — How to find issues
 3. **Browse [Patterns](./docs/recipes/patterns.md)** — Common design solutions
 4. **Review [API Reference](./docs/api/core.md)** — Complete API docs

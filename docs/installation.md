@@ -22,17 +22,20 @@ To confirm everything works:
 
 ```python
 from hermit import Reasoner
-from hermit.model import DLOntology, OWLClass, SubClassOf
+from hermit.owl_model.class_expression import OWLClass
+from hermit.owl_model.owl_axiom import OWLSubClassOfAxiom
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
 
-# Create a simple ontology
+# Create a simple ontology: every Dog is an Animal
 Animal = OWLClass("http://example.org/Animal")
 Dog = OWLClass("http://example.org/Dog")
+axioms = [OWLSubClassOfAxiom(Dog, Animal)]
 
-ontology = DLOntology()
-ontology.add_axiom(SubClassOf(Dog, Animal))
-
-# Create a reasoner
-reasoner = Reasoner(ontology)
+# Compile the axioms and create a reasoner
+normalized = OWLNormalization().process_ontology(axioms)
+dl_ontology = OWLClausification().clausify(normalized)
+reasoner = Reasoner(dl_ontology)
 reasoner.precompute_inferences()
 
 # Check it works

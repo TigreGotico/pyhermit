@@ -54,16 +54,16 @@ DLOntology / Reasoner     src/hermit/reasoner.py
 
 | Class | Purpose | Source |
 |---|---|---|
-| `OWLNormalization` | Transforms OWL axioms to NNF; classifies simple/complex properties | `src/hermit/structural/owl_normalization.py:94` |
-| `OWLClausification` | Converts normalized axioms to DL clauses; enforces non-simplicity | `src/hermit/structural/owl_clausification.py:82` |
-| `ObjectPropertyInclusionManager` | Detects non-simple properties; validates OWL 2 constraints | `src/hermit/structural/object_property_inclusion_manager.py:21` |
+| `OWLNormalization` | Transforms OWL axioms to NNF; classifies simple/complex properties | `src/hermit/structural/owl_normalization.py:111` |
+| `OWLClausification` | Converts normalized axioms to DL clauses; enforces non-simplicity | `src/hermit/structural/owl_clausification.py:89` |
+| `ObjectPropertyInclusionManager` | Detects non-simple properties; validates OWL 2 constraints | `src/hermit/structural/object_property_inclusion_manager.py:35` |
 | `NormalizedAxioms` | Dataclass holding all normalized axiom collections | `src/hermit/structural/normalized_axioms.py` |
-| `load_ontology` | Loads OWL files (RDF/XML, OWL/XML, FSS) via the stdlib readers into `OWLAxiom` objects | `src/hermit/parser.py:25` |
+| `load_ontology` | Loads OWL files (RDF/XML, OWL/XML, FSS) via the stdlib readers into `OWLAxiom` objects | `src/hermit/parser.py:24` |
 | `Reasoner` | Main entry point for queries: consistency, classification, retrieval | `src/hermit/reasoner.py` |
 
 ### Non-Simple Property Validation
 
-`ObjectPropertyInclusionManager.rewrite_axioms()` is called inside `OWLClausification.clausify()` at `src/hermit/structural/owl_clausification.py:132`. It raises `ValueError` if a non-simple property (transitive, in a role chain, or a superrole thereof) appears in:
+`ObjectPropertyInclusionManager.rewrite_axioms()` is called inside `OWLClausification.clausify()` at `src/hermit/structural/owl_clausification.py:139`. It raises `ValueError` if a non-simple property (transitive, in a role chain, or a superrole thereof) appears in:
 
 - `AsymmetricObjectProperty`
 - `IrreflexiveObjectProperty`
@@ -71,7 +71,7 @@ DLOntology / Reasoner     src/hermit/reasoner.py
 - `ObjectMinCardinality`, `ObjectMaxCardinality`, `ObjectExactCardinality`
 - `ObjectHasSelf`
 
-Detection uses a fixpoint propagation through `simple_object_property_inclusions` and always marks inverses of complex properties as complex. Source: `ObjectPropertyInclusionManager._detect_complex_properties` — `src/hermit/structural/object_property_inclusion_manager.py:167`.
+Detection uses a fixpoint propagation through `simple_object_property_inclusions` and always marks inverses of complex properties as complex. Source: `ObjectPropertyInclusionManager._detect_complex_properties` — `src/hermit/structural/object_property_inclusion_manager.py:311`.
 
 ## API Reference
 

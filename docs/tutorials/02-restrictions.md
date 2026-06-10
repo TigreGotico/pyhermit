@@ -4,299 +4,284 @@ Learn how to constrain properties with cardinality and value restrictions.
 
 ## What You'll Learn
 
-- Universal restrictions (∀ - ForAll)
-- Existential restrictions (∃ - AtLeast)
-- Cardinality constraints
-- Value restrictions
+- Existential restrictions (∃ — `OWLObjectSomeValuesFrom`)
+- Universal restrictions (∀ — `OWLObjectAllValuesFrom`)
+- Cardinality constraints (`OWLObjectMinCardinality`, `OWLObjectMaxCardinality`)
 - How restrictions interact with reasoning
 
-## Part 1: Existential Restrictions (AtLeast)
-
-Existential restrictions assert that at least one instance exists with a property:
+As in every tutorial, we use the `reasoner_from_axioms` helper from
+[First Program](../first-program.md):
 
 ```python
 from hermit import Reasoner
-from hermit.model import (
-    DLOntology, OWLClass, OWLObjectProperty,
-    SubClassOf, AtLeast, ClassAssertion,
-    OWLNamedIndividual
+from hermit.model import AtomicConcept, Individual
+from hermit.owl_model.class_expression import (
+    OWLClass,
+    OWLObjectAllValuesFrom,
+    OWLObjectIntersectionOf,
+    OWLObjectMaxCardinality,
+    OWLObjectMinCardinality,
+    OWLObjectSomeValuesFrom,
+    OWLThing,
 )
+from hermit.owl_model.owl_individual import OWLNamedIndividual
+from hermit.owl_model.owl_property import OWLObjectProperty
+from hermit.owl_model.owl_axiom import (
+    OWLClassAssertionAxiom,
+    OWLDifferentIndividualsAxiom,
+    OWLEquivalentClassesAxiom,
+    OWLObjectPropertyAssertionAxiom,
+    OWLSubClassOfAxiom,
+)
+from hermit.structural.owl_clausification import OWLClausification
+from hermit.structural.owl_normalization import OWLNormalization
 
-onto = DLOntology()
 
-# Define classes
-Parent = OWLClass("http://example.org/Parent")
-HasChild = OWLClass("http://example.org/HasChild")
-Person = OWLClass("http://example.org/Person")
+def reasoner_from_axioms(axioms, ontology_iri="urn:example:onto"):
+    normalized = OWLNormalization().process_ontology(axioms)
+    return Reasoner(OWLClausification().clausify(normalized, ontology_iri=ontology_iri))
 
-# Define property
-hasChild = OWLObjectProperty("http://example.org/hasChild")
 
-# Add axiom: HasChild must have at least one child
-# HasChild ⊆ ∃hasChild.Person
-onto.add_axiom(SubClassOf(
-    HasChild,
-    AtLeast(1, hasChild, Person)
-))
+NS = "http://example.org/"
+```
 
-reasoner = Reasoner(onto)
+## Part 1: Existential Restrictions (SomeValuesFrom)
 
-# Create a person with no children
-person_no_children = OWLNamedIndividual("http://example.org/john")
-onto.add_axiom(ClassAssertion(Person, person_no_children))
+An existential restriction `∃hasChild.Person` describes "things with at least
+one child that is a Person". Defining a class as **equivalent** to a
+restriction lets the reasoner *recognize* individuals:
 
-# Create a parent with a child
-parent = OWLNamedIndividual("http://example.org/alice")
-child = OWLNamedIndividual("http://example.org/bob")
-onto.add_axiom(ClassAssertion(Person, parent))
-onto.add_axiom(ClassAssertion(Person, child))
+```python
+Person = OWLClass(NS + "Person")
+Parent = OWLClass(NS + "Parent")
+hasChild = OWLObjectProperty(NS + "hasChild")
 
-# Add child relationship
-from hermit.model import ObjectPropertyAssertion
-onto.add_axiom(ObjectPropertyAssertion(hasChild, parent, child))
+# Parent ≡ ∃hasChild.Person  — anything with a Person child IS a Parent
+axioms = [
+    OWLEquivalentClassesAxiom([Parent, OWLObjectSomeValuesFrom(hasChild, Person)]),
+]
 
-# Now alice can be a HasChild because she has a child
-onto.add_axiom(ClassAssertion(HasChild, parent))
+# alice has a child; john does not
+alice = OWLNamedIndividual(NS + "alice")
+bob = OWLNamedIndividual(NS + "bob")
+john = OWLNamedIndividual(NS + "john")
 
-reasoner2 = Reasoner(onto)
-reasoner2.precompute_inferences()
+axioms += [
+    OWLClassAssertionAxiom(alice, Person),
+    OWLClassAssertionAxiom(bob, Person),
+    OWLClassAssertionAxiom(john, Person),
+    OWLObjectPropertyAssertionAxiom(alice, hasChild, bob),
+]
 
-print("Is alice a HasChild?", reasoner2.has_type(parent, HasChild))  # True
-print("Is john a HasChild?", reasoner2.has_type(person_no_children, HasChild))  # False
+reasoner = reasoner_from_axioms(axioms)
+reasoner.precompute_inferences()
+
+parent = AtomicConcept.create(NS + "Parent")
+alice_h = Individual.create(NS + "alice")
+john_h = Individual.create(NS + "john")
+
+print("Is alice a Parent?", reasoner.has_type(alice_h, parent))  # True (inferred!)
+print("Is john a Parent?", reasoner.has_type(john_h, parent))    # False (unknown)
 
 reasoner.dispose()
-reasoner2.dispose()
 ```
 
 **Output:**
 ```
-Is alice a HasChild? True
-Is john a HasChild? False
+Is alice a Parent? True
+Is john a Parent? False
 ```
 
-## Part 2: Universal Restrictions (ForAll)
+Note the asymmetry: alice is *inferred* to be a Parent, while john is simply
+*not known* to be one — OWL reasoning is open-world.
 
-Universal restrictions constrain all values of a property:
+## Part 2: Universal Restrictions (AllValuesFrom)
+
+Universal restrictions constrain **all** values of a property. They propagate
+types onto property fillers:
 
 ```python
-from hermit.model import ForAll, Complement
+GoodTeacher = OWLClass(NS + "GoodTeacher")
+Competent = OWLClass(NS + "Competent")
+teaches = OWLObjectProperty(NS + "teaches")
 
-onto = DLOntology()
+# GoodTeacher ⊑ ∀teaches.Competent — everyone a GoodTeacher teaches is Competent
+axioms = [
+    OWLSubClassOfAxiom(GoodTeacher, OWLObjectAllValuesFrom(teaches, Competent)),
+]
 
-# Define classes
-GoodTeacher = OWLClass("http://example.org/GoodTeacher")
-Student = OWLClass("http://example.org/Student")
-Competent = OWLClass("http://example.org/Competent")
+prof = OWLNamedIndividual(NS + "prof_smith")
+student1 = OWLNamedIndividual(NS + "student1")
 
-# Define property
-teaches = OWLObjectProperty("http://example.org/teaches")
+axioms += [
+    OWLClassAssertionAxiom(prof, GoodTeacher),
+    OWLObjectPropertyAssertionAxiom(prof, teaches, student1),
+]
 
-# GoodTeacher: All taught students must be competent
-# GoodTeacher ⊆ ∀teaches.Competent
-onto.add_axiom(SubClassOf(
-    GoodTeacher,
-    ForAll(teaches, Competent)
-))
+reasoner = reasoner_from_axioms(axioms)
+reasoner.precompute_inferences()
 
-reasoner = Reasoner(onto)
+competent = AtomicConcept.create(NS + "Competent")
+student1_h = Individual.create(NS + "student1")
 
-# Create individuals
-teacher = OWLNamedIndividual("http://example.org/prof_smith")
-student1 = OWLNamedIndividual("http://example.org/student1")
-student2 = OWLNamedIndividual("http://example.org/student2")
-
-onto.add_axiom(ClassAssertion(Person, teacher))
-onto.add_axiom(ClassAssertion(Student, student1))
-onto.add_axiom(ClassAssertion(Student, student2))
-onto.add_axiom(ClassAssertion(Competent, student1))
-onto.add_axiom(ClassAssertion(Competent, student2))
-
-# Teach students
-onto.add_axiom(ObjectPropertyAssertion(teaches, teacher, student1))
-onto.add_axiom(ObjectPropertyAssertion(teaches, teacher, student2))
-
-# Now teacher can be a GoodTeacher
-onto.add_axiom(ClassAssertion(GoodTeacher, teacher))
-
-reasoner2 = Reasoner(onto)
-reasoner2.precompute_inferences()
-
-print("Is prof_smith a GoodTeacher?", reasoner2.has_type(teacher, GoodTeacher))  # True
+# The reasoner propagates the restriction onto student1:
+print("Is student1 Competent?", reasoner.has_type(student1_h, competent))  # True (inferred!)
 
 reasoner.dispose()
-reasoner2.dispose()
 ```
 
 **Output:**
 ```
-Is prof_smith a GoodTeacher? True
+Is student1 Competent? True
 ```
 
-## Part 3: Exact Cardinality
+## Part 3: Cardinality Restrictions
 
-Exact cardinality constraints:
+Min- and max-cardinality limit how many distinct fillers a property may have:
 
 ```python
-onto = DLOntology()
+Pet = OWLClass(NS + "Pet")
+PetOwner = OWLClass(NS + "PetOwner")
+hasPet = OWLObjectProperty(NS + "hasPet")
 
-# Define classes
-President = OWLClass("http://example.org/President")
-Country = OWLClass("http://example.org/Country")
+# PetOwner ⊑ ≥1 hasPet.Pet  (at least one pet)
+axioms = [
+    OWLSubClassOfAxiom(PetOwner, OWLObjectMinCardinality(1, hasPet, Pet)),
+]
 
-# Define property
-governs = OWLObjectProperty("http://example.org/governs")
+reasoner = reasoner_from_axioms(axioms)
+pet_owner = AtomicConcept.create(NS + "PetOwner")
+print("Is PetOwner satisfiable?", reasoner.is_satisfiable(pet_owner))  # True
+reasoner.dispose()
+```
 
-# A President governs exactly one country
-# President ⊆ ∃governs.Country ⊓ ∀governs.Country ⊓ ≤1governs.Country
-onto.add_axiom(SubClassOf(
-    President,
-    AtLeast(1, governs, Country)
-))
+Max-cardinality violations make the ontology **inconsistent** — but only when
+the fillers are known to be different (OWL has no unique-name assumption):
 
-# This is the typical way to express "exactly one"
-# Other restrictions would need to be added for completeness
+```python
+Monogamous = OWLClass(NS + "Monogamous")
+hasSpouse = OWLObjectProperty(NS + "hasSpouse")
 
-reasoner = Reasoner(onto)
-# ... rest of the example
+dave = OWLNamedIndividual(NS + "dave")
+eve = OWLNamedIndividual(NS + "eve")
+fran = OWLNamedIndividual(NS + "fran")
+
+axioms = [
+    # Monogamous ⊑ ≤1 hasSpouse.Thing
+    OWLSubClassOfAxiom(Monogamous, OWLObjectMaxCardinality(1, hasSpouse, OWLThing)),
+    OWLClassAssertionAxiom(dave, Monogamous),
+    OWLObjectPropertyAssertionAxiom(dave, hasSpouse, eve),
+    OWLObjectPropertyAssertionAxiom(dave, hasSpouse, fran),
+]
+
+# Without DifferentIndividuals the reasoner can merge eve and fran:
+reasoner = reasoner_from_axioms(axioms)
+print("Consistent (eve, fran may be equal)?", reasoner.is_consistent())  # True
+reasoner.dispose()
+
+# Declare them distinct and the constraint is violated:
+axioms.append(OWLDifferentIndividualsAxiom([eve, fran]))
+reasoner = reasoner_from_axioms(axioms)
+print("Consistent (eve ≠ fran)?", reasoner.is_consistent())  # False
+reasoner.dispose()
+```
+
+**Output:**
+```
+Consistent (eve, fran may be equal)? True
+Consistent (eve ≠ fran)? False
 ```
 
 ## Part 4: Combining Restrictions
 
-Complex restrictions help model real-world constraints:
+Complex restrictions model real-world constraints:
 
 ```python
-from hermit.model import AtMost, Intersection
+Supervisor = OWLClass(NS + "Supervisor")
+Employee = OWLClass(NS + "Employee")
+supervises = OWLObjectProperty(NS + "supervises")
 
-onto = DLOntology()
-
-# Define classes
-Supervisor = OWLClass("http://example.org/Supervisor")
-Employee = OWLClass("http://example.org/Employee")
-Person = OWLClass("http://example.org/Person")
-
-# Define property
-supervises = OWLObjectProperty("http://example.org/supervises")
-
-# Supervisor: Person who supervises between 1 and 10 employees
-# Supervisor ⊆ ∃supervises.Employee ⊓ ≤10supervises.Employee
-onto.add_axiom(SubClassOf(
-    Supervisor,
-    Intersection(
-        AtLeast(1, supervises, Employee),
-        AtMost(10, supervises, Employee)
-    )
-))
-
-# Create persons and mark one as supervisor with employees
-supervisor = OWLNamedIndividual("http://example.org/alice")
-employees = [
-    OWLNamedIndividual(f"http://example.org/employee{i}")
-    for i in range(5)
+# Supervisor ⊑ (≥1 supervises.Employee) ⊓ (≤10 supervises.Employee)
+axioms = [
+    OWLSubClassOfAxiom(
+        Supervisor,
+        OWLObjectIntersectionOf([
+            OWLObjectMinCardinality(1, supervises, Employee),
+            OWLObjectMaxCardinality(10, supervises, Employee),
+        ]),
+    ),
 ]
 
-onto.add_axiom(ClassAssertion(Person, supervisor))
+supervisor = OWLNamedIndividual(NS + "alice")
+employees = [OWLNamedIndividual(f"{NS}employee{i}") for i in range(5)]
+
+axioms.append(OWLClassAssertionAxiom(supervisor, Supervisor))
 for emp in employees:
-    onto.add_axiom(ClassAssertion(Employee, emp))
-    onto.add_axiom(ObjectPropertyAssertion(supervises, supervisor, emp))
+    axioms.append(OWLClassAssertionAxiom(emp, Employee))
+    axioms.append(OWLObjectPropertyAssertionAxiom(supervisor, supervises, emp))
 
-onto.add_axiom(ClassAssertion(Supervisor, supervisor))
-
-reasoner = Reasoner(onto)
+reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 
-print("Is alice a Supervisor?", reasoner.has_type(supervisor, Supervisor))  # True
-
-reasoner.dispose()
-```
-
-## Part 5: Reasoning with Restrictions
-
-How restrictions help the reasoner:
-
-```python
-onto = DLOntology()
-
-# Define a restriction-based hierarchy
-HasFriends = OWLClass("http://example.org/HasFriends")
-Person = OWLClass("http://example.org/Person")
-hasFriend = OWLObjectProperty("http://example.org/hasFriend")
-
-# HasFriends ⊆ ∃hasFriend.Person
-onto.add_axiom(SubClassOf(
-    HasFriends,
-    AtLeast(1, hasFriend, Person)
-))
-
-person1 = OWLNamedIndividual("http://example.org/alice")
-person2 = OWLNamedIndividual("http://example.org/bob")
-
-onto.add_axiom(ClassAssertion(Person, person1))
-onto.add_axiom(ClassAssertion(Person, person2))
-onto.add_axiom(ObjectPropertyAssertion(hasFriend, person1, person2))
-
-# Alice doesn't have HasFriends type yet
-onto.add_axiom(ClassAssertion(HasFriends, person1))
-
-reasoner = Reasoner(onto)
-reasoner.precompute_inferences()
-
-# Query to understand the restriction
-print("Alice has friends?", reasoner.has_type(person1, HasFriends))  # True
-print("Alice's friends:", reasoner.get_object_property_values(hasFriend, person1))
+print("Consistent with 5 supervisees?", reasoner.is_consistent())  # True
 
 reasoner.dispose()
 ```
 
 ## Common Patterns
 
+These fragments assume classes/properties defined as above.
+
 ### 1. "At Least One" (Existential)
 ```python
-# Everyone must have a name
-SubClassOf(Person, AtLeast(1, hasName, String))
+# Every Parent has at least one Person child
+OWLSubClassOfAxiom(Parent, OWLObjectSomeValuesFrom(hasChild, Person))
 ```
 
 ### 2. "All Values" (Universal)
 ```python
-# All friends must be persons
-SubClassOf(Person, ForAll(hasFriend, Person))
+# All of a Person's spouses are Persons
+OWLSubClassOfAxiom(Person, OWLObjectAllValuesFrom(hasSpouse, Person))
 ```
 
 ### 3. "Exactly N"
 ```python
-# Parents have exactly 2 biological parents
-SubClassOf(
+# Every Person has exactly 2 biological parents
+hasParent = OWLObjectProperty(NS + "hasParent")
+OWLSubClassOfAxiom(
     Person,
-    Intersection(
-        AtLeast(2, hasParent, Person),
-        AtMost(2, hasParent, Person)
-    )
+    OWLObjectIntersectionOf([
+        OWLObjectMinCardinality(2, hasParent, Person),
+        OWLObjectMaxCardinality(2, hasParent, Person),
+    ]),
 )
 ```
+
+(`OWLObjectExactCardinality(2, hasParent, Person)` is the shorthand.)
 
 ### 4. "At Most N"
 ```python
 # Each person has at most 1 spouse
-SubClassOf(Person, AtMost(1, hasSpouse, Person))
+OWLSubClassOfAxiom(Person, OWLObjectMaxCardinality(1, hasSpouse, Person))
 ```
 
 ## Key Takeaways
 
 1. **Existential restrictions (∃)** assert something exists
-2. **Universal restrictions (∀)** constrain all values
-3. **Cardinality** limits how many values a property can have
-4. Restrictions enable the reasoner to infer new facts
-5. Combinations of restrictions model complex real-world rules
+2. **Universal restrictions (∀)** constrain all values and propagate types
+3. **Cardinality** limits how many fillers a property can have
+4. **Equivalence axioms** let the reasoner *recognize* members of a defined class
+5. Cardinality clashes need `OWLDifferentIndividualsAxiom` — no unique-name assumption
 
 ## Try This!
 
 Create an ontology for a university with:
 - Students (at least 1 course, not more than 5)
-- Professors (at least 1 student, all students must be enrolled)
+- Professors (everything they teach is a Course)
 - Courses (exactly 1 professor)
-- Requirements (prerequisites, corequisites)
 
 ## Next Steps
 
-- **[Tutorial 3: Rules and Queries](./03-rules-and-queries.md)** — Learn SWRL-like rules
-- **[Tutorial 4: Advanced Reasoning](./04-advanced-reasoning.md)** — Reasoning strategies and optimization
-- **[API Reference](../api/core.md)** — OWLClass, properties, and restrictions API
+- **[Tutorial 3: Rules and Queries](./03-rules-and-queries.md)** — Complex class expressions
+- **[Tutorial 4: Advanced Reasoning](./04-advanced-reasoning.md)** — Reasoning strategies and performance
+- **[API Reference](../api/core.md)** — Restriction classes API
