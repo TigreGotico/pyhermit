@@ -142,113 +142,7 @@ class OWLNormalization:
         for axiom in axioms:
             self._process_axiom(axiom, normalized)
 
-        self._axiomatize_transitivity(normalized)
-
         return normalized
-
-    def _axiomatize_transitivity(self, result: NormalizedAxioms) -> None:
-        """Propagate every emitted ∀R.C through transitive sub-roles of R.
-
-        Mirrors the effect of the Java automaton-based rewriting for the
-        transitivity fragment: for each ∀-clause with guard A, role R and
-        filler C, and each transitive role S with S ⊑* R, a fresh concept B
-        encodes ∀S.(∀S⁺.C):
-
-            B(Y) :- A(X), S(X,Y)
-            C(X) :- B(X)          (⊥ :- B(X), C'(X) for a negated filler ¬C')
-            B(Y) :- B(X), S(X,Y)
-        """
-        from hermit.model import (
-            Atom,
-            AtomicConcept,
-            AtomicNegationConcept,
-            AtomicRole,
-            DLClause,
-            InverseRole,
-            Variable,
-        )
-        from hermit.structural.owl_clausification import _role_atom
-
-        def _inverse(role: Role) -> Role:
-            if isinstance(role, AtomicRole):
-                return InverseRole.create(role)
-            assert isinstance(role, InverseRole)
-            return role.inverse_of
-
-        transitive: set[Role] = set()
-        for inclusion in result.complex_object_property_inclusions:
-            if inclusion.is_transitivity():
-                role = inclusion.super_object_property
-                transitive.add(role)
-                transitive.add(_inverse(role))
-        if not transitive or not result.all_values_from_records:
-            return
-
-        # Sub-role edges sup → sub, closed under inverses.
-        subs_by_sup: dict[Role, set[Role]] = {}
-        for sub, sup in result.simple_object_property_inclusions:
-            subs_by_sup.setdefault(sup, set()).add(sub)
-            subs_by_sup.setdefault(_inverse(sup), set()).add(_inverse(sub))
-
-        def _sub_roles_of(role: Role) -> set[Role]:
-            seen: set[Role] = {role}
-            stack = [role]
-            while stack:
-                current = stack.pop()
-                for sub in subs_by_sup.get(current, ()):
-                    if sub not in seen:
-                        seen.add(sub)
-                        stack.append(sub)
-            return seen
-
-        x_var = Variable.create("X")
-        y_var = Variable.create("Y")
-        emitted: dict[tuple[object, object, Role], AtomicConcept] = {}
-        for guard, role, filler in result.all_values_from_records:
-            if isinstance(filler, AtomicConcept) and filler.is_always_true():
-                continue
-            for sub_role in _sub_roles_of(role) & transitive:
-                key = (guard, filler, sub_role)
-                if key in emitted:
-                    continue
-                aux = AtomicConcept.create(
-                    f"internal:trans-aux#{len(emitted)}"
-                )
-                emitted[key] = aux
-                role_atom = _role_atom(sub_role, x_var, y_var)
-                result.direct_dl_clauses.append(
-                    DLClause.create(
-                        (Atom.create(aux, y_var),),
-                        (Atom.create(guard, x_var), role_atom),  # type: ignore[arg-type]
-                    )
-                )
-                if isinstance(filler, AtomicNegationConcept):
-                    result.direct_dl_clauses.append(
-                        DLClause.create(
-                            (),
-                            (
-                                Atom.create(aux, x_var),
-                                Atom.create(filler.negated, x_var),
-                            ),
-                        )
-                    )
-                elif isinstance(filler, AtomicConcept) and filler.is_always_false():
-                    result.direct_dl_clauses.append(
-                        DLClause.create((), (Atom.create(aux, x_var),))
-                    )
-                elif isinstance(filler, AtomicConcept):
-                    result.direct_dl_clauses.append(
-                        DLClause.create(
-                            (Atom.create(filler, x_var),),
-                            (Atom.create(aux, x_var),),
-                        )
-                    )
-                result.direct_dl_clauses.append(
-                    DLClause.create(
-                        (Atom.create(aux, y_var),),
-                        (Atom.create(aux, x_var), role_atom),
-                    )
-                )
 
     def _process_axiom(self, axiom: OWLAxiom, result: NormalizedAxioms) -> None:
         """Process a single axiom and add to normalized result."""
@@ -766,7 +660,7 @@ class OWLNormalization:
             if hasattr(sub_concept, "arity") or hasattr(sub_concept, "accept")
             else AtomicConcept.THING
         )
-        result.all_values_from_records.append((guard, role, filler_concept))
+        result.all_values_from_records.append((guard, role, filler_concept, clause))
 
     def _emit_data_all_values_from_clause(
         self,

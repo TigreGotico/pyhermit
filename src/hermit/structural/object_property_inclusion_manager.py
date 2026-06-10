@@ -5,12 +5,19 @@ A property is non-simple if it is transitive, appears as the superrole of a role
 chain, or is a superrole (via SubObjectPropertyOf) of any such property; the set
 is closed under inverses.
 
-Called by OWLClausification.clausify() before producing DL clauses to enforce
-OWL 2 spec Section 11.2: non-simple properties may not appear in cardinality
-restrictions, hasSelf, asymmetric, irreflexive, or disjoint axioms. The check
-is syntactic, as in the Java original: only min/max/exact cardinality
-restriction syntax is restricted — someValuesFrom over a non-simple property
-is legal even though it normalizes to the same internal at-least form.
+Called by OWLClausification.clausify() before producing DL clauses for two
+purposes:
+
+1. Enforce OWL 2 spec Section 11.2: non-simple properties may not appear in
+   cardinality restrictions, hasSelf, asymmetric, irreflexive, or disjoint
+   axioms. The check is syntactic, as in the Java original: only min/max/exact
+   cardinality restriction syntax is restricted — someValuesFrom over a
+   non-simple property is legal even though it normalizes to the same internal
+   at-least form.
+2. Give role chains and transitivity their tableau semantics: every universal
+   restriction over a non-simple role is unfolded through the role's automaton
+   (see ``hermit.structural.role_automaton``), the port of the Java
+   ``rewriteAxioms`` automaton-state rewriting.
 """
 
 from __future__ import annotations
@@ -18,7 +25,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from hermit.model import AtomicConcept, DLClause
     from hermit.structural.normalized_axioms import NormalizedAxioms
+    from hermit.structural.role_automaton import Automaton
 
 
 class ObjectPropertyInclusionManager:
@@ -149,14 +160,16 @@ class ObjectPropertyInclusionManager:
     def rewrite_axioms(self, normalized_axioms: NormalizedAxioms) -> None:
         """Rewrite axioms to handle complex properties.
 
-        Validates that complex properties don't appear in asymmetric or irreflexive
-        constraints, and processes role inclusions.
+        Validates that complex properties don't appear in asymmetric or
+        irreflexive constraints, and unfolds every universal restriction over
+        a non-simple role through that role's automaton.
 
         Args:
             normalized_axioms: Axioms to rewrite (modified in-place)
 
         Raises:
-            ValueError: If complex properties violate constraints
+            ValueError: If complex properties violate constraints or the
+                property hierarchy is not regular
         """
         # Detect which properties are complex (non-simple)
         self._detect_complex_properties(normalized_axioms)
@@ -164,7 +177,136 @@ class ObjectPropertyInclusionManager:
         # Validate constraints on complex properties
         self._validate_complex_property_constraints(normalized_axioms)
 
-        # Future: could add automata-based rewriting for complex chains
+        # Replace universals over non-simple roles by automaton unfoldings
+        self._rewrite_universals_over_automata(normalized_axioms)
+
+    def _rewrite_universals_over_automata(
+        self, normalized_axioms: NormalizedAxioms
+    ) -> None:
+        """Unfold every ∀R.C over a non-simple role R through R's automaton.
+
+        Port of the rewriting in Java ``rewriteAxioms``: each distinct pair
+        (R, C) with an automaton for R gets one fresh concept per automaton
+        state (the initial state's concept replaces the universal); every
+        transition ``s --S--> t`` yields ``Q_t(Y) :- Q_s(X), S(X,Y)`` (an
+        ε-move yields ``Q_t(X) :- Q_s(X)``) and every accepting state implies
+        the filler. The originally emitted two-variable clause for the
+        universal is removed — its effect is subsumed by the automaton's
+        ``initial --R--> final`` transition.
+        """
+        from hermit.model import (
+            Atom,
+            AtomicConcept,
+            AtomicNegationConcept,
+            DLClause,
+            Variable,
+        )
+        from hermit.structural.role_automaton import build_role_automata
+
+        records = normalized_axioms.all_values_from_records
+        if not records:
+            return
+        automata, _complex = build_role_automata(
+            normalized_axioms.simple_object_property_inclusions,
+            normalized_axioms.complex_object_property_inclusions,
+        )
+
+        x_var = Variable.create("X")
+        counter = 0
+
+        def _fresh() -> AtomicConcept:
+            nonlocal counter
+            concept = AtomicConcept.create(f"internal:all#{counter}")
+            counter += 1
+            return concept
+
+        replaced: dict[tuple[object, object], AtomicConcept] = {}
+        new_clauses: list[DLClause] = []
+        for guard, role, filler, clause in records:
+            automaton = automata.get(role)
+            if automaton is None:
+                continue
+            if isinstance(filler, AtomicConcept) and filler.is_always_true():
+                continue
+            try:
+                normalized_axioms.direct_dl_clauses.remove(clause)
+            except ValueError:
+                pass
+            key = (role, filler)
+            initial_concept = replaced.get(key)
+            if initial_concept is None:
+                initial_concept = _fresh()
+                replaced[key] = initial_concept
+                self._emit_automaton_clauses(
+                    automaton, initial_concept, filler, new_clauses, _fresh
+                )
+            # Entry clause: the universal's guard implies the initial state.
+            body_atoms: list[Atom] = []
+            if isinstance(guard, AtomicNegationConcept):
+                body_atoms.append(Atom.create(guard.negated, x_var))
+            elif hasattr(guard, "arity") or hasattr(guard, "accept"):
+                body_atoms.append(Atom.create(guard, x_var))  # type: ignore[arg-type]
+            new_clauses.append(
+                DLClause.create(
+                    (Atom.create(initial_concept, x_var),), tuple(body_atoms)
+                )
+            )
+        normalized_axioms.direct_dl_clauses.extend(new_clauses)
+
+    @staticmethod
+    def _emit_automaton_clauses(
+        automaton: Automaton,
+        initial_concept: AtomicConcept,
+        filler: object,
+        out_clauses: list[DLClause],
+        fresh: Callable[[], AtomicConcept],
+    ) -> None:
+        """Emit the DL clauses encoding one role automaton for one filler."""
+        from hermit.model import (
+            Atom,
+            AtomicConcept,
+            AtomicNegationConcept,
+            DLClause,
+            Variable,
+        )
+        from hermit.structural.owl_clausification import _role_atom
+
+        x_var = Variable.create("X")
+        y_var = Variable.create("Y")
+
+        state_concepts: dict[int, AtomicConcept] = {}
+        for state in automaton.states():
+            state_concepts[id(state)] = (
+                initial_concept if automaton.is_initial(state) else fresh()
+            )
+        for transition in automaton.delta():
+            from_atom = Atom.create(state_concepts[id(transition.start)], x_var)
+            to_concept = state_concepts[id(transition.end)]
+            if transition.label is None:
+                out_clauses.append(
+                    DLClause.create((Atom.create(to_concept, x_var),), (from_atom,))
+                )
+            else:
+                out_clauses.append(
+                    DLClause.create(
+                        (Atom.create(to_concept, y_var),),
+                        (from_atom, _role_atom(transition.label, x_var, y_var)),
+                    )
+                )
+        for final_state in automaton.terminals():
+            final_atom = Atom.create(state_concepts[id(final_state)], x_var)
+            if isinstance(filler, AtomicNegationConcept):
+                out_clauses.append(
+                    DLClause.create(
+                        (), (final_atom, Atom.create(filler.negated, x_var))
+                    )
+                )
+            elif isinstance(filler, AtomicConcept) and filler.is_always_false():
+                out_clauses.append(DLClause.create((), (final_atom,)))
+            elif isinstance(filler, AtomicConcept):
+                out_clauses.append(
+                    DLClause.create((Atom.create(filler, x_var),), (final_atom,))
+                )
 
     def _detect_complex_properties(
         self, normalized_axioms: NormalizedAxioms
