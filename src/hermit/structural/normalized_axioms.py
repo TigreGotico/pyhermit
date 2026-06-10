@@ -64,6 +64,7 @@ def _owl_expr_to_internal(expr: object, _cardinality_role_registry: list[Role] |
     from hermit.owl_model.class_expression.owl_class import OWLClass
     from hermit.owl_model.class_expression.class_expression import OWLObjectComplementOf
     from hermit.owl_model.class_expression.restriction import (
+        OWLObjectHasSelf,
         OWLObjectSomeValuesFrom,
         OWLObjectAllValuesFrom,
         OWLObjectMinCardinality,
@@ -81,8 +82,17 @@ def _owl_expr_to_internal(expr: object, _cardinality_role_registry: list[Role] |
             return AtomicConcept.NOTHING
         return AtomicConcept.create(iri_str)
 
+    # ∃R.Self is a literal concept in the structural normal form: it stays
+    # unconverted (like Java, where the clausifier visits the OWL object and
+    # emits the role atom R(X,X) directly).
+    if isinstance(expr, OWLObjectHasSelf):
+        return expr
+
     if isinstance(expr, OWLObjectComplementOf):
         operand = expr.get_operand()
+        # ¬∃R.Self is likewise a literal: the clausifier puts R(X,X) in the body.
+        if isinstance(operand, OWLObjectHasSelf):
+            return expr
         # Push complement inward using NNF rules before converting to internal model
         from hermit.owl_model.class_expression.restriction import (
             OWLObjectSomeValuesFrom as _Some,

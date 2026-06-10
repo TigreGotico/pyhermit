@@ -157,7 +157,7 @@ class OWLClausification:
         clausifier = NormalizedAxiomClausifier(data_range_converter, positive_facts)
         for inclusion in axioms.concept_inclusions:
             for concept in inclusion:
-                concept.accept(clausifier)
+                clausifier.clausify_disjunct(concept)
             dl_clause = clausifier.get_dl_clause()
             dl_clauses.add(dl_clause.get_safe_version(AtomicConcept.THING))
             # Flush pairwise clauses emitted by visit_at_most_concept
@@ -533,6 +533,49 @@ class NormalizedAxiomClausifier:
             concept = AtomicConcept.create(f"internal:nom#{individual.iri}")
         self._positive_facts.add(Atom.create(concept, individual))
         return concept
+
+    # -- Disjunct dispatch ------------------------------------------------------
+
+    def clausify_disjunct(self, concept: Any) -> None:
+        """Clausify one disjunct of a normalized concept inclusion.
+
+        Internal model concepts dispatch through ``accept``; ∃R.Self and
+        ¬∃R.Self remain OWL-level literals through normalization (as in Java)
+        and are handled here directly.
+        """
+        from hermit.owl_model.class_expression.class_expression import (
+            OWLObjectComplementOf,
+        )
+        from hermit.owl_model.class_expression.restriction import OWLObjectHasSelf
+
+        if isinstance(concept, OWLObjectHasSelf):
+            self.visit_object_has_self(concept)
+        elif isinstance(concept, OWLObjectComplementOf) and isinstance(
+            concept.get_operand(), OWLObjectHasSelf
+        ):
+            operand = concept.get_operand()
+            assert isinstance(operand, OWLObjectHasSelf)
+            self.visit_negated_object_has_self(operand)
+        else:
+            concept.accept(self)
+
+    def visit_object_has_self(self, concept: Any) -> None:
+        """∃R.Self -> head atom R(X,X)."""
+        from hermit.structural.normalized_axioms import (
+            _owl_prop_to_internal_role_standalone,
+        )
+
+        role = _owl_prop_to_internal_role_standalone(concept.get_property())
+        self._head_atoms.append(_role_atom(role, X, X))
+
+    def visit_negated_object_has_self(self, concept: Any) -> None:
+        """¬∃R.Self -> body atom R(X,X)."""
+        from hermit.structural.normalized_axioms import (
+            _owl_prop_to_internal_role_standalone,
+        )
+
+        role = _owl_prop_to_internal_role_standalone(concept.get_property())
+        self._body_atoms.append(_role_atom(role, X, X))
 
     # -- Visitor methods (called via Concept.accept) ---------------------------
 
