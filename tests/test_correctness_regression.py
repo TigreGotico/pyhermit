@@ -1,7 +1,7 @@
 """Regression tests for pyhermit correctness fixes.
 
 Tests all 12 acceptance criteria from spec.md:
-1. Functional object property → DL clause in direct_dl_clauses
+1. Functional object property → ⊤ ⊑ ≤1 R.⊤ concept inclusion
 2. Symmetric property → simple_object_property_inclusions
 3. Asymmetric property → asymmetric_object_properties
 4. Reflexive property → reflexive_object_properties
@@ -55,29 +55,54 @@ def _make_ontology(clauses, facts, iri="urn:test:reg"):
 # ---------------------------------------------------------------------------
 
 class TestNormalizerFixes:
-    def test_functional_property_creates_dl_clause(self):
-        """OWLFunctionalObjectPropertyAxiom → direct_dl_clauses with Equality head."""
+    def test_functional_property_creates_at_most_inclusion(self):
+        """OWLFunctionalObjectPropertyAxiom → ⊤ ⊑ ≤1 R.⊤ concept inclusion."""
+        from hermit.model import AtMostConcept
         from hermit.owl_model.owl_axiom import OWLFunctionalObjectPropertyAxiom
         from hermit.structural.owl_normalization import OWLNormalization
 
         axiom = OWLFunctionalObjectPropertyAxiom(_make_owl_prop(R_IRI))
         na = OWLNormalization().process_ontology([axiom])
 
-        assert len(na.direct_dl_clauses) >= 1
-        # Head atom should have Equality predicate
-        clause = na.direct_dl_clauses[0]
-        assert any(a.predicate is Equality.INSTANCE for a in clause.head_atoms)
+        at_mosts = [
+            c
+            for inclusion in na.concept_inclusions
+            for c in inclusion
+            if isinstance(c, AtMostConcept)
+        ]
+        assert len(at_mosts) == 1
+        at_most = at_mosts[0]
+        assert at_most.number == 1
+        assert at_most.on_role == AtomicRole.create(R_IRI)
+        assert at_most.to_concept is AtomicConcept.THING
+        # The role must register as occurring in a cardinality restriction
+        # (simplicity requirement for at-most positions).
+        assert AtomicRole.create(R_IRI) in na.cardinality_restriction_roles
 
-    def test_inverse_functional_property_creates_dl_clause(self):
+    def test_inverse_functional_property_creates_at_most_inclusion(self):
+        """OWLInverseFunctionalObjectPropertyAxiom → ⊤ ⊑ ≤1 R⁻.⊤ inclusion."""
+        from hermit.model import AtMostConcept, InverseRole
         from hermit.owl_model.owl_axiom import OWLInverseFunctionalObjectPropertyAxiom
         from hermit.structural.owl_normalization import OWLNormalization
 
         axiom = OWLInverseFunctionalObjectPropertyAxiom(_make_owl_prop(R_IRI))
         na = OWLNormalization().process_ontology([axiom])
 
-        assert len(na.direct_dl_clauses) >= 1
-        clause = na.direct_dl_clauses[0]
-        assert any(a.predicate is Equality.INSTANCE for a in clause.head_atoms)
+        at_mosts = [
+            c
+            for inclusion in na.concept_inclusions
+            for c in inclusion
+            if isinstance(c, AtMostConcept)
+        ]
+        assert len(at_mosts) == 1
+        at_most = at_mosts[0]
+        assert at_most.number == 1
+        assert at_most.on_role == InverseRole.create(AtomicRole.create(R_IRI))
+        assert at_most.to_concept is AtomicConcept.THING
+        assert (
+            InverseRole.create(AtomicRole.create(R_IRI))
+            in na.cardinality_restriction_roles
+        )
 
     def test_symmetric_property_creates_simple_inclusion(self):
         """Symmetric property → (R, R⁻) in simple_object_property_inclusions."""

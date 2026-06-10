@@ -1212,8 +1212,15 @@ class TestOWLNormalization:
             OWLInverseFunctionalObjectPropertyAxiom(r),
         ]
         result = norm.process_ontology(axioms)
-        # functional and inverse-functional -> direct_dl_clauses (2 clauses)
-        assert len(result.direct_dl_clauses) == 2
+        # functional and inverse-functional -> at-most-1 concept inclusions
+        from hermit.model import AtMostConcept
+        at_mosts = [
+            c
+            for inclusion in result.concept_inclusions
+            for c in inclusion
+            if isinstance(c, AtMostConcept) and c.number == 1
+        ]
+        assert len(at_mosts) == 2
         # symmetric -> simple_object_property_inclusions (1 inclusion)
         assert len(result.simple_object_property_inclusions) >= 1
         # asymmetric -> asymmetric_object_properties

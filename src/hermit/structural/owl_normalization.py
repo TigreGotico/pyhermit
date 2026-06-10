@@ -223,27 +223,34 @@ class OWLNormalization:
         elif isinstance(axiom, OWLNegativeDataPropertyAssertionAxiom):
             result.negative_facts.append(axiom)
         elif isinstance(axiom, OWLFunctionalObjectPropertyAxiom):
-            from hermit.model import Atom, DLClause, Variable, Equality
-            role = _owl_prop_to_role(axiom.get_property())
-            if role is not None:
-                xv = Variable.create("X")
-                yv = Variable.create("Y")
-                zv = Variable.create("Z")
-                from hermit.structural.owl_clausification import _role_atom
-                head = (Atom.create(Equality.INSTANCE, yv, zv),)
-                body = (_role_atom(role, xv, yv), _role_atom(role, xv, zv))
-                result.direct_dl_clauses.append(DLClause.create(head, body))
+            # FunctionalObjectProperty(R): ⊤ ⊑ ≤1 R.⊤ — clausified as an
+            # at-most restriction so equalities are annotated for the NI rule.
+            from hermit.owl_model.class_expression import OWLThing
+            from hermit.owl_model.class_expression.restriction import (
+                OWLObjectMaxCardinality,
+            )
+            self._process_sub_class_of(
+                OWLSubClassOfAxiom(
+                    OWLThing,
+                    OWLObjectMaxCardinality(1, axiom.get_property(), OWLThing),
+                ),
+                result,
+            )
         elif isinstance(axiom, OWLInverseFunctionalObjectPropertyAxiom):
-            from hermit.model import Atom, DLClause, Variable, Equality
-            role = _owl_prop_to_role(axiom.get_property())
-            if role is not None:
-                xv = Variable.create("X")
-                yv = Variable.create("Y")
-                zv = Variable.create("Z")
-                from hermit.structural.owl_clausification import _role_atom
-                head = (Atom.create(Equality.INSTANCE, xv, yv),)
-                body = (_role_atom(role, xv, zv), _role_atom(role, yv, zv))
-                result.direct_dl_clauses.append(DLClause.create(head, body))
+            # InverseFunctionalObjectProperty(R): ⊤ ⊑ ≤1 R⁻.⊤
+            from hermit.owl_model.class_expression import OWLThing
+            from hermit.owl_model.class_expression.restriction import (
+                OWLObjectMaxCardinality,
+            )
+            self._process_sub_class_of(
+                OWLSubClassOfAxiom(
+                    OWLThing,
+                    OWLObjectMaxCardinality(
+                        1, axiom.get_property().get_inverse_property(), OWLThing
+                    ),
+                ),
+                result,
+            )
         elif isinstance(axiom, OWLSymmetricObjectPropertyAxiom):
             from hermit.model import InverseRole, AtomicRole
             role = _owl_prop_to_role(axiom.get_property())

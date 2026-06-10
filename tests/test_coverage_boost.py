@@ -412,16 +412,28 @@ class TestOwlNormalizationUnusedPaths:
         assert len(na.negative_facts) >= 1
 
     def test_functional_object_property(self) -> None:
+        from hermit.model import AtMostConcept
         from hermit.owl_model.owl_axiom import OWLFunctionalObjectPropertyAxiom
         axiom = OWLFunctionalObjectPropertyAxiom(_mk_prop("R"))
         na = _run_normalization([axiom])
-        assert len(na.direct_dl_clauses) >= 1
+        assert any(
+            isinstance(c, AtMostConcept) and c.number == 1
+            for inclusion in na.concept_inclusions
+            for c in inclusion
+        )
 
     def test_inverse_functional_object_property(self) -> None:
+        from hermit.model import AtMostConcept, InverseRole
         from hermit.owl_model.owl_axiom import OWLInverseFunctionalObjectPropertyAxiom
         axiom = OWLInverseFunctionalObjectPropertyAxiom(_mk_prop("R"))
         na = _run_normalization([axiom])
-        assert len(na.direct_dl_clauses) >= 1
+        assert any(
+            isinstance(c, AtMostConcept)
+            and c.number == 1
+            and isinstance(c.on_role, InverseRole)
+            for inclusion in na.concept_inclusions
+            for c in inclusion
+        )
 
     def test_symmetric_property(self) -> None:
         from hermit.owl_model.owl_axiom import OWLSymmetricObjectPropertyAxiom
