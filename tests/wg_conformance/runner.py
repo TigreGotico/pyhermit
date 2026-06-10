@@ -272,15 +272,11 @@ def _entails_axiom(premise_axioms: list, axiom, udl: bool) -> bool:
         c = axiom.get_class_expression()
         return _entails_instance(premise_axioms, ind, c, udl)
     if isinstance(axiom, OWLSubObjectPropertyOfAxiom):
-        sub = _role_name(axiom.get_sub_property())
-        sup = _role_name(axiom.get_super_property())
-        if sub is None or sup is None:
-            raise UnsupportedConclusion(f"complex object property in {axiom!r}")
-        reasoner = _build_reasoner(premise_axioms, udl)
-        try:
-            return reasoner.is_sub_role_of(AtomicRole.create(sub), AtomicRole.create(sup))
-        finally:
-            reasoner.dispose()
+        # Same reduction as EquivalentObjectProperties conclusions: assert
+        # sub(a,b) on fresh individuals and deny sup(a,b) by refutation.
+        return _entails_subproperty(
+            premise_axioms, axiom.get_sub_property(), axiom.get_super_property(), udl
+        )
     if isinstance(axiom, OWLSubDataPropertyOfAxiom):
         sub = _role_name(axiom.get_sub_property())
         sup = _role_name(axiom.get_super_property())
@@ -292,20 +288,17 @@ def _entails_axiom(premise_axioms: list, axiom, udl: bool) -> bool:
         finally:
             reasoner.dispose()
     if isinstance(axiom, OWLObjectPropertyAssertionAxiom):
-        subj = _individual_internal(axiom.get_subject())
-        obj = _individual_internal(axiom.get_object())
-        role = _role_name(axiom.get_property())
-        if subj is None or obj is None or role is None:
-            raise UnsupportedConclusion("complex object property assertion")
-        reasoner = _build_reasoner(premise_axioms, udl)
-        try:
-            if not reasoner.is_consistent():
-                return True
-            return reasoner.has_role_relationship(
-                subj, AtomicRole.create(role), obj
-            )
-        finally:
-            reasoner.dispose()
+        # Mirrors EntailmentChecker.visit(ObjectPropertyAssertion): entailed
+        # iff denying the edge refutes the premise. The denial is expressed
+        # as ∀p.¬marker, so non-simple p is unfolded through its automaton
+        # (chains/transitivity never materialize edges in a single model).
+        return _refutes(
+            premise_axioms,
+            _denied_edge(
+                axiom.get_subject(), axiom.get_property(), axiom.get_object()
+            ),
+            udl,
+        )
     if isinstance(axiom, OWLSameIndividualAxiom):
         inds = list(axiom.individuals())
         reasoner = _build_reasoner(premise_axioms, udl)
