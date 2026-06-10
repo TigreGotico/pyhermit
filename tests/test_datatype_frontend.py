@@ -164,6 +164,21 @@ class TestFunctionalSyntaxDataRestrictions:
             " ClassAssertion(:A :a)"
         )
 
+    def test_data_has_value_subclass_clash(self):
+        # DataHasValue in negative polarity: ¬DataHasValue(R, v) = ∀R.¬{v}.
+        assert not _consistent_fss(
+            'SubClassOf(DataHasValue(:hasAge "18"^^xsd:integer) :Eighteen)'
+            ' ClassAssertion(DataHasValue(:hasAge "18"^^xsd:integer) :a)'
+            " ClassAssertion(ObjectComplementOf(:Eighteen) :a)"
+        )
+
+    def test_data_has_value_subclass_satisfiable(self):
+        assert _consistent_fss(
+            'SubClassOf(DataHasValue(:hasAge "18"^^xsd:integer) :Eighteen)'
+            ' ClassAssertion(DataHasValue(:hasAge "19"^^xsd:integer) :a)'
+            " ClassAssertion(ObjectComplementOf(:Eighteen) :a)"
+        )
+
 
 class TestFunctionalSyntaxNegativeAssertions:
     def test_negative_data_property_assertion_clash(self):

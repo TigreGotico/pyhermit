@@ -464,8 +464,9 @@ class TestExpressionManager:
 
     def test_complement_nnf_data_has_value(self):
         from hermit.owl_model.class_expression import (
-            OWLDataHasValue, OWLObjectComplementOf,
+            OWLDataHasValue, OWLDataAllValuesFrom, OWLDataOneOf,
         )
+        from hermit.owl_model.owl_data_ranges import OWLDataComplementOf
         from hermit.owl_model.owl_property import OWLDataProperty
         from hermit.owl_model.owl_literal import OWLLiteral
         from hermit.owl_model.owl_datatype import OWLDatatype
@@ -475,8 +476,12 @@ class TestExpressionManager:
         dt = OWLDatatype(IRI.create("http://www.w3.org/2001/XMLSchema#integer"))
         lit = OWLLiteral("42", dt)
         dhv = OWLDataHasValue(prop, lit)
+        # ¬DataHasValue(R, v) = ∀R.¬{v}
         result = em._get_class_complement_nnf(dhv)
-        assert isinstance(result, OWLObjectComplementOf)
+        assert isinstance(result, OWLDataAllValuesFrom)
+        filler = result.get_filler()
+        assert isinstance(filler, OWLDataComplementOf)
+        assert isinstance(filler.get_data_range(), OWLDataOneOf)
 
     def test_complement_nnf_data_min_cardinality(self):
         from hermit.owl_model.class_expression import (

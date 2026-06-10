@@ -204,7 +204,11 @@ class ExpressionManager:
             dr_filler = self._get_data_range_complement_nnf(expr.get_filler())
             return OWLDataSomeValuesFrom(expr.get_property(), dr_filler)
         elif isinstance(expr, OWLDataHasValue):
-            return OWLObjectComplementOf(expr)
+            # ¬DataHasValue(R, v) = ∀R.¬{v}
+            return OWLDataAllValuesFrom(
+                expr.get_property(),
+                OWLDataComplementOf(OWLDataOneOf(expr.get_filler())),
+            )
         elif isinstance(expr, OWLDataMinCardinality):
             if expr.get_cardinality() == 0:
                 return OWLNothing
