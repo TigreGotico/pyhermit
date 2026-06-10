@@ -1862,15 +1862,20 @@ class InstanceManager:
     def _is_instance(
         self, individual: Individual, atomic_concept: AtomicConcept
     ) -> bool:
+        from hermit.model import Atom
+        from hermit.tableau.reasoning_task_description import (
+            ReasoningTaskDescription,
+        )
+
         result = not self.m_reasoner.get_tableau().is_satisfiable(
             True,
             False,
             None,
+            {Atom.create(atomic_concept, individual)},
             None,
             None,
             None,
-            None,
-            None,
+            ReasoningTaskDescription.is_instance_of(atomic_concept, individual),
         )
         if self.m_tableau_monitor is not None:
             if result:
