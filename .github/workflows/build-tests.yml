@@ -10,5 +10,5 @@ jobs:
     uses: OpenVoiceOS/gh-automations/.github/workflows/build-tests.yml@dev
     with:
       python_versions: '["3.10", "3.11", "3.12", "3.13"]'
-      install_extras: 'dev,owlready2'
+      install_extras: 'dev'
       test_path: 'tests'
