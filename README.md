@@ -130,10 +130,12 @@ answering) is implemented; ontology loading uses a pure stdlib reader
 - Non-simple property validation
 - OWL file parsing via a pure stdlib reader (RDF/XML, OWL/XML, FSS)
 
-**Conformance:** passes 185/350 W3C OWL WG Approved-DL test cases
+**Conformance:** passes 287/350 W3C OWL WG Approved-DL test cases
 (`pytest -m slow tests/test_wg_conformance.py`, or
-`python scripts/wg_run.py approved`). Known open items, including head-disjunction
-inconsistency, are tracked in `TODO.md` and `FAITHFULNESS_AUDIT.md`.
+`python scripts/wg_run.py approved --list-fails --timeout=20`). The main open
+items are automaton-based transitivity rewriting and instance realization
+under deterministic classification; intentional divergences from the Java
+original are documented in `FAITHFULNESS_AUDIT.md`.
 
 The unit suite passes under `pytest` (the W3C conformance corpus is marked
 `slow` and excluded by default); the code passes `mypy --strict` and `ruff`.

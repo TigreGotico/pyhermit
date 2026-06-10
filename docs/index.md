@@ -58,7 +58,7 @@ DLOntology / Reasoner     src/hermit/reasoner.py
 | `OWLClausification` | Converts normalized axioms to DL clauses; enforces non-simplicity | `src/hermit/structural/owl_clausification.py:82` |
 | `ObjectPropertyInclusionManager` | Detects non-simple properties; validates OWL 2 constraints | `src/hermit/structural/object_property_inclusion_manager.py:21` |
 | `NormalizedAxioms` | Dataclass holding all normalized axiom collections | `src/hermit/structural/normalized_axioms.py` |
-| `load_ontology` | Loads OWL/RDF files via owlready2 into `OWLAxiom` objects | `src/hermit/parser.py:25` |
+| `load_ontology` | Loads OWL files (RDF/XML, OWL/XML, FSS) via the stdlib readers into `OWLAxiom` objects | `src/hermit/parser.py:25` |
 | `Reasoner` | Main entry point for queries: consistency, classification, retrieval | `src/hermit/reasoner.py` |
 
 ### Non-Simple Property Validation
