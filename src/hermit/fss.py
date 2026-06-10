@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from hermit.owl_model.class_expression import OWLClassExpression
     from hermit.owl_model.owl_axiom import OWLAxiom
+    from hermit.owl_model.owl_data_ranges import OWLDataRange
     from hermit.owl_model.owl_property import OWLObjectPropertyExpression
 
 OWL = "http://www.w3.org/2002/07/owl#"
@@ -304,8 +305,10 @@ class _Builder:
             OWLClassAssertionAxiom,
             OWLDataPropertyAssertionAxiom,
             OWLDataPropertyDomainAxiom,
+            OWLDataPropertyRangeAxiom,
             OWLDifferentIndividualsAxiom,
             OWLDisjointClassesAxiom,
+            OWLDisjointDataPropertiesAxiom,
             OWLEquivalentClassesAxiom,
             OWLEquivalentDataPropertiesAxiom,
             OWLEquivalentObjectPropertiesAxiom,
@@ -314,6 +317,8 @@ class _Builder:
             OWLInverseFunctionalObjectPropertyAxiom,
             OWLInverseObjectPropertiesAxiom,
             OWLIrreflexiveObjectPropertyAxiom,
+            OWLNegativeDataPropertyAssertionAxiom,
+            OWLNegativeObjectPropertyAssertionAxiom,
             OWLObjectPropertyAssertionAxiom,
             OWLObjectPropertyDomainAxiom,
             OWLObjectPropertyRangeAxiom,
@@ -349,6 +354,14 @@ class _Builder:
         if kw == "DataPropertyAssertion":
             return OWLDataPropertyAssertionAxiom(
                 self.ind(args[1]), self.dpe(args[0]), self.lit(args[2])
+            )
+        if kw == "NegativeDataPropertyAssertion":
+            return OWLNegativeDataPropertyAssertionAxiom(
+                self.ind(args[1]), self.dpe(args[0]), self.lit(args[2])
+            )
+        if kw == "NegativeObjectPropertyAssertion":
+            return OWLNegativeObjectPropertyAssertionAxiom(
+                self.ind(args[1]), self.ope(args[0]), self.ind(args[2])
             )
         if kw == "SameIndividual":
             return OWLSameIndividualAxiom([self.ind(a) for a in args])
@@ -387,8 +400,12 @@ class _Builder:
             return OWLSubDataPropertyOfAxiom(self.dpe(args[0]), self.dpe(args[1]))
         if kw == "EquivalentDataProperties":
             return OWLEquivalentDataPropertiesAxiom([self.dpe(a) for a in args])
+        if kw == "DisjointDataProperties":
+            return OWLDisjointDataPropertiesAxiom([self.dpe(a) for a in args])
         if kw == "DataPropertyDomain":
             return OWLDataPropertyDomainAxiom(self.dpe(args[0]), self.ce(args[1]))
+        if kw == "DataPropertyRange":
+            return OWLDataPropertyRangeAxiom(self.dpe(args[0]), self.dr(args[1]))
         if kw == "FunctionalDataProperty":
             return OWLFunctionalDataPropertyAxiom(self.dpe(args[0]))
         return None
@@ -447,10 +464,80 @@ class _Builder:
                 int(_iri_str(a[0])), self.ope(a[1]),
                 self.ce(a[2]) if len(a) > 2 else OWLClass(OWL + "Thing"),
             )
-        # Data-range restrictions exercise datatype reasoning the clausifier
-        # does not support; over-approximate to owl:Thing rather than emit an
-        # expression the clausifier cannot accept.
+        if op in (
+            "DataSomeValuesFrom",
+            "DataAllValuesFrom",
+            "DataHasValue",
+            "DataMinCardinality",
+            "DataMaxCardinality",
+            "DataExactCardinality",
+        ):
+            return self._data_restriction(op, a)
         return OWLClass(OWL + "Thing")
+
+    def _data_restriction(self, op: str, a: list[object]) -> OWLClassExpression:
+        from hermit.owl_model.class_expression.restriction import (
+            OWLDataAllValuesFrom,
+            OWLDataExactCardinality,
+            OWLDataHasValue,
+            OWLDataMaxCardinality,
+            OWLDataMinCardinality,
+            OWLDataSomeValuesFrom,
+        )
+        from hermit.owl_model.owl_literal import TopOWLDatatype
+
+        if op == "DataSomeValuesFrom":
+            return OWLDataSomeValuesFrom(self.dpe(a[0]), self.dr(a[1]))
+        if op == "DataAllValuesFrom":
+            return OWLDataAllValuesFrom(self.dpe(a[0]), self.dr(a[1]))
+        if op == "DataHasValue":
+            return OWLDataHasValue(self.dpe(a[0]), self.lit(a[1]))
+        n = int(_iri_str(a[0]))
+        filler = self.dr(a[2]) if len(a) > 2 else TopOWLDatatype
+        if op == "DataMinCardinality":
+            return OWLDataMinCardinality(n, self.dpe(a[1]), filler)
+        if op == "DataMaxCardinality":
+            return OWLDataMaxCardinality(n, self.dpe(a[1]), filler)
+        return OWLDataExactCardinality(n, self.dpe(a[1]), filler)
+
+    def dr(self, t: object) -> OWLDataRange:
+        from hermit.owl_model.class_expression.restriction import (
+            OWLDataOneOf,
+            OWLDatatypeRestriction,
+            OWLFacetRestriction,
+        )
+        from hermit.owl_model.owl_data_ranges import (
+            OWLDataComplementOf,
+            OWLDataIntersectionOf,
+            OWLDataUnionOf,
+        )
+        from hermit.owl_model.owl_datatype import OWLDatatype
+        from hermit.owl_model.vocab import OWLFacet
+
+        if isinstance(t, _IRI):
+            return OWLDatatype(t.v)
+        if isinstance(t, _Expr):
+            op, a = t.op, t.args
+            if op == "DataOneOf":
+                return OWLDataOneOf([self.lit(x) for x in a])
+            if op == "DataComplementOf":
+                return OWLDataComplementOf(self.dr(a[0]))
+            if op == "DataIntersectionOf":
+                return OWLDataIntersectionOf([self.dr(x) for x in a])
+            if op == "DataUnionOf":
+                return OWLDataUnionOf([self.dr(x) for x in a])
+            if op == "DatatypeRestriction":
+                facets_by_iri = {f.iri.as_str(): f for f in OWLFacet}
+                restrictions = []
+                for i in range(1, len(a) - 1, 2):
+                    facet = facets_by_iri[_iri_str(a[i])]
+                    restrictions.append(
+                        OWLFacetRestriction(facet, self.lit(a[i + 1]))
+                    )
+                return OWLDatatypeRestriction(
+                    OWLDatatype(_iri_str(a[0])), restrictions
+                )
+        raise ValueError(f"Unsupported data range: {t!r}")
 
     def ope(self, t: object) -> OWLObjectPropertyExpression:
         from hermit.owl_model.owl_property import (
