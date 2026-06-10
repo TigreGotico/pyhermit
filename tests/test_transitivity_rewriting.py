@@ -212,6 +212,40 @@ class TestRoleChainComposition:
         assert _consistent(facts)
 
 
+class TestEquivalentObjectProperties:
+    """p ≡ q must yield mutual role-inclusion clauses."""
+
+    def test_equivalent_properties_transfer_edges(self):
+        from hermit.owl_model.owl_axiom import OWLEquivalentObjectPropertiesAxiom
+
+        p = OWLObjectProperty(NS + "p")
+        q = OWLObjectProperty(NS + "q")
+        a = OWLNamedIndividual(NS + "a")
+        b = OWLNamedIndividual(NS + "b")
+        facts = [
+            OWLObjectPropertyAssertionAxiom(a, p, b),
+            *_denied_edge(a, q, b),
+        ]
+        assert not _consistent(
+            [OWLEquivalentObjectPropertiesAxiom([p, q]), *facts]
+        )
+        assert _consistent(facts)
+
+    def test_equivalent_properties_populate_inclusions(self):
+        from hermit.owl_model.owl_axiom import OWLEquivalentObjectPropertiesAxiom
+
+        p = OWLObjectProperty(NS + "p")
+        q = OWLObjectProperty(NS + "q")
+        normalized = OWLNormalization().process_ontology(
+            [OWLEquivalentObjectPropertiesAxiom([p, q])]
+        )
+        p_role = AtomicRole.create(NS + "p")
+        q_role = AtomicRole.create(NS + "q")
+        inclusions = set(normalized.simple_object_property_inclusions)
+        assert (p_role, q_role) in inclusions
+        assert (q_role, p_role) in inclusions
+
+
 class TestSymmetricTransitiveInterplay:
     """Symmetric + transitive roles propagate universals in both directions."""
 

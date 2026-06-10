@@ -780,16 +780,17 @@ class OWLNormalization:
         self, axiom: OWLEquivalentObjectPropertiesAxiom, result: NormalizedAxioms
     ) -> None:
         """Process EquivalentObjectProperties: add bidirectional inclusions."""
+        from hermit.owl_model.owl_axiom import OWLSubObjectPropertyOfAxiom
+
         props = list(axiom.properties())
         for i in range(len(props)):
             for j in range(i + 1, len(props)):
                 # Add R ⊑ S and S ⊑ R
-                from hermit.owl_model.owl_axiom import OWLSubObjectPropertyOfAxiom
-                result.positive_facts.append(
-                    OWLSubObjectPropertyOfAxiom(props[i], props[j])
+                self._process_sub_object_property_of(
+                    OWLSubObjectPropertyOfAxiom(props[i], props[j]), result
                 )
-                result.positive_facts.append(
-                    OWLSubObjectPropertyOfAxiom(props[j], props[i])
+                self._process_sub_object_property_of(
+                    OWLSubObjectPropertyOfAxiom(props[j], props[i]), result
                 )
 
     def _process_object_property_domain(
