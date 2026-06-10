@@ -611,3 +611,163 @@ class TestExpressivityFlagWiring:
 
         ont = OWLClausification().clausify(axioms, ontology_iri="urn:test:inv")
         assert ont.has_inverse_roles() is True
+
+
+# ---------------------------------------------------------------------------
+# Classification completeness: precomputed hierarchy must agree with the
+# direct tableau subsumption test for defined (equivalence) classes.
+# Exercises QuasiOrderClassification._read_known_subsumers_from_root_node
+# (empty-dependency-set check) and _ClassificationRelation.does_subsume
+# (the parent atom is a *negative* dummy-dependency assertion).
+# ---------------------------------------------------------------------------
+
+class TestClassificationDefinedClasses:
+    NS = "http://example.org/pizza#"
+
+    def _reasoner(self, axioms):
+        from hermit import Reasoner
+        from hermit.structural.owl_clausification import OWLClausification
+        from hermit.structural.owl_normalization import OWLNormalization
+
+        normalized = OWLNormalization().process_ontology(axioms)
+        dl = OWLClausification().clausify(normalized, ontology_iri="urn:test:pizza")
+        return Reasoner(dl)
+
+    def _base_entities(self):
+        from hermit.owl_model.class_expression import OWLClass
+        from hermit.owl_model.owl_property import OWLObjectProperty
+
+        ns = self.NS
+        return (
+            OWLClass(ns + "Pizza"),
+            OWLClass(ns + "MargheritaPizza"),
+            OWLClass(ns + "CheeseTopping"),
+            OWLObjectProperty(ns + "hasTopping"),
+        )
+
+    def test_horn_defined_class_in_precomputed_hierarchy(self):
+        """Margherita ⊑ CheesyPizza via CheesyPizza ≡ Pizza ⊓ ∃hasTopping.Cheese."""
+        from hermit.owl_model.class_expression import (
+            OWLClass,
+            OWLObjectIntersectionOf,
+            OWLObjectSomeValuesFrom,
+        )
+        from hermit.owl_model.owl_axiom import (
+            OWLEquivalentClassesAxiom,
+            OWLSubClassOfAxiom,
+        )
+
+        pizza, margherita, cheese, has_topping = self._base_entities()
+        cheesy = OWLClass(self.NS + "CheesyPizza")
+        axioms = [
+            OWLSubClassOfAxiom(margherita, pizza),
+            OWLSubClassOfAxiom(
+                margherita, OWLObjectSomeValuesFrom(has_topping, cheese)
+            ),
+            OWLEquivalentClassesAxiom([
+                cheesy,
+                OWLObjectIntersectionOf([
+                    pizza, OWLObjectSomeValuesFrom(has_topping, cheese)
+                ]),
+            ]),
+        ]
+        r = self._reasoner(axioms)
+        try:
+            r.precompute_inferences()
+            m = AtomicConcept.create(self.NS + "MargheritaPizza")
+            c = AtomicConcept.create(self.NS + "CheesyPizza")
+            assert r.is_sub_class_of(m, c) is True
+        finally:
+            r.dispose()
+
+    def test_nondeterministic_defined_class_in_precomputed_hierarchy(self):
+        """Margherita ⊑ VegetarianPizza needs a backtracking subsumption test."""
+        from hermit.owl_model.class_expression import (
+            OWLClass,
+            OWLObjectAllValuesFrom,
+            OWLObjectComplementOf,
+            OWLObjectIntersectionOf,
+            OWLObjectUnionOf,
+        )
+        from hermit.owl_model.owl_axiom import (
+            OWLDisjointClassesAxiom,
+            OWLEquivalentClassesAxiom,
+            OWLSubClassOfAxiom,
+        )
+
+        pizza, margherita, cheese, has_topping = self._base_entities()
+        veg_topping = OWLClass(self.NS + "VegetableTopping")
+        meat = OWLClass(self.NS + "MeatTopping")
+        vegetarian = OWLClass(self.NS + "VegetarianPizza")
+        axioms = [
+            OWLSubClassOfAxiom(margherita, pizza),
+            OWLSubClassOfAxiom(
+                margherita,
+                OWLObjectAllValuesFrom(
+                    has_topping, OWLObjectUnionOf([cheese, veg_topping])
+                ),
+            ),
+            OWLEquivalentClassesAxiom([
+                vegetarian,
+                OWLObjectIntersectionOf([
+                    pizza,
+                    OWLObjectAllValuesFrom(
+                        has_topping, OWLObjectComplementOf(meat)
+                    ),
+                ]),
+            ]),
+            OWLDisjointClassesAxiom([cheese, meat]),
+            OWLDisjointClassesAxiom([veg_topping, meat]),
+        ]
+        r = self._reasoner(axioms)
+        try:
+            r.precompute_inferences()
+            m = AtomicConcept.create(self.NS + "MargheritaPizza")
+            v = AtomicConcept.create(self.NS + "VegetarianPizza")
+            assert r.is_sub_class_of(m, v) is True
+        finally:
+            r.dispose()
+
+    def test_precomputed_hierarchy_matches_direct_test(self):
+        """Hierarchy lookups and direct tableau tests must agree."""
+        from hermit.owl_model.class_expression import (
+            OWLClass,
+            OWLObjectIntersectionOf,
+            OWLObjectSomeValuesFrom,
+        )
+        from hermit.owl_model.owl_axiom import (
+            OWLEquivalentClassesAxiom,
+            OWLSubClassOfAxiom,
+        )
+
+        pizza, margherita, cheese, has_topping = self._base_entities()
+        cheesy = OWLClass(self.NS + "CheesyPizza")
+        axioms = [
+            OWLSubClassOfAxiom(margherita, pizza),
+            OWLSubClassOfAxiom(
+                margherita, OWLObjectSomeValuesFrom(has_topping, cheese)
+            ),
+            OWLEquivalentClassesAxiom([
+                cheesy,
+                OWLObjectIntersectionOf([
+                    pizza, OWLObjectSomeValuesFrom(has_topping, cheese)
+                ]),
+            ]),
+        ]
+        m = AtomicConcept.create(self.NS + "MargheritaPizza")
+        c = AtomicConcept.create(self.NS + "CheesyPizza")
+
+        r_direct = self._reasoner(axioms)
+        try:
+            direct = r_direct.is_sub_class_of(m, c)
+        finally:
+            r_direct.dispose()
+
+        r_hier = self._reasoner(axioms)
+        try:
+            r_hier.precompute_inferences()
+            hier = r_hier.is_sub_class_of(m, c)
+        finally:
+            r_hier.dispose()
+
+        assert direct == hier == True  # noqa: E712
