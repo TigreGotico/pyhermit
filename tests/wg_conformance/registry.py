@@ -46,6 +46,19 @@ _ONTOLOGIES = (
 )
 ALL_RDF = _ONTOLOGIES / "all.rdf"
 
+# Mirrors AbstractTest.registerImportedReosurces(): the WG suite ships local
+# copies of the ontologies that test premises import via owl:imports, and the
+# Java harness maps those ontology IRIs onto the local files. consistent001
+# and consistent002 import each other, so resolution must track visited IRIs.
+IMPORT_MAP: dict[str, Path] = {
+    "http://www.w3.org/2002/03owlt/miscellaneous/consistent001": _ONTOLOGIES
+    / "consistent001.rdf",
+    "http://www.w3.org/2002/03owlt/miscellaneous/consistent002": _ONTOLOGIES
+    / "consistent002.rdf",
+    "http://www.w3.org/2002/03owlt/imports/support011-A": _ONTOLOGIES
+    / "support011-A.rdf",
+}
+
 
 class Status(str, Enum):
     APPROVED = "Approved"
