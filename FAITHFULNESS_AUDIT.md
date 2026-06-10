@@ -202,14 +202,10 @@ axiom objects the OWL API would. `parser.load_ontology` /
 There is **no third-party OWL stack (no owlready2) on the load path** — it is
 pure stdlib. The reader accepts custom and relative datatype IRIs, retains class
 assertions on anonymous individuals, and preserves cyclic `EquivalentClasses` /
-`EquivalentProperties` axioms. Constructs the reasoning core does not yet support
-(datatype restrictions on data properties in some positions; named-class nominal
-enumerations requiring nominal closure) are over-approximated or omitted rather
-than emitted as expressions the clausifier cannot accept.
-
-(The repository `README.md` and `docs/index.md` still mention loading "via
-owlready2"; that is stale prose, not the code path. The code path is the stdlib
-readers above.)
+`EquivalentProperties` axioms. Data restrictions (`DataSomeValuesFrom`/`DataAllValuesFrom`/`DataHasValue`/
+`DatatypeRestriction`/`DataOneOf`), data-property range/domain, and negative
+data-property assertions flow end-to-end from all three readers through
+normalization into DL clauses.
 
 ## 6. Partial subsystems
 
@@ -228,12 +224,15 @@ the full Java pipeline.
 **File:** `datatypes/`, `tableau/datatype_manager.py`.
 
 The `DatatypeManager` machinery (D-conjunction handling, value-space intersection,
-unknown-restriction inequality generation) is ported. Coverage of the OWL 2
-datatype map across the full set of facet/value-space combinations is narrower
-than Java's: datatype reasoning is exact for the implemented datatypes
-(`datatypes/registry.py`: xsd string/decimal/integer/float/double/boolean/anyURI/
-dateTime, rdf:PlainLiteral, base64Binary, hexBinary, …) and conservative
-elsewhere.
+unknown-restriction inequality generation) is ported, and the per-type handlers
+mirror Java's value-space models: `owlreal` interval arithmetic over
+INTEGER/DECIMAL/RATIONAL/REAL base ranges with exact integer cardinality and
+`owl:rational` fractions; bit-pattern `xsd:float`/`xsd:double` values (distinct
+±0, self-equal NaN, nextFloat/previousFloat discreteness); timeline-based
+`xsd:dateTime` (millisecond position + timezone-offset interval families); a
+string-family subset lattice; and handler-dispatched disjointness (different
+handlers ⇒ disjoint value spaces). Datatypes outside the registry remain
+conservative (unknown-restriction semantics).
 
 ## 7. Per-subsystem summary
 
