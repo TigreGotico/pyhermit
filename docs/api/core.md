@@ -528,7 +528,8 @@ A property is **non-simple** if it:
 
 ### load_ontology
 
-Loads OWL/RDF files via owlready2. Source: `src/hermit/parser.py:25`.
+Loads OWL documents (RDF/XML, OWL/XML, Functional-Style Syntax) via the
+stdlib readers. Source: `src/hermit/parser.py:25`.
 
 ```python
 from hermit.parser import load_ontology
@@ -536,7 +537,7 @@ from hermit.parser import load_ontology
 axioms = load_ontology("path/to/ontology.owl")  # list[OWLAxiom]
 ```
 
-Raises `ImportError` if owlready2 is not installed, `FileNotFoundError` if the path does not exist, `ValueError` if the file cannot be parsed.
+Raises `FileNotFoundError` if the path does not exist, `ValueError` if the file cannot be parsed.
 
 ### NonSimicityError (ValueError)
 
