@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1a2](https://github.com/TigreGotico/pyhermit/tree/0.3.1a2) (2026-07-30)
+
+[Full Changelog](https://github.com/TigreGotico/pyhermit/compare/0.3.1a1...0.3.1a2)
+
+**Merged pull requests:**
+
+- docs: rewrite README in Simplified Technical English [\#4](https://github.com/TigreGotico/pyhermit/pull/4) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.3.1a1](https://github.com/TigreGotico/pyhermit/tree/0.3.1a1) (2026-06-10)
 
 [Full Changelog](https://github.com/TigreGotico/pyhermit/compare/ba9de8f4fa042bec2fc758c2512592ab84d5d5f9...0.3.1a1)
