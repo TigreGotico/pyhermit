@@ -41,41 +41,32 @@ def reasoner_from_axioms(axioms, ontology_iri="urn:example:onto"):
 NS = "http://example.org/"
 ```
 
-## Getting Started
+## Getting started
 
-### Q: What's the difference between PyHermit and other reasoners?
+### Q: What is the difference between PyHermit and other reasoners?
 
-**A:** PyHermit is a Python port of the HermiT reasoner (originally Java). It implements **OWL 2 DL** reasoning with the hypertableau calculus.
+A: PyHermit is a Python port of the HermiT reasoner, originally written in Java. It implements OWL 2 DL reasoning with the hypertableau calculus.
 
 | Reasoner | Language | OWL Profile | Strengths |
 |----------|----------|-------------|-----------|
 | HermiT (Java) | Java | OWL 2 DL | Fast, mature, original |
-| **PyHermit** | Python | OWL 2 DL | Pure Python, no JVM, easy embedding |
+| PyHermit | Python | OWL 2 DL | Pure Python, no JVM, easy embedding |
 | Pellet | Java | OWL 2 DL | Modular ontologies |
 | RDFlib | Python | RDFS-level | Simple, lightweight triple store |
 
 ### Q: Can I use PyHermit in my application?
 
-**A:** Yes. PyHermit is:
-- ✅ Apache 2.0 licensed (commercial-friendly)
-- ✅ Pure Python (no Java dependencies)
-- ✅ Embeddable in applications
-- ✅ Conformance-tested: 340/350 W3C OWL WG Approved-DL test cases pass at a
-  20 s per-case budget, with zero wrong answers
+A: Yes. PyHermit is Apache 2.0 licensed, so it is commercial-friendly. It is pure Python with no Java dependencies, and it embeds in applications. It is conformance-tested: 340 of 350 W3C OWL WG Approved-DL test cases pass at a 20-second per-case budget, with zero wrong answers.
 
 ### Q: Is PyHermit faster than the Java version?
 
-**A:** No. Java HermiT is faster due to JVM optimizations. Use PyHermit when you need:
-- Integration with Python libraries (pandas, numpy, scikit-learn)
-- A reasoner without a JVM dependency
-- Small-to-medium ontologies
+A: No. Java HermiT is faster because of JVM optimizations. Use PyHermit when you need integration with Python libraries (pandas, numpy, scikit-learn), a reasoner without a JVM dependency, or you work with small-to-medium ontologies.
 
-## Ontology Design
+## Ontology design
 
 ### Q: How do I model "A has at least one B"?
 
-**A:** Use an **existential restriction** (`OWLObjectSomeValuesFrom`, or
-`OWLObjectMinCardinality` for counts):
+A: Use an existential restriction (`OWLObjectSomeValuesFrom`, or `OWLObjectMinCardinality` for counts).
 
 ```python
 Parent = OWLClass(NS + "Parent")
@@ -88,7 +79,7 @@ axiom = OWLSubClassOfAxiom(Parent, OWLObjectSomeValuesFrom(hasChild, Child))
 
 ### Q: How do I model "all A are B" or "if A then B"?
 
-**A:** Use **OWLSubClassOfAxiom** (subsumption):
+A: Use `OWLSubClassOfAxiom` (subsumption).
 
 ```python
 Dog = OWLClass(NS + "Dog")
@@ -100,7 +91,7 @@ axiom = OWLSubClassOfAxiom(Dog, Animal)
 
 ### Q: How do I say "A and B are mutually exclusive"?
 
-**A:** Use **OWLDisjointClassesAxiom**:
+A: Use `OWLDisjointClassesAxiom`.
 
 ```python
 Student = OWLClass(NS + "Student")
@@ -112,7 +103,7 @@ axiom = OWLDisjointClassesAxiom([Student, Employee])
 
 ### Q: Can I model inheritance chains?
 
-**A:** Yes, naturally:
+A: Yes, naturally.
 
 ```python
 Mammal = OWLClass(NS + "Mammal")
@@ -123,7 +114,7 @@ axioms = [
 ]
 
 reasoner = reasoner_from_axioms(axioms)
-# Reasoner automatically infers: Dog ⊑ Animal
+# Reasoner automatically infers: Dog is a subclass of Animal
 print(reasoner.is_sub_class_of(
     AtomicConcept.create(NS + "Dog"), AtomicConcept.create(NS + "Animal")
 ))  # True
@@ -132,7 +123,7 @@ reasoner.dispose()
 
 ### Q: How do I express "exactly 2 parents"?
 
-**A:** Combine min- and max-cardinality (or use `OWLObjectExactCardinality`):
+A: Combine min- and max-cardinality, or use `OWLObjectExactCardinality`.
 
 ```python
 Person = OWLClass(NS + "Person")
@@ -149,7 +140,7 @@ axiom = OWLSubClassOfAxiom(
 
 ### Q: Can I have circular class references?
 
-**A:** Yes, but be careful:
+A: Yes, but be careful.
 
 ```python
 # Safe circular reference — Parents have Child children, Children have Parent parents
@@ -164,15 +155,15 @@ A = OWLClass(NS + "A")
 B = OWLClass(NS + "B")
 unsafe = [
     OWLSubClassOfAxiom(A, B),
-    OWLSubClassOfAxiom(B, OWLObjectComplementOf(A)),  # A ⊑ B ⊑ ¬A
+    OWLSubClassOfAxiom(B, OWLObjectComplementOf(A)),  # A is a subclass of B is a subclass of not-A
 ]
 ```
 
-## Reasoning & Queries
+## Reasoning and queries
 
-### Q: What's the difference between precompute_inferences() and on-demand reasoning?
+### Q: What is the difference between precompute_inferences() and on-demand reasoning?
 
-**A:**
+A:
 
 ```python
 axioms = [OWLSubClassOfAxiom(Dog, Animal)]
@@ -191,26 +182,21 @@ print(reasoner.is_sub_class_of(dog, animal))  # computed on demand
 reasoner.dispose()
 ```
 
-**When to use:**
-- **Precompute:** multiple queries, instance retrieval, hierarchies
-- **On-demand:** a single satisfiability or subsumption test
+Use precompute when you run multiple queries, retrieve instances, or need the full hierarchy. Use on-demand for a single satisfiability or subsumption test.
 
-### Q: Why is my query returning fewer results than expected?
+### Q: Why does my query return fewer results than expected?
 
-**A:** Common causes:
+A: Check these common causes.
 
-1. **Instance not asserted into the right class** — check your
-   `OWLClassAssertionAxiom`s (the individual comes first).
-2. **Missing rule** — there's no `OWLSubClassOfAxiom` connecting the asserted
-   class to the queried class.
-3. **Defined class uses ⊑ instead of ≡** — the reasoner can only *recognize*
-   members of a class defined with `OWLEquivalentClassesAxiom`.
+1. The instance is not asserted into the right class. Check your `OWLClassAssertionAxiom`s (the individual comes first).
+2. A rule is missing. There is no `OWLSubClassOfAxiom` connecting the asserted class to the queried class.
+3. A defined class uses subclass-of instead of equivalent-to. The reasoner can only recognize members of a class defined with `OWLEquivalentClassesAxiom`.
 
 See the [Debugging Guide](./recipes/debugging.md) for a step-by-step diagnosis.
 
 ### Q: Can I check if a class is satisfiable (can have instances)?
 
-**A:** Yes:
+A: Yes.
 
 ```python
 reasoner = reasoner_from_axioms(unsafe)
@@ -222,7 +208,7 @@ reasoner.dispose()
 
 ### Q: How do I find contradictions in my ontology?
 
-**A:**
+A:
 
 ```python
 reasoner = reasoner_from_axioms(unsafe)
@@ -242,8 +228,7 @@ reasoner.dispose()
 
 ### Q: Can I query inverse relationships?
 
-**A:** Yes — either declare the inverse property, or query with an
-`InverseRole` handle directly:
+A: Yes. Declare the inverse property, or query with an `InverseRole` handle directly.
 
 ```python
 from hermit.model import InverseRole
@@ -266,41 +251,31 @@ print(reasoner.has_role_relationship(bob_h, InverseRole.create(has_child), alice
 reasoner.dispose()
 ```
 
-## Performance & Optimization
+## Performance and optimization
 
 ### Q: Why is reasoning slow for my ontology?
 
-**A:** Check these:
+A: Check these points.
 
-1. **Ontology size and shape:**
+1. Ontology size and shape:
    ```python
    reasoner = reasoner_from_axioms(axioms)
    print(reasoner.stats)  # clauses, atomic_concepts, individuals, is_horn
    reasoner.dispose()
    ```
-   Horn ontologies (`is_horn: True`) avoid backtracking and classify much
-   faster.
+   Horn ontologies (`is_horn: True`) avoid backtracking and classify much faster.
+2. Expensive constructs: large max-cardinalities, deeply nested disjunctions, and transitive properties over deep existential chains.
+3. No precomputation: call `precompute_inferences()` once before a batch of queries, instead of letting every query re-reason.
 
-2. **Expensive constructs:** large max-cardinalities, deeply nested
-   disjunctions, and transitive properties over deep existential chains.
+### Q: What is the maximum ontology size PyHermit can handle?
 
-3. **No precomputation:** call `precompute_inferences()` once before a batch
-   of queries instead of letting every query re-reason.
+A: It depends on the constructs used, not just raw counts. A Horn ontology with 50,000 simple subclass axioms classifies quickly, while a few hundred axioms mixing disjunctions, cardinalities, and transitivity can be hard. As a rule of thumb, prefer Java HermiT above roughly 10,000 classes, or when classification times stop being acceptable.
 
-### Q: What's the maximum ontology size PyHermit can handle?
-
-**A:** It depends on the constructs used, not just raw counts — a Horn
-ontology with 50k simple subclass axioms classifies quickly, while a few
-hundred axioms mixing disjunctions, cardinalities, and transitivity can be
-hard. As a rule of thumb, prefer Java HermiT above roughly 10k classes or
-when classification times stop being acceptable.
-
-## Data Handling
+## Data handling
 
 ### Q: Can I use strings, numbers, and dates as property values?
 
-**A:** Yes, using **data properties** and `OWLLiteral` (the datatype is
-inferred from the Python type):
+A: Yes, with data properties and `OWLLiteral`. PyHermit infers the datatype from the Python type.
 
 ```python
 from datetime import date
@@ -319,7 +294,7 @@ axioms = [
 
 ### Q: Can I have multi-valued properties?
 
-**A:** Yes — add multiple assertions:
+A: Yes. Add multiple assertions.
 
 ```python
 hasEmail = OWLDataProperty(NS + "hasEmail")
@@ -332,21 +307,18 @@ axioms = [
 
 ### Q: How do I handle missing data?
 
-**A:** OWL uses the **open-world assumption**: if you don't assert something,
-it's *unknown* (not false). To state an explicit falsehood, use a negative
-assertion:
+A: OWL uses the open-world assumption: if you do not assert something, it is unknown, not false. To state an explicit falsehood, use a negative assertion.
 
 ```python
 axiom = OWLNegativeDataPropertyAssertionAxiom(person, hasAge, OWLLiteral(30))
 # person definitely does not have age 30
 ```
 
-## Integration & APIs
+## Integration and APIs
 
 ### Q: Can I load RDF/OWL files?
 
-**A:** Use **load_ontology** (pure stdlib reader for RDF/XML, OWL/XML, and
-Functional-Style Syntax), then compile the axioms as usual:
+A: Use `load_ontology` (a pure stdlib reader for RDF/XML, OWL/XML, and Functional-Style Syntax), then compile the axioms as usual.
 
 ```python
 # doc-sample: skip (needs an .owl file on disk)
@@ -359,7 +331,7 @@ reasoner.precompute_inferences()
 
 ### Q: Can I export the reasoned hierarchy?
 
-**A:** Dump it in Functional-Style Syntax:
+A: Dump it in Functional-Style Syntax.
 
 ```python
 import io, sys
@@ -372,7 +344,7 @@ reasoner.dispose()
 
 ### Q: Can I use PyHermit with pandas/numpy?
 
-**A:** Yes:
+A: Yes.
 
 ```python
 axioms = [
@@ -395,7 +367,7 @@ reasoner.dispose()
 
 ### Q: Can I integrate PyHermit with a web service?
 
-**A:** Yes — compile the reasoner once at startup and answer queries from it:
+A: Yes. Compile the reasoner once at startup and answer queries from it.
 
 ```python
 # doc-sample: skip (illustrative server sketch)
@@ -416,29 +388,22 @@ def instances():
 
 ## Troubleshooting
 
-### Q: I get "UnsupportedDatatypeException" — what does this mean?
+### Q: I get "UnsupportedDatatypeException". What does this mean?
 
-**A:** The ontology uses a datatype the reasoner doesn't implement. Stick to
-the OWL 2 datatypes (`xsd:string`, `xsd:integer`, `xsd:decimal`, `xsd:float`,
-`xsd:double`, `xsd:boolean`, `xsd:dateTime`, `xsd:anyURI`,
-`xsd:base64Binary`, `xsd:hexBinary`, …), or construct the clausifier with
-`OWLClausification(ignore_unsupported_datatypes=True)` to skip them.
+A: The ontology uses a datatype the reasoner does not implement. Stick to the OWL 2 datatypes (`xsd:string`, `xsd:integer`, `xsd:decimal`, `xsd:float`, `xsd:double`, `xsd:boolean`, `xsd:dateTime`, `xsd:anyURI`, `xsd:base64Binary`, `xsd:hexBinary`, and so on), or construct the clausifier with `OWLClausification(ignore_unsupported_datatypes=True)` to skip them.
 
-### Q: My reasoner hangs or is very slow
+### Q: My reasoner hangs or runs very slowly
 
-**A:** Try:
+A: Try these steps.
 
-1. **Check the ontology shape:** `reasoner.stats` — non-Horn ontologies
-   backtrack.
-2. **Reduce axioms:** remove rules you don't query.
-3. **Set a task timeout:** `Configuration.individual_task_timeout` (ms).
-4. **Profile:** time `is_consistent()` and `precompute_inferences()`
-   separately.
+1. Check the ontology shape: `reasoner.stats`. Non-Horn ontologies backtrack.
+2. Reduce axioms: remove rules you do not query.
+3. Set a task timeout: `Configuration.individual_task_timeout` (in milliseconds).
+4. Profile: time `is_consistent()` and `precompute_inferences()` separately.
 
-### Q: How do I debug why an inference didn't happen?
+### Q: How do I debug why an inference did not happen?
 
-**A:** Walk the chain — see the
-[Debugging Guide](./recipes/debugging.md#problem-4-wrong-inference):
+A: Walk the chain. See the [Debugging Guide](./recipes/debugging.md#problem-4-wrong-inference).
 
 ```python
 reasoner = reasoner_from_axioms([OWLSubClassOfAxiom(Dog, Animal)])
@@ -449,20 +414,21 @@ animal = AtomicConcept.create(NS + "Animal")
 print(f"Dog satisfiable: {reasoner.is_satisfiable(dog)}")
 
 # 2. Does the subsumption hold?
-print(f"Dog ⊑ Animal: {reasoner.is_sub_class_of(dog, animal)}")
+print(f"Dog is a subclass of Animal: {reasoner.is_sub_class_of(dog, animal)}")
 reasoner.dispose()
 ```
 
-## License & Community
+## License and community
 
 ### Q: Can I use PyHermit commercially?
 
-**A:** Yes. The Apache 2.0 license allows commercial use without restriction.
+A: Yes. The Apache 2.0 license allows commercial use without restriction.
 
 ### Q: Where do I report bugs?
 
-**A:** GitHub Issues: https://github.com/TigreGotico/pyhermit/issues
+A: Open an issue on [GitHub](https://github.com/TigreGotico/pyhermit/issues).
+
+For more detail, see the [full documentation](./index.md).
 
 ---
-
-**Still have questions?** Check the [full documentation](./index.md) or open an issue.
+[← First Program](first-program.md) · [Home](index.md)
