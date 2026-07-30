@@ -1,24 +1,24 @@
 # Installation Guide
 
-Get PyHermit up and running on your system in less than 5 minutes.
+Get PyHermit running on your system in under 5 minutes.
 
 ## Requirements
 
-- Python 3.10 or later
-- pip (Python package manager)
-- No Java or external dependencies required
+- Python 3.10 or later.
+- pip (the Python package manager).
+- No Java or other external dependencies.
 
-## Quick Install
+## Quick install
 
 ```bash
 pip install hermit-reasoner
 ```
 
-That's it! PyHermit is now installed and ready to use.
+PyHermit is now installed and ready to use.
 
-## Verify Installation
+## Verify the installation
 
-To confirm everything works:
+Run this script to confirm the install works.
 
 ```python
 from hermit import Reasoner
@@ -43,11 +43,11 @@ print(f"Reasoner is ready: {reasoner.is_consistent()}")
 reasoner.dispose()
 ```
 
-If you see `Reasoner is ready: True`, the installation is successful!
+If the script prints `Reasoner is ready: True`, the installation works.
 
-## For Developers
+## For developers
 
-### Install for Development
+### Install for development
 
 ```bash
 git clone https://github.com/TigreGotico/pyhermit.git
@@ -55,19 +55,19 @@ cd pyhermit
 pip install -e ".[dev]"
 ```
 
-### Run Tests
+### Run tests
 
 ```bash
 pytest tests/
 ```
 
-### Type Checking
+### Check types
 
 ```bash
 mypy src/
 ```
 
-### Linting
+### Lint the code
 
 ```bash
 ruff check src/
@@ -77,33 +77,33 @@ ruff check src/
 
 ### ImportError: No module named 'hermit'
 
-Make sure pip installed the package correctly:
+Check that pip installed the package.
 
 ```bash
 pip show hermit-reasoner
 ```
 
-If not listed, try reinstalling:
+If pip does not list the package, reinstall it.
 
 ```bash
 pip install --force-reinstall hermit-reasoner
 ```
 
-### Version Mismatch
+### Version mismatch
 
-If you have multiple Python versions, use the specific version:
+If you have several Python versions installed, target the one you want.
 
 ```bash
 python3.10 -m pip install hermit-reasoner
 ```
 
-### Still Having Issues?
+### The problem persists
 
-Open an issue on GitHub with:
-- Your Python version: `python --version`
-- Your pip version: `pip --version`
-- Full error message
+Open an issue on GitHub with this information:
+
+- Your Python version: `python --version`.
+- Your pip version: `pip --version`.
+- The full error message.
 
 ---
-
-**Next:** Read [Concepts](./concepts.md) to understand OWL and reasoning.
+[Home](index.md) · [Concepts →](concepts.md)

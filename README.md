@@ -1,20 +1,20 @@
-# PyHermit — Python OWL 2 DL Reasoner
+# PyHermit: Python OWL 2 DL Reasoner
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-A Python port of [HermiT](http://hermit-reasoner.com), an OWL 2 DL reasoner developed at the University of Oxford. Reasons about OWL ontologies using tableau-based decision procedures — no JVM required.
+PyHermit is a Python port of [HermiT](http://hermit-reasoner.com), an OWL 2 DL reasoner developed at the University of Oxford. It reasons about OWL ontologies with tableau-based decision procedures and needs no JVM.
 
-## Key Features
+## Features
 
-- **OWL 2 DL reasoning** — tableau decision procedure over the OWL 2 Direct Semantics constructs
-- **Tableau algorithm** — Hyperresolution with configurable blocking strategies
-- **Non-simple property validation** — Enforces OWL 2 spec: transitive, role-chain, and inherited-superrole properties are rejected at clausification time if used in cardinality restrictions, hasSelf, asymmetric, irreflexive, or disjoint axioms (`ValueError`)
-- **All OWL 2 datatypes** — xsd:string, decimal, integer, float, double, dateTime, boolean, anyURI, etc.
-- **SWRL rules & Datalog queries** — DL-safe rule support with query evaluation
-- **OWL file parsing** — Load RDF/XML, OWL/XML, and Functional-Style Syntax via a pure stdlib reader (`hermit.parser.load_ontology`)
-- **Pure Python** — No JVM, no external binaries, single `pip install`
-- **Type-safe** — Complete type hints, passes `mypy --strict`
+- OWL 2 DL reasoning: a tableau decision procedure over the OWL 2 Direct Semantics constructs.
+- Tableau algorithm: hyperresolution with configurable blocking strategies.
+- Non-simple property validation: the OWL 2 spec forbids transitive, role-chain, and inherited-superrole properties in cardinality restrictions, `hasSelf`, asymmetric, irreflexive, or disjoint axioms. PyHermit rejects these at clausification time with a `ValueError`.
+- All OWL 2 datatypes: `xsd:string`, `decimal`, `integer`, `float`, `double`, `dateTime`, `boolean`, `anyURI`, and more.
+- SWRL rules and Datalog queries: DL-safe rule support with query evaluation.
+- OWL file parsing: load RDF/XML, OWL/XML, and Functional-Style Syntax through a pure stdlib reader (`hermit.parser.load_ontology`).
+- Pure Python: no JVM, no external binaries, a single `pip install`.
+- Full type hints: the code passes `mypy --strict`.
 
 ## Install
 
@@ -22,7 +22,7 @@ A Python port of [HermiT](http://hermit-reasoner.com), an OWL 2 DL reasoner deve
 pip install hermit-reasoner
 ```
 
-## Basic Usage
+## Basic usage
 
 ```python
 from hermit import Reasoner
@@ -67,7 +67,7 @@ instances = reasoner.get_instances(animal)            # {fido}
 reasoner.dispose()
 ```
 
-## Load from OWL Files
+## Load from OWL files
 
 ```python
 from hermit.parser import load_ontology
@@ -93,7 +93,7 @@ OWL Ontology
 OWLNormalization  (NNF, fresh-concept introduction, simple/complex property classification)
     |
     v
-OWLClausification (DL clauses; non-simple property validation via ObjectPropertyInclusionManager)
+OWLClausification (DL clauses, non-simple property validation via ObjectPropertyInclusionManager)
     |
     v
 Tableau Expansion (hyperresolution with blocking)
@@ -104,9 +104,9 @@ Classification & Instance Retrieval
 
 See [docs/](docs/) for architecture detail and API reference.
 
-## Non-Simple Property Enforcement
+## Non-simple property enforcement
 
-OWL 2 forbids non-simple properties (transitive, or appearing as superroles of a role chain) in certain axiom positions. PyHermit enforces this at clausification time:
+OWL 2 forbids non-simple properties (transitive, or a superrole of a role chain) in certain axiom positions. PyHermit enforces this at clausification time:
 
 ```python
 from hermit.structural.owl_clausification import OWLClausification
@@ -119,53 +119,45 @@ except ValueError as e:
     print(e)
 ```
 
-Constraints checked (per OWL 2 spec Section 11.2):
+PyHermit checks these constraints, per OWL 2 spec Section 11.2:
+
 - `AsymmetricObjectProperty`
 - `IrreflexiveObjectProperty`
 - `DisjointObjectProperties`
 - Cardinality restrictions (`ObjectMinCardinality`, `ObjectMaxCardinality`, `ObjectExactCardinality`)
 - `ObjectHasSelf`
 
-Source: `ObjectPropertyInclusionManager._validate_complex_property_constraints` — `src/hermit/structural/object_property_inclusion_manager.py:360`
+Source: `ObjectPropertyInclusionManager._validate_complex_property_constraints`, at `src/hermit/structural/object_property_inclusion_manager.py:360`.
 
-## Project Status
+## Project status
 
-Structural port of Java HermiT. The reasoning core (tableau, blocking,
-hyperresolution, classification, datatype reasoning, SWRL/Datalog query
-answering) is implemented; ontology loading uses a pure stdlib reader
-(RDF/XML, OWL/XML, Functional-Style Syntax).
+PyHermit is a structural port of Java HermiT. The reasoning core is implemented: tableau, blocking, hyperresolution, classification, datatype reasoning, and SWRL/Datalog query answering. Ontology loading uses a pure stdlib reader (RDF/XML, OWL/XML, Functional-Style Syntax).
 
 - TBox reasoning (classification, subsumption)
 - ABox instance retrieval
 - Datatype reasoning
-- SWRL rules & Datalog query answering
+- SWRL rules and Datalog query answering
 - Non-simple property validation
-- OWL file parsing via a pure stdlib reader (RDF/XML, OWL/XML, FSS)
+- OWL file parsing through a pure stdlib reader (RDF/XML, OWL/XML, FSS)
 
-**Conformance:** passes 340/350 W3C OWL WG Approved-DL test cases at a 20 s
-per-case budget (`pytest -m slow tests/test_wg_conformance.py`, or
-`python scripts/wg_run.py approved --list-fails --timeout=20`), with zero
-wrong answers, errors, or unchecked conclusions — the 10 non-passing cases
-are timeouts on hard combinatorial ontologies (several pass with the 300 s
-budget the Java harness uses). Intentional divergences from the Java original
-are documented in `FAITHFULNESS_AUDIT.md`.
+**Conformance:** PyHermit passes 340 of 350 W3C OWL WG Approved-DL test cases at a 20-second per-case budget. Run this with `pytest -m slow tests/test_wg_conformance.py`, or `python scripts/wg_run.py approved --list-fails --timeout=20`. It reports zero wrong answers, zero errors, and zero unchecked conclusions. The 10 non-passing cases time out on hard combinatorial ontologies. Several of them pass with the 300-second budget the Java harness uses. `FAITHFULNESS_AUDIT.md` documents intentional divergences from the Java original.
 
-The unit suite passes under `pytest` (the W3C conformance corpus is marked
-`slow` and excluded by default); the code passes `mypy --strict` and `ruff`.
+The unit suite passes under `pytest` (the W3C conformance corpus is marked `slow` and excluded by default). The code passes `mypy --strict` and `ruff`.
 
 ## Documentation
 
-- **[docs/README.md](docs/README.md)** — Learning guide: OWL 2 DL reasoning and
-  the hypertableau calculus from scratch, mapped to this codebase
-  ([algorithms series](docs/algorithms/00-overview.md))
-- **[FAITHFULNESS_AUDIT.md](FAITHFULNESS_AUDIT.md)** — Where and why pyhermit
-  diverges from Java HermiT
-- **[docs/](docs/)** — Architecture, API reference, tutorials, recipes
-- **[examples/](examples/)** — Working examples from basic to advanced
-- **[Original Source](https://github.com/phillord/hermit-reasoner)** — Java HermiT
+- [docs/README.md](docs/README.md): a learning guide covering OWL 2 DL reasoning and the hypertableau calculus from scratch, mapped to this codebase (see the [algorithms series](docs/algorithms/00-overview.md)).
+- [FAITHFULNESS_AUDIT.md](FAITHFULNESS_AUDIT.md): where and why PyHermit diverges from Java HermiT.
+- [docs/](docs/): architecture, API reference, tutorials, and recipes.
+- [examples/](examples/): working examples, from basic to advanced.
+- [Original source](https://github.com/phillord/hermit-reasoner): Java HermiT.
+
+## Related projects
+
+- [phillord/hermit-reasoner](https://github.com/phillord/hermit-reasoner): the Java HermiT reasoner this project ports.
 
 ## License
 
 Apache 2.0. See [LICENSE](LICENSE).
 
-Based on HermiT, copyright Oxford University Computing Laboratory 2008–2014.
+Based on HermiT, copyright Oxford University Computing Laboratory 2008-2014.

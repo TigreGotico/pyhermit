@@ -1,20 +1,15 @@
 # Your First PyHermit Program
 
-A step-by-step walkthrough of your first reasoner program, with explanations at each step.
+A step-by-step walkthrough of your first reasoner program, with an explanation at each step.
 
-## The Two Halves of the API
+## The two halves of the API
 
-PyHermit splits work between two layers:
+PyHermit splits work between two layers.
 
-1. **Building** an ontology — create OWL entities and axioms with the
-   `hermit.owl_model` classes (the same shapes as the OWL API), then compile
-   them into a reasoner through normalization and clausification.
-2. **Querying** the reasoner — `Reasoner` methods take lightweight handles
-   from `hermit.model`: `AtomicConcept.create(iri)`, `Individual.create(iri)`,
-   and `AtomicRole.create(iri)`.
+1. Build an ontology. Create OWL entities and axioms with the `hermit.owl_model` classes (the same shapes as the OWL API). Then compile them into a reasoner through normalization and clausification.
+2. Querying the reasoner: `Reasoner` methods take lightweight handles from `hermit.model`, such as `AtomicConcept.create(iri)`, `Individual.create(iri)`, and `AtomicRole.create(iri)`.
 
-Every program in these docs uses the same small helper to compile axioms into
-a `Reasoner`:
+Every program in these docs uses the same small helper to compile axioms into a `Reasoner`.
 
 ```python
 from hermit import Reasoner
@@ -29,7 +24,7 @@ def reasoner_from_axioms(axioms, ontology_iri="urn:example:onto"):
     return Reasoner(dl_ontology)
 ```
 
-## The Program
+## The program
 
 ```python
 from hermit.model import AtomicConcept, AtomicRole, Individual
@@ -56,7 +51,7 @@ hasOwner = OWLObjectProperty(NS + "hasOwner")
 fido = OWLNamedIndividual(NS + "fido")
 john = OWLNamedIndividual(NS + "john")
 
-# Step 4: Collect the axioms — rules first, then facts
+# Step 4: Collect the axioms (rules first, then facts)
 axioms = [
     # Rules: dogs and cats are animals
     OWLSubClassOfAxiom(Dog, Animal),
@@ -71,7 +66,7 @@ axioms = [
 reasoner = reasoner_from_axioms(axioms, ontology_iri="urn:example:pets")
 reasoner.precompute_inferences()
 
-# Step 6: Query the reasoner — queries use hermit.model handles
+# Step 6: Query the reasoner (queries use hermit.model handles)
 animal = AtomicConcept.create(NS + "Animal")
 dog = AtomicConcept.create(NS + "Dog")
 cat = AtomicConcept.create(NS + "Cat")
@@ -93,16 +88,16 @@ print(f"Is the ontology consistent? {reasoner.is_consistent()}")
 # Question 4: Does Fido have an owner?
 print(f"Is John Fido's owner? {reasoner.has_role_relationship(fido_h, has_owner, john_h)}")
 
-# Question 5: Subsumption — is Dog a kind of Animal?
+# Question 5: Subsumption (is Dog a kind of Animal?)
 print(f"Is Dog a subclass of Animal? {reasoner.is_sub_class_of(dog, animal)}")
 
 # Step 7: Clean up
 reasoner.dispose()
 ```
 
-## Understanding the Output
+## Understanding the output
 
-Run this program:
+Run this program.
 
 ```bash
 python first_program.py
@@ -119,60 +114,55 @@ Is John Fido's owner? True
 Is Dog a subclass of Animal? True
 ```
 
-## What Happened?
+## What happened?
 
-### The Inference
+### The inference
 
 You told PyHermit:
-1. "Dogs are Animals" (`OWLSubClassOfAxiom(Dog, Animal)`)
-2. "Fido is a Dog" (`OWLClassAssertionAxiom(fido, Dog)`)
+1. "Dogs are Animals" (`OWLSubClassOfAxiom(Dog, Animal)`).
+2. "Fido is a Dog" (`OWLClassAssertionAxiom(fido, Dog)`).
 
-PyHermit inferred:
-- "Fido is an Animal" ← This wasn't explicitly stated!
+PyHermit inferred: "Fido is an Animal." This fact was never stated explicitly.
 
-This is **reasoning in action**. The reasoner applied the rule "Dogs are
-Animals" to the fact "Fido is a Dog" and automatically concluded "Fido is an
-Animal".
+This is reasoning in action. The reasoner applies the rule "Dogs are Animals" to the fact "Fido is a Dog" and concludes "Fido is an Animal."
 
-### The Pipeline
+### The pipeline
 
-`reasoner_from_axioms` runs the same pipeline the file loader uses:
+`reasoner_from_axioms` runs the same pipeline the file loader uses.
 
 ```
 OWL axioms (hermit.owl_model)
     |
     v
-OWLNormalization.process_ontology()   — negation normal form, fresh concepts
+OWLNormalization.process_ontology()   (negation normal form, fresh concepts)
     |
     v
-OWLClausification.clausify()          — DL clauses; OWL 2 validity checks
+OWLClausification.clausify()          (DL clauses, OWL 2 validity checks)
     |
     v
-Reasoner(dl_ontology)                 — hypertableau reasoning
+Reasoner(dl_ontology)                 (hypertableau reasoning)
 ```
 
-## Step-by-Step Breakdown
+## Step-by-step breakdown
 
-### Step 1: Define Classes
+### Step 1: Define classes
 
 ```python
 Animal = OWLClass("http://example.org/Animal")
 Dog = OWLClass("http://example.org/Dog")
 ```
 
-These create class objects. The IRI is just an identifier (it doesn't have to
-exist on the web).
+These calls create class objects. The IRI is just an identifier. It does not have to exist on the web.
 
-### Step 2: Define Properties
+### Step 2: Define properties
 
 ```python
 hasOwner = OWLObjectProperty("http://example.org/hasOwner")
 ```
 
-Properties represent relationships between individuals (not data values).
-Later, we say "Fido hasOwner John".
+Properties represent relationships between individuals, not data values. Later, the program states "Fido hasOwner John."
 
-### Step 3-4: Collect Axioms
+### Steps 3-4: Collect axioms
 
 ```python
 axioms = [
@@ -181,22 +171,18 @@ axioms = [
 ]
 ```
 
-`OWLSubClassOfAxiom(Dog, Animal)` means "Every Dog is also an Animal" — a
-rule. `OWLClassAssertionAxiom(fido, Dog)` means "Fido is a Dog" — a fact.
-Note the argument order: the **individual comes first** in a class assertion,
-matching the OWL API.
+`OWLSubClassOfAxiom(Dog, Animal)` states a rule: "Every Dog is also an Animal." `OWLClassAssertionAxiom(fido, Dog)` states a fact: "Fido is a Dog." Note the argument order: the individual comes first in a class assertion, matching the OWL API.
 
-### Step 5: Compile and Precompute
+### Step 5: Compile and precompute
 
 ```python
 reasoner = reasoner_from_axioms(axioms)
 reasoner.precompute_inferences()
 ```
 
-The reasoner compiles your axioms, then computes the class hierarchy up
-front. This can take time for large ontologies, so you only do it once.
+The reasoner compiles your axioms, then computes the class hierarchy up front. This can take time for large ontologies, so you only do it once.
 
-### Step 6: Query with Handles
+### Step 6: Query with handles
 
 ```python
 animal = AtomicConcept.create("http://example.org/Animal")
@@ -204,21 +190,19 @@ fido_h = Individual.create("http://example.org/fido")
 reasoner.has_type(fido_h, animal)
 ```
 
-Query methods take `hermit.model` handles, created from the same IRIs you
-used when building the axioms. The handles are interned — calling
-`AtomicConcept.create` twice with the same IRI gives the same object.
+Query methods take `hermit.model` handles, created from the same IRIs used when building the axioms. The handles are interned: calling `AtomicConcept.create` twice with the same IRI returns the same object.
 
-### Step 7: Clean Up
+### Step 7: Clean up
 
 ```python
 reasoner.dispose()
 ```
 
-This releases resources. Always do this when you're done.
+This call releases resources. Always call it when you finish with a reasoner.
 
-## Try This!
+## Try this
 
-Modify the program to ask more questions (before `dispose()`):
+Modify the program to ask more questions, before `dispose()`.
 
 ```python
 reasoner = reasoner_from_axioms(axioms, ontology_iri="urn:example:pets")
@@ -238,26 +222,18 @@ print(f"Is Fido a Cat? {reasoner.has_type(fido_h, cat)}")
 reasoner.dispose()
 ```
 
-## Key Takeaways
+## Key takeaways
 
-1. **Rules + Facts = Inferences**: Define rules (subclass axioms,
-   restrictions), add facts (assertions), and the reasoner finds new facts.
+1. Rules plus facts equal inferences. Define rules (subclass axioms, restrictions), add facts (assertions), and the reasoner finds new facts.
+2. Consistency: if you add contradictory axioms, `is_consistent()` returns `False`.
+3. Two layers: build with `hermit.owl_model` axioms, query with `hermit.model` handles.
+4. Automatic: you do not write code to find inferences. The reasoner does it.
 
-2. **Consistency**: If you add contradictory axioms, `is_consistent()`
-   returns `False`.
+## Next steps
 
-3. **Two layers**: build with `hermit.owl_model` axioms, query with
-   `hermit.model` handles.
-
-4. **Automatic**: You don't write code to find inferences — the reasoner does
-   it.
-
-## Next Steps
-
-- **[Building Your First Ontology](./tutorials/01-build-ontology.md)** — Add more classes and properties
-- **[Restrictions & Cardinality](./tutorials/02-restrictions.md)** — Learn about cardinality and constraints
-- **[Rules & Complex Queries](./tutorials/03-rules-and-queries.md)** — Make ontologies more powerful
+- [Building Your First Ontology](./tutorials/01-build-ontology.md) adds more classes and properties.
+- [Restrictions & Cardinality](./tutorials/02-restrictions.md) covers cardinality and constraints.
+- [Rules & Complex Queries](./tutorials/03-rules-and-queries.md) covers more complex ontology rules.
 
 ---
-
-**Congratulations!** You've written your first PyHermit program and seen reasoning in action.
+[← Concepts](concepts.md) · [Home](index.md) · [FAQ →](faq.md)
