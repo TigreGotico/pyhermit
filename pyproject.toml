@@ -7,7 +7,7 @@ name = "hermit-reasoner"
 dynamic = ["version"]
 description = "A conformant OWL 2 DL tableau reasoner — Python port of HermiT"
 readme = "README.md"
-license = "Apache-2.0"
+license = "LGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [
