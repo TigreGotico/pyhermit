@@ -231,7 +231,7 @@ See [Debugging Guide](./docs/recipes/debugging.md) for more.
 
 ## License
 
-Apache 2.0 — Free for commercial and private use.
+LGPL-3.0-or-later, matching upstream HermiT.
 
 ---
 
