@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1a3](https://github.com/TigreGotico/pyhermit/tree/0.3.1a3) (2026-08-02)
+
+[Full Changelog](https://github.com/TigreGotico/pyhermit/compare/0.3.1a2...0.3.1a3)
+
+**Merged pull requests:**
+
+- chore: relicense to LGPL-3.0, matching upstream HermiT [\#5](https://github.com/TigreGotico/pyhermit/pull/5) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.3.1a2](https://github.com/TigreGotico/pyhermit/tree/0.3.1a2) (2026-07-30)
 
 [Full Changelog](https://github.com/TigreGotico/pyhermit/compare/0.3.1a1...0.3.1a2)
