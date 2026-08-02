@@ -56,7 +56,7 @@ A: PyHermit is a Python port of the HermiT reasoner, originally written in Java.
 
 ### Q: Can I use PyHermit in my application?
 
-A: Yes. PyHermit is Apache 2.0 licensed, so it is commercial-friendly. It is pure Python with no Java dependencies, and it embeds in applications. It is conformance-tested: 340 of 350 W3C OWL WG Approved-DL test cases pass at a 20-second per-case budget, with zero wrong answers.
+A: Yes. PyHermit is LGPL-3.0-or-later licensed, matching upstream HermiT. It is pure Python with no Java dependencies, and it embeds in applications as a library (dynamic linking keeps the LGPL terms permissive for proprietary applications). It is conformance-tested: 340 of 350 W3C OWL WG Approved-DL test cases pass at a 20-second per-case budget, with zero wrong answers.
 
 ### Q: Is PyHermit faster than the Java version?
 
@@ -422,7 +422,7 @@ reasoner.dispose()
 
 ### Q: Can I use PyHermit commercially?
 
-A: Yes. The Apache 2.0 license allows commercial use without restriction.
+A: Yes. The LGPL-3.0-or-later license allows commercial use; if you modify PyHermit itself, those modifications must be shared under the same license, but linking it into your own application does not.
 
 ### Q: Where do I report bugs?
 
